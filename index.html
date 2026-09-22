@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Red Bear — Studio Edition v2.0</title>
+  <meta name="description" content="Red Bear Studio Edition — Step-by-Step Video Dubbing (မြန်မာ)" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='26' r='16' fill='%23D92D2D'/%3E%3Ccircle cx='12' cy='12' r='7' fill='%23D92D2D'/%3E%3Ccircle cx='36' cy='12' r='7' fill='%23D92D2D'/%3E%3Cellipse cx='24' cy='31' rx='8' ry='6' fill='%23fff'/%3E%3Cellipse cx='24' cy='28.5' rx='3' ry='2.2' fill='%233A2218'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- ======================= SIDEBAR ======================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 48 48" width="30" height="30">
+            <circle cx="12" cy="12" r="7" fill="#fff"/>
+            <circle cx="36" cy="12" r="7" fill="#fff"/>
+            <circle cx="24" cy="26" r="16" fill="#fff"/>
+            <ellipse cx="24" cy="31.5" rx="8" ry="6" fill="#FDECEC"/>
+            <ellipse cx="24" cy="29" rx="3.1" ry="2.3" fill="#3A2218"/>
+            <circle cx="17.6" cy="23" r="2.1" fill="#3A2218"/>
+            <circle cx="30.4" cy="23" r="2.1" fill="#3A2218"/>
+            <path d="M21 34.5c1.8 1.4 4.2 1.4 6 0" stroke="#3A2218" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1 class="brand-name">Red Bear</h1>
+          <p class="brand-sub">v2.0 • Studio Edition</p>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="Main navigation">
+        <button class="nav-item active" data-page="manual" type="button">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2.5" y="5" width="13" height="14" rx="2.5"/>
+              <path d="M15.5 10.5 21 7.5v9l-5.5-3"/>
+              <path d="M6 15.5l2.2-2.8 1.9 2 2.3-3"/>
+            </svg>
+          </span>
+          <span class="nav-labels">
+            <span class="nav-title">Manual Editor</span>
+            <span class="nav-desc">Step-by-Step Video Dubbing</span>
+          </span>
+        </button>
+
+        <button class="nav-item" data-page="recap" type="button">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2.5 5 13.5h5l-1 8 8-11h-5l1-8z"/>
+            </svg>
+          </span>
+          <span class="nav-labels">
+            <span class="nav-title">Auto Recap</span>
+            <span class="nav-desc">1-Click Premium Auto Mode</span>
+          </span>
+          <span class="nav-badge">PRO</span>
+        </button>
+
+        <button class="nav-item" data-page="history" type="button">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="8.5"/>
+              <path d="M12 7.5V12l3 2"/>
+            </svg>
+          </span>
+          <span class="nav-labels">
+            <span class="nav-title">Job History</span>
+            <span class="nav-desc">Saved Videos &amp; Audio</span>
+          </span>
+        </button>
+
+        <button class="nav-item" data-page="keys" type="button">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="8.5" cy="14.5" r="4.5"/>
+              <path d="M12 11.5 20.5 3.5M17 6.5l2.5 2.5M14.5 9l2 2"/>
+            </svg>
+          </span>
+          <span class="nav-labels">
+            <span class="nav-title">API Keys</span>
+            <span class="nav-desc">Gemini &amp; AssemblyAI Key ပြင်ဆင်ရန်</span>
+          </span>
+        </button>
+      </nav>
+
+      <div class="quota-card">
+        <div class="quota-head">
+          <span class="quota-dot" aria-hidden="true"></span>
+          <span class="quota-title">Remaining Quota</span>
+          <span class="plan-tag" id="planTag">Free</span>
+        </div>
+        <p class="quota-text" id="quotaText">ယနေ့အတွက် အခမဲ့ 1 / 1 ကျန်ရှိပါသည်</p>
+        <div class="quota-bar" aria-hidden="true"><span class="quota-fill" id="quotaFill" style="width:100%"></span></div>
+        <button class="btn-upgrade" id="btnUpgrade" type="button">✨ Upgrade to Pro</button>
+      </div>
+
+      <!-- ======== Auth & Profile Area ======== -->
+      <div class="auth-area" id="authArea">
+        <!-- Unauthenticated -->
+        <div id="signinCard">
+          <p class="auth-hint">အလုပ်များကို သိမ်းဆည်းရန် အကောင့် ဝင်ပါ</p>
+          <button class="btn-signin" id="btnSignIn" type="button">Sign In / Sign Up</button>
+        </div>
+
+        <!-- Authenticated -->
+        <div class="profile-card" id="profileCard" hidden>
+          <div class="avatar" id="userAvatar">LP</div>
+          <div class="profile-meta">
+            <p class="profile-name" id="profileName">Legal Pu</p>
+            <p class="profile-email" id="profileEmail">legal.pu@example.com</p>
+          </div>
+          <button class="gear-btn" id="btnSettings" type="button" title="ဆက်တင် (Settings)" aria-label="Settings">⚙️</button>
+        </div>
+
+        <!-- Settings dropdown -->
+        <div class="settings-menu" id="settingsMenu" hidden>
+          <button class="sm-item" id="smAccount" type="button"><span class="sm-ico">👤</span> အကောင့် ဆက်တင်များ (Account Settings)</button>
+          <button class="sm-item" id="smApi" type="button"><span class="sm-ico">🔑</span> API Key များ စီမံရန် (API Keys Management)</button>
+          <button class="sm-item" id="smPlan" type="button"><span class="sm-ico">💎</span> ငွေပေးချေမှု အစီအစဉ် (Subscription Plan)</button>
+          <div class="sm-sep"></div>
+          <button class="sm-item danger" id="smLogout" type="button"><span class="sm-ico">🚪</span> အကောင့် ထွက်မည် (Log Out)</button>
+        </div>
+      </div>
+    </aside>
+    <div class="nav-backdrop" id="navBackdrop" hidden></div>
+
+    <!-- ======================= MAIN ======================= -->
+    <div class="main">
+      <header class="topbar">
+        <button class="hamburger" id="btnHamburger" type="button" aria-label="Menu">☰</button>
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <span class="crumb-root">STUDIO</span>
+          <span class="crumb-sep"> / </span>
+          <span class="crumb-current" id="crumbCurrent">Manual Video Editor</span>
+        </nav>
+        <button class="btn-help" id="btnHelp" type="button">📖 အသုံးပြုနည်း လမ်းညွှန်</button>
+      </header>
+
+      <main class="content">
+
+        <!-- ============ PAGE: MANUAL EDITOR ============ -->
+        <section class="page active" id="page-manual">
+
+          <!-- 4-Steps Pipeline Bar -->
+          <div class="steps-bar" id="stepsBar">
+            <div class="step-item current" data-step="1">
+              <div class="step-rail"><span class="step-circle">1</span></div>
+              <div class="step-label">Step 1: Upload<br class="lb-br" /><span class="lb-my">(ဗီဒီယို တင်ပါ)</span></div>
+            </div>
+            <div class="step-line"><span class="step-line-fill"></span></div>
+            <div class="step-item" data-step="2">
+              <div class="step-rail"><span class="step-circle">2</span></div>
+              <div class="step-label">Step 2: Source Text<br class="lb-br" /><span class="lb-my">(မူရင်းစာသား စစ်ဆေးရန်)</span></div>
+            </div>
+            <div class="step-line"><span class="step-line-fill"></span></div>
+            <div class="step-item" data-step="3">
+              <div class="step-rail"><span class="step-circle">3</span></div>
+              <div class="step-label">Step 3: Burmese<br class="lb-br" /><span class="lb-my">(မြန်မာဘာသာပြန်နှင့် အသံရွေးချယ်ပါ)</span></div>
+            </div>
+            <div class="step-line"><span class="step-line-fill"></span></div>
+            <div class="step-item" data-step="4">
+              <div class="step-rail"><span class="step-circle">4</span></div>
+              <div class="step-label">Step 4: Result<br class="lb-br" /><span class="lb-my">(ရလဒ်များ)</span></div>
+            </div>
+          </div>
+
+          <!-- Red alert (blocked navigation) -->
+          <div class="alert-danger" id="alertDanger" role="alert" hidden>
+            <span class="alert-icon">⚠️</span>
+            <span class="alert-text">⚠️ ကျေးဇူးပြု၍ Generate Voice Over ကို အရင်နှိပ်ပါ။</span>
+            <button class="alert-close" id="alertClose" type="button" aria-label="Close">×</button>
+          </div>
+
+          <!-- ---------- STEP 1 : UPLOAD ---------- -->
+          <section class="step-panel active" id="stepPanel1">
+            <div class="card">
+              <div class="card-head">
+                <h2 class="card-title">Step 1: Upload — ဗီဒီယို တင်ပါ</h2>
+                <span class="chip chip-soft">1 / 4</span>
+              </div>
+
+              <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="ဗီဒီယိုဖိုင် တင်ရန်">
+                <input type="file" id="fileInput" accept=".mp4,.mov,.webm,.mkv,video/mp4,video/quicktime,video/webm,video/x-matroska" hidden />
+                <div class="dz-icon" aria-hidden="true">
+                  <svg viewBox="0 0 64 64" width="58" height="58" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 42a12 12 0 0 1 .6-23.9 16 16 0 0 1 30.6 4.2A10 10 0 0 1 49 42H20z"/>
+                    <path d="M32 26v14M27 31l5-5 5 5"/>
+                  </svg>
+                </div>
+                <p class="dz-title">ဗီဒီယိုဖိုင်ကို ဒီနေရာတွင် တင်ပါ သို့မဟုတ် နှိပ်၍ ရွေးချယ်ပါ</p>
+                <p class="dz-info">MP4, MOV, WEBM, MKV ဖိုင်များကို လက်ခံပါသည် (အများဆုံး ၁၀ မိနစ်)</p>
+              </div>
+
+              <div class="file-chip" id="fileChip" hidden>
+                <span class="fc-icon" aria-hidden="true">🎬</span>
+                <div class="fc-meta">
+                  <p class="fc-name" id="fileName">—</p>
+                  <p class="fc-sub" id="fileMeta">—</p>
+                </div>
+                <button class="fc-remove" id="fileRemove" type="button" aria-label="ဖိုင် ဖယ်ရှားရန်">×</button>
+              </div>
+
+              <div class="panel-foot">
+                <span class="foot-hint" id="step1Hint">ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးမှ ရှေ့သို့ ဆက်နိုင်ပါမည်</span>
+                <button class="btn btn-primary" id="btnToStep2" type="button" disabled>ရှေ့သို့ ဆက်သွားမည် (Next)</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- STEP 2 : SOURCE TEXT ---------- -->
+          <section class="step-panel" id="stepPanel2">
+            <div class="card">
+              <div class="card-head">
+                <h2 class="card-title">ရယူထားသော မူရင်း အင်္ဂလိပ် စာသားများ</h2>
+                <span class="chip chip-soft">2 / 4</span>
+              </div>
+
+              <div class="transcript-meta">
+                <span class="tm-item">🎙 AssemblyAI Extraction</span>
+                <span class="tm-item" id="transcriptWords">— words</span>
+                <span class="tm-item" id="transcriptDur">—</span>
+              </div>
+
+              <div class="transcript-box" id="transcriptBox" aria-live="polite"></div>
+
+              <div class="action-row">
+                <button class="btn btn-ghost" id="btnCopyGemini" type="button">📋 Gemini App သို့ ကူးယူရန် (Free Workflow)</button>
+                <button class="btn btn-primary" id="btnAutoTranslate" type="button">🌏 မြန်မာသို့ အလိုအလျောက် ဘာသာပြန်မည် (Auto Translate)</button>
+              </div>
+
+              <div class="panel-foot">
+                <button class="btn btn-quiet" data-back="1" type="button">← နောက်သို့ (Back)</button>
+                <button class="btn btn-primary" data-next="3" type="button">ရှေ့သို့ ဆက်သွားမည် (Next) →</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- STEP 3 : BURMESE + VOICE ---------- -->
+          <section class="step-panel" id="stepPanel3">
+            <div class="card">
+              <div class="card-head">
+                <h2 class="card-title">မြန်မာဘာသာပြန် စာမူ</h2>
+                <span class="chip chip-soft">3 / 4</span>
+              </div>
+              <label class="field-label" for="burmeseText">မြန်မာဘာသာပြန် စာမူ (ပြင်ဆင်နိုင်ပါသည်)</label>
+              <textarea class="textarea" id="burmeseText" rows="7" placeholder="Auto Translate ကို နှိပ်ပါ သို့မဟုတ် မြန်မာဘာသာ ပြန်ဆိုထားသော စာသားကို ဤနေရာတွင် ရေးပါ..."></textarea>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h2 class="card-title">အသံအမျိုးအစား ရွေးချယ်ပါ (Voice Personas)</h2>
+                <span class="chip chip-red" id="voiceChip" hidden>ရွေးပြီး</span>
+              </div>
+
+              <div class="voice-grid" id="voiceGrid">
+                <!-- Voice cards injected by app.js -->
+              </div>
+
+              <div class="pitch-box">
+                <div class="pitch-head">
+                  <label class="field-label" for="pitchSlider">အသံ အနိမ့်အမြင့် ချိန်ညှိရန် (Pitch Offset: -30Hz မှ +30Hz)</label>
+                  <span class="pitch-value" id="pitchValue">0 Hz</span>
+                </div>
+                <input type="range" class="pitch-slider" id="pitchSlider" min="-30" max="30" step="1" value="0" />
+                <div class="pitch-scale" aria-hidden="true">
+                  <span>-30Hz</span><span>0</span><span>+30Hz</span>
+                </div>
+              </div>
+
+              <button class="btn btn-generate" id="btnGenerate" type="button">🔊 အသံဖန်တီးပေးမည် (Generate Voice Over)</button>
+            </div>
+
+            <div class="panel-foot panel-foot-card">
+              <button class="btn btn-quiet" data-back="2" type="button">← နောက်သို့ (Back)</button>
+              <button class="btn btn-primary" data-next="4" type="button">ရလဒ်ကြည့်မည် (Next) →</button>
+            </div>
+          </section>
+
+          <!-- ---------- STEP 4 : RESULT ---------- -->
+          <section class="step-panel" id="stepPanel4">
+            <div class="card">
+              <div class="card-head">
+                <h2 class="card-title">ဖန်တီးပြီးစီးသော ဗီဒီယိုနှင့် အသံ</h2>
+                <span class="chip chip-green">✓ ပြီးစီးပါပြီ</span>
+              </div>
+
+              <div class="result-grid">
+                <div class="video-preview" id="videoPreview">
+                  <div class="vp-screen">
+                    <button class="vp-play" id="vpPlay" type="button" aria-label="Play preview">
+                      <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor"><path d="M8 5.5v13l11-6.5-11-6.5z"/></svg>
+                    </button>
+                    <span class="vp-tag">Dubbed Preview</span>
+                  </div>
+                  <div class="vp-progress"><span id="vpProgressFill"></span></div>
+                </div>
+
+                <div class="result-side">
+                  <h3 class="rs-title">အကျဉ်းချုပ် (Summary)</h3>
+                  <ul class="rs-list">
+                    <li><span>ဖိုင်အမည်</span><b id="resFileName">—</b></li>
+                    <li><span>Voice Persona</span><b id="resVoice">—</b></li>
+                    <li><span>Pitch Offset</span><b id="resPitch">0 Hz</b></li>
+                    <li><span>အသံ ကြာချိန်</span><b>~ 00:28</b></li>
+                  </ul>
+
+                  <div class="audio-mock">
+                    <button class="am-play" id="amPlay" type="button" aria-label="Play voice over">▶</button>
+                    <div class="am-wave" id="amWave" aria-hidden="true">
+                      <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                    <span class="am-time">00:28</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="render-bar" id="renderBar" hidden>
+                <div class="rb-head"><span>ပြန်လည် ဖန်တီးနေပါသည်...</span><b id="rbPct">0%</b></div>
+                <div class="rb-track"><span id="rbFill"></span></div>
+              </div>
+
+              <div class="action-row">
+                <button class="btn btn-ghost" id="btnRerender" type="button">🔄 ပြန်လည် ဖန်တီးမည် (Re-render)</button>
+                <button class="btn btn-primary" id="btnDownloadSrt" type="button">📥 စာတန်းထိုး ဒေါင်းလုဒ်ဆွဲရန် (.srt)</button>
+              </div>
+
+              <div class="panel-foot">
+                <button class="btn btn-quiet" data-back="3" type="button">← နောက်သို့ (Back)</button>
+                <button class="btn btn-ghost" id="btnNewJob" type="button">🆕 အလုပ်အသစ် စတင်ရန်</button>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <!-- ============ PAGE: AUTO RECAP ============ -->
+        <section class="page" id="page-recap">
+          <div class="card">
+            <div class="card-head">
+              <h2 class="card-title">Auto Recap — 1-Click Premium Auto Mode</h2>
+              <span class="chip chip-gold">★ PRO</span>
+            </div>
+            <p class="page-intro">ဗီဒီယိုတစ်ခုလုံးကို တစ်ချက်နှိပ်ရုံဖြင့် အကျဉ်းချုပ်ကာ မြန်မာဘာသာဖြင့် Dubbing အသင့် ဖြစ်အောင် ဖန်တီးပေးပါမည်။ လုပ်ငန်းစဉ် အားလုံးကို အလိုအလျောက် ဆောင်ရွက်ပေးပါမည်။</p>
+            <ul class="feature-list">
+              <li>⚡ AI Recap Script ကို အလိုအလျောက် ရေးသားပေးခြင်း</li>
+              <li>🌏 မြန်မာဘာသာသို့ အလိုအလျောက် ပြန်ဆိုပေးခြင်း</li>
+              <li>🎙 Premium Voice Persona ဖြင့် အသံ ဖန်တီးပေးခြင်း</li>
+              <li>🎬 စာတန်းထိုး ပါဝင်သော နောက်ဆုံး ရလဒ် ဗီဒီယိုကို အသင့် ထုတ်ပေးခြင်း</li>
+            </ul>
+            <button class="btn btn-generate" id="btnAutoRecap" type="button">⚡ 1-Click Auto Recap ဖန်တီးမည်</button>
+          </div>
+        </section>
+
+        <!-- ============ PAGE: JOB HISTORY ============ -->
+        <section class="page" id="page-history">
+          <div class="card">
+            <div class="card-head">
+              <h2 class="card-title">Job History — Saved Videos &amp; Audio</h2>
+              <span class="chip chip-soft" id="jobCount">3 jobs</span>
+            </div>
+            <div class="table-wrap">
+              <table class="jobs-table">
+                <thead>
+                  <tr>
+                    <th>အမည်</th>
+                    <th>အမျိုးအစား</th>
+                    <th>နေ့စွဲ</th>
+                    <th>အခြေအနေ</th>
+                    <th>လုပ်ဆောင်ချက်</th>
+                  </tr>
+                </thead>
+                <tbody id="jobsBody">
+                  <tr>
+                    <td class="jd-name">🎬 bagan_travel_recap.mp4</td>
+                    <td>Video + Voice</td>
+                    <td>2026-09-21</td>
+                    <td><span class="status ok">ပြီးစီး</span></td>
+                    <td><button class="mini-btn" type="button">ဒေါင်းလုဒ်</button></td>
+                  </tr>
+                  <tr>
+                    <td class="jd-name">🎙 market_story_voice.mp3</td>
+                    <td>Audio Only</td>
+                    <td>2026-09-19</td>
+                    <td><span class="status ok">ပြီးစီး</span></td>
+                    <td><button class="mini-btn" type="button">ဒေါင်းလုဒ်</button></td>
+                  </tr>
+                  <tr>
+                    <td class="jd-name">🎬 tea_shop_interview.mp4</td>
+                    <td>Video + Voice</td>
+                    <td>2026-09-17</td>
+                    <td><span class="status wait">စောင့်ဆိုင်း</span></td>
+                    <td><button class="mini-btn" type="button">ဒေါင်းလုဒ်</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ PAGE: API KEYS ============ -->
+        <section class="page" id="page-keys">
+          <!-- Top info banner -->
+          <div class="keys-banner">
+            <div class="keys-banner-main">
+              <p class="keys-banner-title">AssemblyAI API Key (Required for Free Users)</p>
+              <div class="keys-banner-badges">
+                <span class="badge-req">Free User Requirement</span>
+                <span class="badge-store">Local Browser Storage</span>
+              </div>
+            </div>
+            <button class="btn-save-top" id="btnSaveTop" type="button">💾 Save Changes</button>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2 class="card-title">API Keys — Gemini &amp; AssemblyAI Key ပြင်ဆင်ရန်</h2>
+              <span class="chip chip-soft">Local Storage</span>
+            </div>
+            <p class="page-intro">Gemini (ဘာသာပြန်ရန်) နှင့် AssemblyAI (စာသား ထုတ်ယူရန်) API Key များကို ထည့်သွင်း ပြင်ဆင်ပါ။ Key များကို သင့် Browser အတွင်းတွင်သာ သိမ်းဆည်းပါသည်။</p>
+
+            <!-- AssemblyAI API Key card -->
+            <div class="key-card">
+              <div class="key-head">
+                <div class="key-head-main">
+                  <b class="key-title">AssemblyAI API Key (အသံဖိုင် စာသားပြောင်းရန်)</b>
+                  <div class="key-badges">
+                    <span class="badge-req">Required for Free Users</span>
+                    <span class="badge-state on" id="assemblyStatus">Active</span>
+                  </div>
+                </div>
+                <a class="get-key-link" href="https://www.assemblyai.com/dashboard" target="_blank" rel="noopener noreferrer">Get Free Key ↗</a>
+              </div>
+              <div class="key-row">
+                <input type="password" class="input" id="assemblyKey" placeholder="xxxxxxxxxxxxxxxx" autocomplete="off" />
+                <button class="btn btn-quiet btn-sm" type="button" data-toggle="assemblyKey">ပြရန်</button>
+              </div>
+              <p class="key-help">assemblyai.com တွင် API key ကို အခမဲ့ ရယူနိုင်ပါသည်။</p>
+            </div>
+
+            <!-- Gemini API Key card -->
+            <div class="key-card">
+              <div class="key-head">
+                <div class="key-head-main">
+                  <b class="key-title">Gemini API Key (မြန်မာဘာသာပြန်ဆိုရန်)</b>
+                  <div class="key-badges">
+                    <span class="badge-req">Required for Free Users</span>
+                    <span class="badge-state on" id="geminiStatus">Active</span>
+                  </div>
+                </div>
+                <a class="get-key-link" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get Free Key ↗</a>
+              </div>
+              <div class="key-row">
+                <input type="password" class="input" id="geminiKey" placeholder="AIza..." autocomplete="off" />
+                <button class="btn btn-quiet btn-sm" type="button" data-toggle="geminiKey">ပြရန်</button>
+              </div>
+              <p class="key-help">aistudio.google.com တွင် API key ကို အခမဲ့ ရယူနိုင်ပါသည်။</p>
+            </div>
+
+            <div class="action-row">
+              <button class="btn btn-primary" id="btnSaveKeys" type="button">💾 သိမ်းဆည်းမည် (Save)</button>
+            </div>
+            <div class="key-msg" id="keyMsg" role="alert" hidden></div>
+          </div>
+
+          <!-- Device Video Engine card -->
+          <div class="card engine-card">
+            <div class="key-head">
+              <div class="key-head-main">
+                <b class="key-title">Device Video Engine (FFmpeg WASM 31MB)</b>
+                <div class="key-badges">
+                  <span class="badge-state" id="engineBadge">Not Cached</span>
+                </div>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btnDownloadEngine" type="button">Download Engine Now</button>
+            </div>
+          </div>
+        </section>
+
+            </main>
+    </div>
+  </div>
+
+  <!-- ======================= HELP MODAL ======================= -->
+  <div class="modal-overlay" id="helpModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modal-head">
+        <h2 id="helpTitle">📖 အသုံးပြုနည်း လမ်းညွှန်</h2>
+        <button class="modal-close" id="helpClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="help-intro">Red Bear Studio Edition ဖြင့် ဗီဒီယို Dubbing လုပ်ရန် အောက်ပါ အဆင့်များအတိုင်း လိုက်နာ ဆောင်ရွက်ပါ။</p>
+        <ol class="help-steps">
+          <li>
+            <b>ဗီဒီယို တင်ခြင်း (Upload)</b>
+            <span>Step 1 ရှိ Dropzone ထဲသို့ MP4 / MOV / WEBM / MKV ဖိုင်ကို ဆွဲထည့်ပါ သို့မဟုတ် နှိပ်၍ ရွေးချယ်ပါ။ အများဆုံး ၁၀ မိနစ် ကြာချိန်အထိ ရှိသော ဗီဒီယိုများကို လက်ခံပါသည်။</span>
+          </li>
+          <li>
+            <b>စာတန်း/စာသား ထုတ်ယူခြင်း (Extract Subtitles)</b>
+            <span>“ရှေ့သို့ ဆက်သွားမည် (Next)” ကို နှိပ်လျှင် AssemblyAI မှတစ်ဆင့် မူရင်း အင်္ဂလိပ် စာသားများကို Step 2 တွင် အလိုအလျောက် ထုတ်ယူပေးပါမည်။</span>
+          </li>
+          <li>
+            <b>မြန်မာဘာသာ ပြန်ခြင်း (Translate to Burmese)</b>
+            <span>“Gemini App သို့ ကူးယူရန် (Free Workflow)” ဖြင့် ကူးယူ၍ Gemini တွင် ကိုယ်တိုင် ပြန်ဆိုနိုင်သည်၊ သို့မဟုတ် “မြန်မာသို့ အလိုအလျောက် ဘာသာပြန်မည် (Auto Translate)” ကို နှိပ်ပြီး အလိုအလျောက် ပြန်ဆိုနိုင်ပါသည်။ ပြန်ဆိုထားသော စာသားကို Step 3 တွင် ပြင်ဆင်နိုင်ပါသည်။</span>
+          </li>
+          <li>
+            <b>အသံ ရွေးချယ်ခြင်း (Choose Voice)</b>
+            <span>Step 3 ရှိ Voice Persona ကတ် ၁၀ ခု အနက် နှစ်သက်ရာ အသံကို ရွေးချယ်ပါ။ “▶ အသံနမူနာ နားထောင်ရန် (Preview)” ခလုတ်ဖြင့် အသံကို ကြိုတင် နားထောင်ကြည့်နိုင်ပါသည်။</span>
+          </li>
+          <li>
+            <b>အသံ အနိမ့်အမြင့် ချိန်ညှိခြင်း (Adjust Pitch)</b>
+            <span>Pitch Slider ကို ဆွဲ၍ အသံ အနိမ့်အမြင့်ကို -30Hz မှ +30Hz အထိ ချိန်ညှိနိုင်ပါသည် (0Hz သည် မူလအသံ အတိုင်း ဖြစ်သည်)။</span>
+          </li>
+          <li>
+            <b>အသံ ဖန်တီးခြင်း (Generate Voice Over)</b>
+            <span>“🔊 အသံဖန်တီးပေးမည် (Generate Voice Over)” ကို နှိပ်ပါ။ မနှိပ်ရသေးပါက Step 4 သို့ သွား၍ မရပါ — အနီရောင် သတိပေးချက် ပေးပါမည်။</span>
+          </li>
+          <li>
+            <b>နောက်ဆုံး ရလဒ် ရယူခြင်း (Finalize)</b>
+            <span>Step 4 တွင် ဖန်တီးပြီးစီးသော ဗီဒီယိုနှင့် အသံကို ကြည့်ရှုနိုင်ပြီး “🔄 ပြန်လည် ဖန်တီးမည် (Re-render)” ဖြင့် ပြန်လည် ဖန်တီးနိုင်သည်၊ “📥 စာတန်းထိုး ဒေါင်းလုဒ်ဆွဲရန် (.srt)” ဖြင့် စာတန်းထိုးဖိုင်ကို ဒေါင်းလုဒ် ဆွဲနိုင်ပါသည်။</span>
+          </li>
+        <li>
+            <b>API Key များ ပြင်ဆင်ခြင်း (API Keys Setup)</b>
+            <span>စာသား ထုတ်ယူရန် (AssemblyAI) နှင့် ဘာသာပြန်ရန် (Gemini) API Key များကို အောက်ပါ လင့်များမှ အခမဲ့ ရယူနိုင်ပါသည် —
+              <div class="link-card" data-url="https://aistudio.google.com/app/apikey">
+                <a class="help-link" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">👉 Gemini API Key ရယူရန် ဤနေရာကို နှိပ်ပါ</a>
+              </div>
+              <div class="link-card" data-url="https://www.assemblyai.com/dashboard">
+                <a class="help-link" href="https://www.assemblyai.com/dashboard" target="_blank" rel="noopener noreferrer">👉 AssemblyAI API Key ရယူရန် ဤနေရာကို နှိပ်ပါ</a>
+              </div>
+            </span>
+          </li>
+        </ol>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-primary" id="helpOk" type="button">နားလည်ပါပြီ (Got it)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= AUTH MODAL (Sign In / Sign Up) ======================= -->
+  <div class="modal-overlay" id="authModal" hidden>
+    <div class="modal modal-sm auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <div class="auth-head">
+        <div class="auth-logo">
+          <span class="auth-logo-mark" aria-hidden="true">🐻</span>
+          <span class="auth-logo-text" id="authTitle">Red Bear Studio</span>
+        </div>
+        <button class="modal-close" id="authClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="auth-tabs" role="tablist">
+          <button class="auth-tab active" data-atab="signin" type="button">Sign In (အကောင့်ဝင်ရန်)</button>
+          <button class="auth-tab" data-atab="signup" type="button">Sign Up (အကောင့်သစ်ဖွင့်ရန်)</button>
+        </div>
+
+        <!-- Sign In -->
+        <form class="auth-pane" id="pane-signin" autocomplete="off">
+          <div class="form-group">
+            <label class="field-label" for="siEmail">Email Address</label>
+            <input class="input" type="email" id="siEmail" placeholder="example@gmail.com" required />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="siPassword">Password</label>
+            <input class="input" type="password" id="siPassword" placeholder="••••••••" required />
+            <div class="pw-row">
+              <button class="auth-forgot" id="btnForgot" type="button">Forgot Password?(စကားဝှက်မေ့နေပါသလား)</button>
+            </div>
+          </div>
+          <button class="btn-auth" type="submit">Sign In (အကောင့်ဝင်မည်)</button>
+          <div class="auth-divider"><span>OR</span></div>
+          <button class="btn btn-google btn-block" id="btnGoogle" type="button">
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4c-7.7 0-14.4 4.4-17.7 10.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C41 35.4 44 30.2 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+            Continue with Google
+          </button>
+        </form>
+
+        <!-- Sign Up -->
+        <form class="auth-pane" id="pane-signup" autocomplete="off" hidden>
+          <div class="form-group">
+            <label class="field-label" for="suName">Full Name</label>
+            <input class="input" type="text" id="suName" placeholder="Your Name" required />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="suEmail">Email Address</label>
+            <input class="input" type="email" id="suEmail" placeholder="example@gmail.com" required />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="suPassword">Password</label>
+            <input class="input" type="password" id="suPassword" placeholder="At least 6 characters" minlength="6" required />
+          </div>
+          <button class="btn-auth" type="submit">Create Account (အကောင့်သစ်ဖန်တီးမည်)</button>
+          <p class="auth-terms">By signing up, you agree to our <b>Terms</b> &amp; <b>Privacy Policy</b>.</p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= ACCOUNT SETTINGS MODAL ======================= -->
+  <div class="modal-overlay" id="accountModal" hidden>
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+      <div class="modal-head">
+        <h2 id="accountTitle">👤 အကောင့် ဆက်တင်များ (Account Settings)</h2>
+        <button class="modal-close" id="accountClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-sub">ပရိုဖိုင်နှင့် စကားဝှက်ကို ဤနေရာတွင် ပြင်ဆင်နိုင်ပါသည်။</p>
+        <form id="accountForm" autocomplete="off">
+          <div class="form-group">
+            <label class="field-label" for="acName">Name (အမည်)</label>
+            <input class="input" type="text" id="acName" required />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="acEmail">Email (အီးမေးလ်)</label>
+            <input class="input" type="email" id="acEmail" required />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="acPassword">New Password (စကားဝှက် အသစ်)</label>
+            <input class="input" type="password" id="acPassword" placeholder="ကျန်ခဲ့ပါက မပြောင်းပါ" minlength="6" />
+          </div>
+          <div class="action-row" style="margin-top:4px">
+            <button class="btn btn-primary" type="submit">သိမ်းဆည်းမည် (Save)</button>
+            <button class="btn btn-quiet" id="accountCancel" type="button">မလုပ်တော့ပါ (Cancel)</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= PRICING GRID MODAL ======================= -->
+  <div class="modal-overlay" id="planModal" hidden>
+    <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="pricingTitle">
+      <div class="modal-body">
+        <div class="pricing-head">
+          <div>
+            <h2 class="pricing-title" id="pricingTitle">Pricing Plans &amp; Packages</h2>
+            <p class="pricing-sub">Choose the best plan for your video recap needs</p>
+            <span class="user-badge" id="priceUserBadge">—</span>
+          </div>
+          <div class="pricing-head-right">
+            <div class="currency-toggle" role="group" aria-label="Currency">
+              <button class="ct-btn active" data-cur="mmk" type="button">MMK (ကျပ်)</button>
+              <button class="ct-btn" data-cur="thb" type="button">THB (฿)</button>
+            </div>
+            <button class="modal-close" id="planClose" type="button" aria-label="Close">×</button>
+          </div>
+        </div>
+
+        <div class="pricing-grid">
+          <!-- Package 1 -->
+          <div class="pkg-card" data-pkg="p1">
+            <span class="pkg-badge">10 Videos</span>
+            <p class="pkg-sub">စတင်အသုံးပြုသူများအတွက် အထူးသင့်လျော်ပါသည်။</p>
+            <div class="pkg-price">
+              <span class="price" data-mmk="7,000 MMK" data-thb="100 THB">7,000 MMK</span>
+              <span class="price-per" data-mmk="≈ 700 MMK / video" data-thb="≈ 10 THB / video">≈ 700 MMK / video</span>
+            </div>
+            <ul class="pkg-features">
+              <li>10 AI Video Recaps</li>
+              <li>Up to 10 Minutes per Video (၁၀ မိနစ်အထိ)</li>
+              <li>Automatic Burmese Subtitles (အလိုအလျောက် မြန်မာစာတန်းထိုး)</li>
+              <li>Natural AI Voice Dubbing (သဘာဝကျသော AI အသံများ)</li>
+              <li>1080p Full HD Export</li>
+              <li>Standard Processing Speed</li>
+              <li>No Watermark</li>
+            </ul>
+            <button class="btn-choose dark" data-choose="p1" type="button">Choose Package 1</button>
+          </div>
+
+          <!-- Package 2 (POPULAR) -->
+          <div class="pkg-card highlight" data-pkg="p2">
+            <span class="pkg-top-badge">★ အရောင်းရဆုံး (POPULAR)</span>
+            <span class="pkg-badge">30 Videos</span>
+            <p class="pkg-sub">ဗီဒီယို မကြာခဏ ဖန်တီးသူများအတွက် အကောင်းဆုံးရွေးချယ်မှု</p>
+            <div class="pkg-price">
+              <span class="price" data-mmk="15,000 MMK" data-thb="220 THB">15,000 MMK</span>
+              <span class="price-per" data-mmk="≈ 500 MMK / video" data-thb="≈ 7 THB / video">≈ 500 MMK / video</span>
+            </div>
+            <ul class="pkg-features">
+              <li>30 AI Video Recaps</li>
+              <li>Up to 10 Minutes per Video (၁၀ မိနစ်အထိ)</li>
+              <li>Fast AI Transcription &amp; Translation</li>
+              <li>Premium Natural AI Voices (Nilar &amp; Thiha)</li>
+              <li>Optimal +30% Speed Voice Tuning</li>
+              <li>Full HD 1080p Video Burn-in</li>
+              <li>High Priority Rendering Queue</li>
+              <li>Email &amp; Community Support</li>
+            </ul>
+            <button class="btn-choose purple" data-choose="p2" type="button">Choose Package 2</button>
+          </div>
+
+          <!-- Package 3 (BEST VALUE) -->
+          <div class="pkg-card highlight" data-pkg="p3">
+            <span class="pkg-top-badge">★ အကောင်းဆုံး တန်ဖိုး (BEST VALUE)</span>
+            <span class="pkg-badge">50 Videos</span>
+            <p class="pkg-sub">Channel များ၊ စတူဒီယိုများနှင့် စီးပွားဖြစ် ဖန်တီးသူများအတွက်</p>
+            <div class="pkg-price">
+              <span class="price" data-mmk="25,000 MMK" data-thb="360 THB">25,000 MMK</span>
+              <span class="price-per" data-mmk="≈ 500 MMK / video" data-thb="≈ 7 THB / video">≈ 500 MMK / video</span>
+            </div>
+            <ul class="pkg-features">
+              <li>100 Video Recaps (High Quota)</li>
+              <li>Up to 10 Minutes per Video (၁၀ မိနစ်အထိ)</li>
+              <li>Maximum GPU Priority Processing</li>
+              <li>All AI Voices with Audio Preview</li>
+              <li>Custom Subtitle Styles &amp; Presets</li>
+              <li>Instant Auto-Pipeline Access</li>
+              <li>VIP Telegram Admin Support</li>
+              <li>Free Lifetime Updates</li>
+            </ul>
+            <button class="btn-choose purple" data-choose="p3" type="button">Choose Package 3</button>
+          </div>
+        </div>
+
+        <div class="pay-notice">
+          <span>🛡️ Instant manual verification with Myanmar &amp; Thai mobile payment support.</span>
+          <div class="pay-badges">KBZPay • WavePay • PromptPay</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= CONFIRM & PAY MODAL ======================= -->
+  <div class="modal-overlay" id="payModal" hidden>
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+      <div class="pay-head">
+        <button class="pay-back" id="payBack" type="button" aria-label="Back">&lt;</button>
+        <div class="pay-head-main">
+          <h2 class="pay-title" id="payTitle">Confirm &amp; Pay - Package 1</h2>
+          <p class="pay-sub">Scan QR code, transfer, and upload your payment slip</p>
+          <div class="pay-meta">
+            <span class="user-badge" id="payMetaEmail">—</span>
+            <span class="user-badge" id="payMetaQuota">—</span>
+          </div>
+        </div>
+        <button class="modal-close" id="payClose" type="button" aria-label="Close">×</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Selected package summary -->
+        <div class="pay-summary">
+          <div>
+            <p class="ps-label">SELECTED PACKAGE</p>
+            <div class="ps-row">
+              <span class="ps-badge" id="paySumBadge">10 Videos</span>
+              <span class="ps-title" id="paySumTitle">Package 1</span>
+            </div>
+          </div>
+          <div class="total">
+            <p class="ps-label">Total Amount</p>
+            <p class="total-amount" id="payTotal">7,000 MMK</p>
+            <p class="total-alt" id="payTotalAlt">(100 THB)</p>
+          </div>
+        </div>
+
+        <!-- 1. Payment method -->
+        <h3 class="pay-section-title">1. SELECT PAYMENT METHOD (ငွေပေးချေမည့် နည်းလမ်း)</h3>
+        <div class="method-tabs" role="tablist">
+          <button class="method-card active" data-method="kbz" type="button">KBZPay<small>(Myanmar)</small></button>
+          <button class="method-card" data-method="wave" type="button">WavePay<small>(Myanmar)</small></button>
+          <button class="method-card" data-method="prompt" type="button">PromptPay<small>(Thailand)</small></button>
+        </div>
+        <div class="qr-box">
+          <div class="qr-code" id="payQr" aria-label="QR Code"></div>
+          <div class="qr-side">
+            <span class="qr-phone" id="payQrPhone">09xxxxxxxx</span>
+            <p class="qr-instr" id="payQrInstr">KBZPay Application ဖြင့် အထက်ပါ QR code သို့မဟုတ် ဖုန်းနံပါတ်သို့ ငွေလွှဲပေးပါ။</p>
+          </div>
+        </div>
+
+        <!-- 2. Upload slip -->
+        <h3 class="pay-section-title">2. UPLOAD SLIP (ငွေလွှဲပြေစာ ပေးပို့မည်)</h3>
+        <div class="account-cards">
+          <div class="account-card">
+            <p class="ps-label">ACCOUNT NAME</p>
+            <p class="ac-value" id="payAcName">—</p>
+          </div>
+          <div class="account-card">
+            <p class="ps-label">ACCOUNT EMAIL</p>
+            <p class="ac-value" id="payAcEmail">—</p>
+          </div>
+        </div>
+
+        <label class="field-label" for="paySlipInput">Payment Slip Screenshot (ငွေလွှဲပြေစာ) *</label>
+        <div class="slip-zone" id="paySlipZone" tabindex="0" role="button" aria-label="Payment slip တင်ရန်">
+          <input type="file" id="paySlipInput" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden />
+          <div class="dz-icon" aria-hidden="true">
+            <svg viewBox="0 0 64 64" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 42a12 12 0 0 1 .6-23.9 16 16 0 0 1 30.6 4.2A10 10 0 0 1 49 42H20z"/>
+              <path d="M32 26v14M27 31l5-5 5 5"/>
+            </svg>
+          </div>
+          <p class="slip-main">Drop payment slip here, or <span class="browse">browse</span></p>
+          <p class="slip-note">Supports JPG, PNG, WEBP up to 10MB</p>
+        </div>
+        <div class="slip-preview" id="paySlipPreview" hidden>
+          <img class="slip-thumb" id="paySlipThumb" alt="Payment slip preview" />
+          <div class="slip-meta">
+            <p class="slip-name" id="paySlipName">—</p>
+            <p class="slip-sub">✓ ငွေလွှဲပြေစာ တင်ပြီးပါပြီ</p>
+          </div>
+          <button class="fc-remove" id="paySlipRemove" type="button" aria-label="ဖယ်ရှားရန်">×</button>
+        </div>
+
+        <button class="btn-pay-submit is-disabled" id="paySubmit" type="button">Submit Payment Slip (ငွေလွှဲပြေစာ ပေးပို့မည်)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
