@@ -207,32 +207,44 @@
                 <button class="fc-remove" id="fileRemove" type="button" aria-label="ဖိုင် ဖယ်ရှားရန်">×</button>
               </div>
 
+              <div class="video-meta-card" id="videoMetaCard" hidden>
+                <video class="step1-player" id="step1Player" controls playsinline></video>
+                <ul class="rs-list">
+                  <li><span>Video Name</span><b id="vidName">—</b></li>
+                  <li><span>Duration</span><b id="vidDuration">—</b></li>
+                  <li><span>Size</span><b id="vidSize">—</b></li>
+                </ul>
+              </div>
+
+              <div class="extract-bar" id="extractBar" hidden>
+                <div class="rb-head"><span id="extractLabel">Extracting audio &amp; transcribing...</span><b id="extractPct">0%</b></div>
+                <div class="rb-track"><span id="extractFill"></span></div>
+              </div>
+
+              <div class="action-row" id="step1Actions" hidden>
+                <button class="btn btn-generate" id="btnExtractScript" type="button" disabled>🎙 Extract Raw Script</button>
+              </div>
+
               <div class="panel-foot">
                 <span class="foot-hint" id="step1Hint">ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးမှ ရှေ့သို့ ဆက်နိုင်ပါမည်</span>
-                <button class="btn btn-primary" id="btnToStep2" type="button" disabled>ရှေ့သို့ ဆက်သွားမည် (Next)</button>
+                <button class="btn btn-primary" id="btnToStep2" type="button" disabled>Next to Step 2</button>
               </div>
             </div>
           </section>
 
-          <!-- ---------- STEP 2 : SOURCE TEXT ---------- -->
+          <!-- ---------- STEP 2 : SOURCE TEXT (single raw-text box) ---------- -->
           <section class="step-panel" id="stepPanel2">
             <div class="card">
               <div class="card-head">
-                <h2 class="card-title">ရယူထားသော မူရင်း အင်္ဂလိပ် စာသားများ</h2>
+                <h2 class="card-title">မူရင်း Raw စာသား (Source Text)</h2>
                 <span class="chip chip-soft">2 / 4</span>
               </div>
 
-              <div class="transcript-meta">
-                <span class="tm-item">🎙 AssemblyAI Extraction</span>
-                <span class="tm-item" id="transcriptWords">— words</span>
-                <span class="tm-item" id="transcriptDur">—</span>
-              </div>
-
-              <div class="transcript-box" id="transcriptBox" aria-live="polite"></div>
+              <label class="field-label" for="step2RawText">Raw Subtitles (တရုတ် / အင်္ဂလိပ် မူရင်း စာသား) — ဤ Textarea တစ်ခုတည်းတွင် ကြည့်ရှုစစ်ဆေးပါ၊ တည်းဖြတ်ပါ သို့မဟုတ် Paste လုပ်ပါ</label>
+              <textarea class="textarea raw-textarea" id="step2RawText" rows="12" spellcheck="false" placeholder="ရယူ/တင်သွင်းထားသော မူရင်း Raw စာသား (တရုတ် သို့မဟုတ် အင်္ဂလိပ် စာတန်းများ) ကို ဤနေရာတွင် ကြည့်ရှုစစ်ဆေးပါ သို့မဟုတ် တိုက်ရိုက် Paste လုပ်ပါ..."></textarea>
 
               <div class="action-row">
-                <button class="btn btn-ghost" id="btnCopyGemini" type="button">📋 Gemini App သို့ ကူးယူရန် (Free Workflow)</button>
-                <button class="btn btn-primary" id="btnAutoTranslate" type="button">🌏 မြန်မာသို့ အလိုအလျောက် ဘာသာပြန်မည် (Auto Translate)</button>
+                <button class="btn btn-ghost" id="btnCopyPrompt" type="button">📋 Copy Full Prompt (System Prompt + Raw Text ကို အပြည့်အစုံ ကူးယူရန်)</button>
               </div>
 
               <div class="panel-foot">
@@ -246,11 +258,12 @@
           <section class="step-panel" id="stepPanel3">
             <div class="card">
               <div class="card-head">
-                <h2 class="card-title">မြန်မာဘာသာပြန် စာမူ</h2>
+                <h2 class="card-title">မြန်မာဘာသာပြန် စာမူ (Auto JSON Cleaner)</h2>
                 <span class="chip chip-soft">3 / 4</span>
               </div>
-              <label class="field-label" for="burmeseText">မြန်မာဘာသာပြန် စာမူ (ပြင်ဆင်နိုင်ပါသည်)</label>
-              <textarea class="textarea" id="burmeseText" rows="7" placeholder="Auto Translate ကို နှိပ်ပါ သို့မဟုတ် မြန်မာဘာသာ ပြန်ဆိုထားသော စာသားကို ဤနေရာတွင် ရေးပါ..."></textarea>
+              <label class="field-label" for="burmeseText">Gemini ၏ JSON တုံ့ပြန်ချက်ကို ဤနေရာတွင် Paste လုပ်ပါ — {"translations": [...]} structure, backticks နှင့် quote များကို အလိုအလျောက် ဖယ်ရှားပြီး သန့်ရှင်းသော မြန်မာလိုင်းများအဖြစ် ပြောင်းလဲပေးပါမည်</label>
+              <textarea class="textarea" id="burmeseText" rows="7" spellcheck="false" placeholder="Gemini မှ ရရှိသော JSON (```json ဖြင့် starting ဖြစ်ဖြစ်) ကို ဒီနေရာတွင် Paste လုပ်ပါ... သို့မဟုတ် မြန်မာဘာသာပြန် စာသားကို တိုက်ရိုက် ရေးပါ..."></textarea>
+              <p class="raw-hint">✓ Paste လုပ်သည်နှင့် အလိုအလျောက် သန့်စင်၍ ရလဒ် မြန်မာလိုင်းများအဖြစ် ပြသပေးပါမည်။</p>
             </div>
 
             <div class="card">
@@ -274,12 +287,11 @@
                 </div>
               </div>
 
-              <button class="btn btn-generate" id="btnGenerate" type="button">🔊 အသံဖန်တီးပေးမည် (Generate Voice Over)</button>
+              <button class="btn btn-generate" id="btnGenerate" type="button" onclick="void(0)">🔊 အသံဖန်တီးပေးမည် (Generate Voice Over)</button>
             </div>
 
             <div class="panel-foot panel-foot-card">
               <button class="btn btn-quiet" data-back="2" type="button">← နောက်သို့ (Back)</button>
-              <button class="btn btn-primary" data-next="4" type="button">ရလဒ်ကြည့်မည် (Next) →</button>
             </div>
           </section>
 
@@ -308,6 +320,7 @@
                     <li><span>ဖိုင်အမည်</span><b id="resFileName">—</b></li>
                     <li><span>Voice Persona</span><b id="resVoice">—</b></li>
                     <li><span>Pitch Offset</span><b id="resPitch">0 Hz</b></li>
+                    <li><span>Script Lines</span><b id="resLines">—</b></li>
                     <li><span>အသံ ကြာချိန်</span><b>~ 00:28</b></li>
                   </ul>
 
@@ -322,7 +335,7 @@
               </div>
 
               <div class="render-bar" id="renderBar" hidden>
-                <div class="rb-head"><span>ပြန်လည် ဖန်တီးနေပါသည်...</span><b id="rbPct">0%</b></div>
+                <div class="rb-head"><span id="rbLabel">ဗီဒီယို ဖန်တီးနေပါသည်...</span><b id="rbPct">0%</b></div>
                 <div class="rb-track"><span id="rbFill"></span></div>
               </div>
 
@@ -347,58 +360,132 @@
               <span class="chip chip-gold">★ PRO</span>
             </div>
             <p class="page-intro">ဗီဒီယိုတစ်ခုလုံးကို တစ်ချက်နှိပ်ရုံဖြင့် အကျဉ်းချုပ်ကာ မြန်မာဘာသာဖြင့် Dubbing အသင့် ဖြစ်အောင် ဖန်တီးပေးပါမည်။ လုပ်ငန်းစဉ် အားလုံးကို အလိုအလျောက် ဆောင်ရွက်ပေးပါမည်။</p>
-            <ul class="feature-list">
-              <li>⚡ AI Recap Script ကို အလိုအလျောက် ရေးသားပေးခြင်း</li>
-              <li>🌏 မြန်မာဘာသာသို့ အလိုအလျောက် ပြန်ဆိုပေးခြင်း</li>
-              <li>🎙 Premium Voice Persona ဖြင့် အသံ ဖန်တီးပေးခြင်း</li>
-              <li>🎬 စာတန်းထိုး ပါဝင်သော နောက်ဆုံး ရလဒ် ဗီဒီယိုကို အသင့် ထုတ်ပေးခြင်း</li>
-            </ul>
-            <button class="btn btn-generate" id="btnAutoRecap" type="button">⚡ 1-Click Auto Recap ဖန်တီးမည်</button>
+
+            <!-- Before upload -->
+            <div id="recapUploadWrap">
+              <div class="dropzone" id="recapDropzone" tabindex="0" role="button" aria-label="ဗီဒီယိုဖိုင် တင်ရန်">
+                <input type="file" id="recapFileInput" accept=".mp4,.mov,.webm,.mkv,video/mp4,video/quicktime,video/webm,video/x-matroska" hidden />
+                <div class="dz-icon" aria-hidden="true">
+                  <svg viewBox="0 0 64 64" width="58" height="58" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 42a12 12 0 0 1 .6-23.9 16 16 0 0 1 30.6 4.2A10 10 0 0 1 49 42H20z"/>
+                    <path d="M32 26v14M27 31l5-5 5 5"/>
+                  </svg>
+                </div>
+                <p class="dz-title">ဗီဒီယိုဖိုင်ကို ဒီနေရာတွင် တင်ပါ သို့မဟုတ် နှိပ်၍ ရွေးချယ်ပါ</p>
+                <p class="dz-info">MP4, MOV, WEBM, MKV ဖိုင်များကို လက်ခံပါသည် (အများဆုံး ၁၀ မိနစ်)</p>
+              </div>
+            </div>
+
+            <!-- After upload -->
+            <div id="recapWorkspace" hidden>
+              <div class="file-chip" id="recapFileChip">
+                <span class="fc-icon" aria-hidden="true">🎬</span>
+                <div class="fc-meta">
+                  <p class="fc-name" id="recapFileName">—</p>
+                  <p class="fc-sub" id="recapFileMeta">—</p>
+                </div>
+                <button class="fc-remove" id="recapFileRemove" type="button" aria-label="ဖိုင် ဖယ်ရှားရန်">×</button>
+              </div>
+
+              <div class="card-head" style="margin-top:18px">
+                <h3 class="card-title" style="font-size:var(--fs-sh)">အသံအမျိုးအစား ရွေးချယ်ပါ (Voice Personas)</h3>
+                <span class="chip chip-red" id="recapVoiceChip" hidden>ရွေးပြီး</span>
+              </div>
+              <div class="voice-grid" id="recapVoiceGrid"></div>
+
+              <div class="pitch-box">
+                <div class="pitch-head">
+                  <label class="field-label" for="recapPitchSlider">အသံ အနိမ့်အမြင့် ချိန်ညှိရန် (Pitch Offset: -30Hz မှ +30Hz)</label>
+                  <span class="pitch-value" id="recapPitchValue">0 Hz</span>
+                </div>
+                <input type="range" class="pitch-slider" id="recapPitchSlider" min="-30" max="30" step="1" value="0" />
+                <div class="pitch-scale" aria-hidden="true">
+                  <span>-30Hz</span><span>0</span><span>+30Hz</span>
+                </div>
+              </div>
+
+              <button class="btn btn-generate" id="btnStartAutoTranslate" type="button">⚡ Start Auto Translate</button>
+            </div>
           </div>
         </section>
 
         <!-- ============ PAGE: JOB HISTORY ============ -->
         <section class="page" id="page-history">
           <div class="card">
-            <div class="card-head">
-              <h2 class="card-title">Job History — Saved Videos &amp; Audio</h2>
-              <span class="chip chip-soft" id="jobCount">3 jobs</span>
+            <div class="jh-head">
+              <div>
+                <div class="card-head" style="margin-bottom:6px">
+                  <h2 class="card-title">ပြီးစီးခဲ့သော မှတ်တမ်းများ (Job History)</h2>
+                  <span class="chip chip-gold">2 Days Retention</span>
+                </div>
+                <p class="page-intro jh-sub">ဖန်တီးထားသော အသံဖိုင်နှင့် Subtitle စာတမ်းထိုးများကို ၂ ရက် (၄၈ နာရီ) သိမ်းဆည်းပေးထားပြီး သက်တမ်းကုန်ပါက အလိုအလျောက် သန့်ရှင်းဖျက်ဆီးပေးပါသည်။</p>
+              </div>
+              <div class="jh-actions">
+                <button class="btn btn-ghost" id="btnHistoryRefresh" type="button">↻ Refresh</button>
+                <button class="btn btn-primary" id="btnHistoryNewVideo" type="button">Video အသစ်ဖန်တီးမည်</button>
+              </div>
             </div>
-            <div class="table-wrap">
-              <table class="jobs-table">
-                <thead>
-                  <tr>
-                    <th>အမည်</th>
-                    <th>အမျိုးအစား</th>
-                    <th>နေ့စွဲ</th>
-                    <th>အခြေအနေ</th>
-                    <th>လုပ်ဆောင်ချက်</th>
-                  </tr>
-                </thead>
-                <tbody id="jobsBody">
-                  <tr>
-                    <td class="jd-name">🎬 bagan_travel_recap.mp4</td>
-                    <td>Video + Voice</td>
-                    <td>2026-09-21</td>
-                    <td><span class="status ok">ပြီးစီး</span></td>
-                    <td><button class="mini-btn" type="button">ဒေါင်းလုဒ်</button></td>
-                  </tr>
-                  <tr>
-                    <td class="jd-name">🎙 market_story_voice.mp3</td>
-                    <td>Audio Only</td>
-                    <td>2026-09-19</td>
-                    <td><span class="status ok">ပြီးစီး</span></td>
-                    <td><button class="mini-btn" type="button">ဒေါင်းလုဒ်</button></td>
-                  </tr>
-                  <tr>
-                    <td class="jd-name">🎬 tea_shop_interview.mp4</td>
-                    <td>Video + Voice</td>
-                    <td>2026-09-17</td>
-                    <td><span class="status wait">စောင့်ဆိုင်း</span></td>
-                    <td><button class="mini-btn" type="button">ဒေါင်းလုဒ်</button></td>
-                  </tr>
-                </tbody>
-              </table>
+
+            <!-- Free user: locked PRO promo -->
+            <div id="historyLocked" class="jh-lock">
+              <div class="jh-crown" aria-hidden="true">👑</div>
+              <h3 class="jh-lock-title">Cloud Job History (၄၈ နာရီ သိမ်းဆည်းမှု) သည် Pro Feature ဖြစ်ပါသည်။</h3>
+              <p class="jh-lock-text">Free user များသည် ဖုန်း/ကွန်ပျူတာ (Client-Side) ပေါ်တွင်သာ တိုက်ရိုက် အသံနှင့် ဗီဒီယို ပေါင်းစပ်ပြီး ဆာဗာတွင် လုံးဝ သိမ်းဆည်းထားခြင်း မရှိပါ။ ဖန်တီးထားသော ဗီဒီယိုနှင့် အသံများကို ဆာဗာပေါ်တွင် ၄၈ နာရီ သိမ်းဆည်းထားလိုပါက Pro သို့ Upgrade ပြုလုပ်နိုင်ပါသည်။</p>
+              <div class="action-row jh-lock-btns">
+                <button class="btn btn-primary" id="btnHistoryUpgrade" type="button">✨ Upgrade to Pro</button>
+                <button class="btn btn-ghost" id="btnHistoryToManual" type="button">Manual Editor သို့ သွားမည် &gt;</button>
+              </div>
+            </div>
+
+            <!-- Pro user: jobs table -->
+            <div id="historyPro" hidden>
+              <div class="table-wrap">
+                <table class="jobs-table">
+                  <thead>
+                    <tr>
+                      <th>အမည်</th>
+                      <th>အမျိုးအစား</th>
+                      <th>နေ့စွဲ</th>
+                      <th>အခြေအနေ</th>
+                      <th>လုပ်ဆောင်ချက်</th>
+                    </tr>
+                  </thead>
+                  <tbody id="jobsBody">
+                    <tr>
+                      <td class="jd-name">🎬 bagan_travel_recap.mp4</td>
+                      <td>Video + Voice</td>
+                      <td>2026-09-21</td>
+                      <td><span class="status ok">ပြီးစီး</span></td>
+                      <td>
+                        <button class="mini-btn" type="button">ဗီဒီယို</button>
+                        <button class="mini-btn" type="button">အသံ</button>
+                        <button class="mini-btn" type="button">.srt</button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="jd-name">🎙 market_story_voice.mp3</td>
+                      <td>Audio + Subtitles</td>
+                      <td>2026-09-21</td>
+                      <td><span class="status ok">ပြီးစီး</span></td>
+                      <td>
+                        <button class="mini-btn" type="button">အသံ</button>
+                        <button class="mini-btn" type="button">.srt</button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="jd-name">🎬 tea_shop_interview.mp4</td>
+                      <td>Video + Voice</td>
+                      <td>2026-09-20</td>
+                      <td><span class="status ok">ပြီးစီး</span></td>
+                      <td>
+                        <button class="mini-btn" type="button">ဗီဒီယို</button>
+                        <button class="mini-btn" type="button">အသံ</button>
+                        <button class="mini-btn" type="button">.srt</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
@@ -408,7 +495,7 @@
           <!-- Top info banner -->
           <div class="keys-banner">
             <div class="keys-banner-main">
-              <p class="keys-banner-title">AssemblyAI API Key (Required for Free Users)</p>
+              <p class="keys-banner-title">API Keys — Gemini နှင့် AssemblyAI (Optional, save either one)</p>
               <div class="keys-banner-badges">
                 <span class="badge-req">Free User Requirement</span>
                 <span class="badge-store">Local Browser Storage</span>
@@ -422,7 +509,7 @@
               <h2 class="card-title">API Keys — Gemini &amp; AssemblyAI Key ပြင်ဆင်ရန်</h2>
               <span class="chip chip-soft">Local Storage</span>
             </div>
-            <p class="page-intro">Gemini (ဘာသာပြန်ရန်) နှင့် AssemblyAI (စာသား ထုတ်ယူရန်) API Key များကို ထည့်သွင်း ပြင်ဆင်ပါ။ Key များကို သင့် Browser အတွင်းတွင်သာ သိမ်းဆည်းပါသည်။</p>
+            <p class="page-intro">Gemini နှင့် AssemblyAI API Key များကို သီးခြားစီ ထည့်သွင်း သိမ်းဆည်းနိုင်ပါသည် — တစ်ခုတည်း ထည့်ရုံဖြင့် Save လုပ်နိုင်ပါသည်။ Key များကို သင့် Browser အတွင်းတွင်သာ သိမ်းဆည်းပါသည်။</p>
 
             <!-- AssemblyAI API Key card -->
             <div class="key-card">
@@ -430,7 +517,7 @@
                 <div class="key-head-main">
                   <b class="key-title">AssemblyAI API Key (အသံဖိုင် စာသားပြောင်းရန်)</b>
                   <div class="key-badges">
-                    <span class="badge-req">Required for Free Users</span>
+                    <span class="badge-store">Optional</span>
                     <span class="badge-state on" id="assemblyStatus">Active</span>
                   </div>
                 </div>
@@ -449,7 +536,7 @@
                 <div class="key-head-main">
                   <b class="key-title">Gemini API Key (မြန်မာဘာသာပြန်ဆိုရန်)</b>
                   <div class="key-badges">
-                    <span class="badge-req">Required for Free Users</span>
+                    <span class="badge-store">Optional</span>
                     <span class="badge-state on" id="geminiStatus">Active</span>
                   </div>
                 </div>
@@ -502,11 +589,11 @@
           </li>
           <li>
             <b>စာတန်း/စာသား ထုတ်ယူခြင်း (Extract Subtitles)</b>
-            <span>“ရှေ့သို့ ဆက်သွားမည် (Next)” ကို နှိပ်လျှင် AssemblyAI မှတစ်ဆင့် မူရင်း အင်္ဂလိပ် စာသားများကို Step 2 တွင် အလိုအလျောက် ထုတ်ယူပေးပါမည်။</span>
+            <span>“ရှေ့သို့ ဆက်သွားမည် (Next)” ကို နှိပ်လျှင် Step 2 ရှိ Raw Text ဘောက်ထဲသို့ ရောက်ရှိပါမည် — မူရင်း စာတန်းများ (တရုတ်/အင်္ဂလိပ်) ကို ထိုဘောက်တစ်ခုတည်းတွင် တိုက်ရိုက် Paste လုပ်၍ စစ်ဆေးတည်းဖြတ်နိုင်ပါသည်။</span>
           </li>
           <li>
             <b>မြန်မာဘာသာ ပြန်ခြင်း (Translate to Burmese)</b>
-            <span>“Gemini App သို့ ကူးယူရန် (Free Workflow)” ဖြင့် ကူးယူ၍ Gemini တွင် ကိုယ်တိုင် ပြန်ဆိုနိုင်သည်၊ သို့မဟုတ် “မြန်မာသို့ အလိုအလျောက် ဘာသာပြန်မည် (Auto Translate)” ကို နှိပ်ပြီး အလိုအလျောက် ပြန်ဆိုနိုင်ပါသည်။ ပြန်ဆိုထားသော စာသားကို Step 3 တွင် ပြင်ဆင်နိုင်ပါသည်။</span>
+            <span>“📋 Copy Full Prompt” ကို နှိပ်ပါက Step 2 ရှိ Raw စာသား (ဥပမာ တရုတ်စာတန်းများ) ကို Movie Recap Dubbing System Prompt အပြည့်အစုံထဲ ထည့်သွင်း၍ Clipboard သို့ ကူးယူပေးပါမည် — ထို့ကြောင့် Gemini App ထဲတွင် Paste လုပ်ရုံဖြင့် အသုံးပြုနိုင်ပါသည်။ Gemini မှ ပြန်လာသော JSON အဖြေကို Step 3 တွင် Paste လုပ်သည်နှင့် Auto JSON Cleaner က သန့်စင်၍ မြန်မာလိုင်းများအဖြစ် ပြသပေးပါမည်။</span>
           </li>
           <li>
             <b>အသံ ရွေးချယ်ခြင်း (Choose Voice)</b>
@@ -518,7 +605,7 @@
           </li>
           <li>
             <b>အသံ ဖန်တီးခြင်း (Generate Voice Over)</b>
-            <span>“🔊 အသံဖန်တီးပေးမည် (Generate Voice Over)” ကို နှိပ်ပါ။ မနှိပ်ရသေးပါက Step 4 သို့ သွား၍ မရပါ — အနီရောင် သတိပေးချက် ပေးပါမည်။</span>
+            <span>“🔊 အသံဖန်တီးပေးမည် (Generate Voice Over)” ကို နှိပ်ပါက Step 4 ရလဒ်စာမျက်နှာသို့ ရောက်ရှိပြီး ဗီဒီယိုကို ဖန်တီးပေးပါမည်။</span>
           </li>
           <li>
             <b>နောက်ဆုံး ရလဒ် ရယူခြင်း (Finalize)</b>
@@ -636,18 +723,18 @@
   <div class="modal-overlay" id="planModal" hidden>
     <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="pricingTitle">
       <div class="modal-body">
-        <div class="pricing-head">
-          <div>
-            <h2 class="pricing-title" id="pricingTitle">Pricing Plans &amp; Packages</h2>
-            <p class="pricing-sub">Choose the best plan for your video recap needs</p>
+        <div class="modal-header">
+          <div class="header-titles">
+            <h2 class="modal-title" id="pricingTitle">Pricing Plans &amp; Packages</h2>
+            <p class="modal-subtitle">Choose the best plan for your video recap needs</p>
             <span class="user-badge" id="priceUserBadge">—</span>
           </div>
-          <div class="pricing-head-right">
-            <div class="currency-toggle" role="group" aria-label="Currency">
-              <button class="ct-btn active" data-cur="mmk" type="button">MMK (ကျပ်)</button>
-              <button class="ct-btn" data-cur="thb" type="button">THB (฿)</button>
-            </div>
-            <button class="modal-close" id="planClose" type="button" aria-label="Close">×</button>
+          <button class="close-btn" id="planClose" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="pricing-head-right">
+          <div class="currency-toggle" role="group" aria-label="Currency">
+            <button class="ct-btn active" data-cur="mmk" type="button">MMK (ကျပ်)</button>
+            <button class="ct-btn" data-cur="thb" type="button">THB (฿)</button>
           </div>
         </div>
 
@@ -814,6 +901,6 @@
 
   <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=recap-history-1"></script>
 </body>
 </html>

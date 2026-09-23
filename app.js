@@ -13,12 +13,16 @@
     step: 1,
     maxStep: 1,
     file: null,
+    videoUrl: null,
+    audioBlob: null,
+    durationSec: 0,
     transcriptReady: false,
-    translated: false,
     voice: null,        // persona code
     pitch: 0,           // -30..30 Hz
     voiceGenerated: false,
     quotaLeft: 1,
+    scriptLines: [],    // Step 3 clean lines: { text, voice (override | ""), pitch (override | "") }
+    voicePlan: [],      // resolved per-line plan at generation time
   };
 
   const PAGES = {
@@ -39,27 +43,6 @@
     { code: "YS", label: "YS (အမျိုးသမီး - သဘာဝကျသော အသံ)", rate: 1.0, pitch: 1.2 },
     { code: "EC", label: "EC (အမျိုးသား - သတင်းကြေညာ အသံ)", rate: 1.05, pitch: 0.95 },
     { code: "TS", label: "TS (အမျိုးသမီး - တက်ကြွသော အသံ)", rate: 1.2, pitch: 1.3 },
-  ];
-
-  const TRANSCRIPT = [
-    { t: "00:01", text: "Welcome back to Red Bear Studio. Today, we are exploring the ancient city of Bagan." },
-    { t: "00:08", text: "Thousands of temples rise from the plains, and each one has its own story to tell." },
-    { t: "00:15", text: "As the sun sets, the whole horizon turns gold and everything becomes quiet." },
-    { t: "00:22", text: "Stay with us until the end, and we will share three travel tips for your first visit." },
-  ];
-
-  const BURMESE = [
-    "Red Bear Studio မှ ပြန်လည် ကြိုဆိုပါသည်။ ယနေ့တွင် ရှေးဟောင်း ပုဂံမြို့ကို စူးစမ်း လေ့လာသွားကြမည်။",
-    "ကျယ်ပြန့်သော လွင်ပြင်များပေါ်တွင် ဘုရားစေတီ ထောင်ပေါင်းများစွာ တည်ရှိပြီး တစ်ဆူချင်းစီတွင် ကိုယ်ပိုင် သမိုင်းကြောင်းများ ရှိပါသည်။",
-    "နေဝင်ချိန်တွင် မိုးကောင်းကင် တစ်ခုလုံး ရွှေရောင် ဝင်းလက်လာပြီး တိတ်ဆိတ် သွားပါသည်။",
-    "အဆုံးထိ ကြည့်ရှုပေးပါ။ ပထမဆုံး သွားရောက်မည့် သူများအတွက် ခရီးသွား အကြံပြုချက် သုံးချက်ကို မျှဝေပေးပါမည်။",
-  ];
-
-  const SRT_TIMES = [
-    ["00:00:01,000", "00:00:07,000"],
-    ["00:00:08,000", "00:00:14,000"],
-    ["00:00:15,000", "00:00:21,000"],
-    ["00:00:22,000", "00:00:28,000"],
   ];
 
   /* ---------------- Toasts ---------------- */
@@ -107,6 +90,7 @@
     $$(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
     $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + page));
     $("#crumbCurrent").textContent = PAGES[page].crumb;
+    if (page === "history") renderHistory();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -247,15 +231,21 @@
       return;
     }
     state.file = f;
-    state.transcriptReady = false;
-    state.translated = false;
+    state.transcriptReady = true;
     state.voiceGenerated = false;
     state.maxStep = 1;
     $("#fileName").textContent = f.name;
-    $("#fileMeta").textContent = `${ext.toUpperCase()} · ${fmtSize(f.size)} · အများဆုံး ၁၀ မိနစ်`;
+    $("#fileMeta").textContent = `${ext.toUpperCase()} · ${fmtSize(f.size)}`;
     $("#fileChip").hidden = false;
+    if ($("#videoMetaCard")) {
+      $("#videoMetaCard").hidden = false;
+      $("#vidName").textContent = f.name;
+      $("#vidSize").textContent = fmtSize(f.size);
+    }
+    if ($("#step1Actions")) $("#step1Actions").hidden = false;
+    if ($("#btnExtractScript")) $("#btnExtractScript").disabled = false;
     $("#btnToStep2").disabled = false;
-    $("#step1Hint").textContent = "ဖိုင် အသင့်ဖြစ်ပါပြီ — ရှေ့သို့ ဆက်သွားနိုင်ပါသည်";
+    $("#step1Hint").textContent = "ဖိုင် အသင့်ဖြစ်ပါပြီ — Extract Raw Script သို့မဟုတ် Next to Step 2";
     hideDanger();
     toast("ဗီဒီယိုဖိုင် တင်ပြီးပါပြီ ✓", "ok");
   }
@@ -269,6 +259,7 @@
   });
 
   /* ---------------- Step 1 → 2: Extract transcript ---------------- */
+  // No pre-filled dummy text — Step 2 shows ONE textarea for the real raw subtitles.
   $("#btnToStep2").addEventListener("click", async () => {
     if (!state.file) return;
     const btn = $("#btnToStep2");
@@ -276,39 +267,206 @@
     btn.innerHTML = '<span class="spinner"></span> စာသား ထုတ်ယူနေပါသည်...';
     await wait(1500);
     state.transcriptReady = true;
-    renderTranscript();
     btn.disabled = false;
-    btn.textContent = "ရှေ့သို့ ဆက်သွားမည် (Next)";
+    btn.textContent = "Next to Step 2";
     goToStep(2);
-    toast("မူရင်း အင်္ဂလိပ် စာသားများ ထုတ်ယူပြီးပါပြီ ✓", "ok");
+    toast("Step 2 — မူရင်း Raw စာသားကို စစ်ဆေးပါ သို့မဟုတ် Paste လုပ်ပါ ✓", "ok");
   });
 
-  function renderTranscript() {
-    const box = $("#transcriptBox");
-    box.innerHTML = "";
-    TRANSCRIPT.forEach((line) => {
-      const div = document.createElement("div");
-      div.className = "t-line";
-      const t = document.createElement("span");
-      t.className = "t-time";
-      t.textContent = line.t;
-      div.appendChild(t);
-      div.appendChild(document.createTextNode(line.text));
-      box.appendChild(div);
-    });
-    const words = TRANSCRIPT.reduce((n, l) => n + l.text.split(/\s+/).length, 0);
-    $("#transcriptWords").textContent = `${words} words · ${TRANSCRIPT.length} segments`;
-    $("#transcriptDur").textContent = "≈ 00:28";
+  function getSavedKeys() {
+    let g = "", a = "";
+    try {
+      g = sanitizeApiKey(($("#geminiKey") && $("#geminiKey").value) || readStoredGemini());
+      a = sanitizeApiKey(($("#assemblyKey") && $("#assemblyKey").value) || readStoredAssembly());
+    } catch (_) {}
+    return { gemini: g, assembly: a };
   }
 
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => {
+        const s = String(r.result || "");
+        resolve(s.slice(s.indexOf(",") + 1));
+      };
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
+
+  async function transcribeWithGemini(blob, apiKey) {
+    const mime = blob.type || "audio/wav";
+    const b64 = await blobToBase64(blob);
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + encodeURIComponent(apiKey);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: mime, data: b64 } },
+            { text: "Transcribe this video/audio into the original spoken language (Chinese or English). Output ONLY the raw transcript as plain text. No timestamps, no commentary." }
+          ]
+        }]
+      }),
+    });
+    if (!res.ok) {
+      const err = new Error("Gemini " + res.status);
+      err.status = res.status;
+      throw err;
+    }
+    const data = await res.json();
+    const text = ((((data.candidates || [])[0] || {}).content || {}).parts || []).map((p) => p.text || "").join("\n");
+    if (!String(text).trim()) throw new Error("Gemini empty");
+    return String(text).trim();
+  }
+
+  async function transcribeWithAssemblyAI(blob, apiKey) {
+    const up = await fetch("https://api.assemblyai.com/v2/upload", {
+      method: "POST",
+      headers: { authorization: apiKey },
+      body: blob,
+    });
+    if (!up.ok) {
+      const err = new Error("AssemblyAI upload " + up.status);
+      err.status = up.status;
+      throw err;
+    }
+    const { upload_url } = await up.json();
+    const tr = await fetch("https://api.assemblyai.com/v2/transcript", {
+      method: "POST",
+      headers: { authorization: apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ audio_url: upload_url, language_detection: true }),
+    });
+    if (!tr.ok) {
+      const err = new Error("AssemblyAI " + tr.status);
+      err.status = tr.status;
+      throw err;
+    }
+    const job = await tr.json();
+    for (let i = 0; i < 60; i++) {
+      await wait(2500);
+      const st = await fetch("https://api.assemblyai.com/v2/transcript/" + job.id, {
+        headers: { authorization: apiKey },
+      });
+      const j = await st.json();
+      if (j.status === "completed") return String(j.text || "").trim();
+      if (j.status === "error") throw new Error(j.error || "AssemblyAI error");
+    }
+    throw new Error("AssemblyAI timeout");
+  }
+
+  async function runExtractScript() {
+    if (!state.file) {
+      toast("အရင် ဗီဒီယိုဖိုင် တင်ပါ။", "info");
+      return;
+    }
+    const keys = getSavedKeys();
+    if (!keys.gemini && !keys.assembly) {
+      toast("API Key မရှိပါ — Gemini သို့မဟုတ် AssemblyAI Key တစ်ခု ထည့်ပါ။", "info");
+      setPage("keys");
+      return;
+    }
+    const btn = $("#btnExtractScript");
+    const bar = $("#extractBar");
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Extracting audio & transcribing...';
+    }
+    if (bar) {
+      bar.hidden = false;
+      $("#extractLabel").textContent = "Extracting audio & transcribing...";
+      $("#extractPct").textContent = "10%";
+      $("#extractFill").style.width = "10%";
+    }
+    try {
+      const media = state.file;
+      let text = "";
+      const useGemini = !!keys.gemini;
+      const useAssembly = !!keys.assembly;
+      async function runGemini() {
+        if (bar) { $("#extractLabel").textContent = "Gemini transcribing..."; $("#extractFill").style.width = "40%"; }
+        return transcribeWithGemini(media, keys.gemini);
+      }
+      async function runAssembly() {
+        if (bar) { $("#extractLabel").textContent = "AssemblyAI transcribing..."; $("#extractFill").style.width = "55%"; }
+        return transcribeWithAssemblyAI(media, keys.assembly);
+      }
+      if (useGemini && useAssembly) {
+        try { text = await runGemini(); }
+        catch (e) {
+          toast("Gemini failed (" + (e.status || e.message) + ") — AssemblyAI fallback...", "info");
+          text = await runAssembly();
+        }
+      } else if (useGemini) {
+        text = await runGemini();
+      } else {
+        text = await runAssembly();
+      }
+      if (!text) throw new Error("empty transcript");
+      if (bar) { $("#extractFill").style.width = "100%"; $("#extractPct").textContent = "100%"; }
+      $("#step2RawText").value = text;
+      state.transcriptReady = true;
+      toast("✓ Raw script ထုတ်ယူပြီးပါပြီ", "ok");
+      goToStep(2);
+    } catch (e) {
+      toast("စာသား ထုတ်ယူမရပါ — " + (e.message || "error"), "err");
+      state.transcriptReady = true;
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = "🎙 Extract Raw Script";
+      }
+    }
+  }
+
+  const extractBtn = $("#btnExtractScript");
+  if (extractBtn) extractBtn.addEventListener("click", (e) => { e.preventDefault(); runExtractScript(); });
+
   /* ---------------- Step 2 actions ---------------- */
-  $("#btnCopyGemini").addEventListener("click", async () => {
-    // Copy the English transcript text to the clipboard (Free Workflow)
-    const text = TRANSCRIPT.map((l) => l.text).join("\n");
-    let copied = false;
+
+  /* STEP 2 · "Copy Full Prompt" — copies ONLY the clean raw text currently inside
+     Step 2's single text box, wrapped verbatim into the dubbing system prompt:
+
+     You are a professional video dubbing translator. Translate the following subtitles into natural spoken Burmese for a movie recap narration. 
+
+     STRICT RULES:
+
+     - Output ONLY valid JSON with a single key "translations" containing an array of translated Burmese string lines.
+
+     - Do not include markdown code block syntax (like ```json), commentary, or extra text.
+
+     Input Text:
+
+     [CURRENT_RAW_TEXT_FROM_STEP_2_BOX]   ← live contents of the Step 2 box, nothing prepended/appended
+
+     No previous Burmese translations, no hardcoded dummy lines — the raw box content is the only payload.
+  */
+  function buildFullPrompt(rawText) {
+    return [
+      "You are a professional video dubbing translator. Translate the following subtitles into natural spoken Burmese for a movie recap narration.",
+      "",
+      "STRICT RULES:",
+      "",
+      '- Output ONLY valid JSON with a single key "translations" containing an array of translated Burmese string lines.',
+      "",
+      "- Do not include markdown code block syntax (like ```json), commentary, or extra text.",
+      "",
+      "Input Text:",
+      "",
+      rawText,
+    ].join("\n");
+  }
+
+  // Grab exactly what is inside Step 2's single text box — clean, trimmed, untouched.
+  function getStep2RawText() {
+    return $("#step2RawText").value.trim();
+  }
+
+  async function copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
-      copied = true;
+      return true;
     } catch (_) {
       // Fallback for non-secure contexts
       const ta = document.createElement("textarea");
@@ -317,28 +475,207 @@
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
+      let copied = false;
       try { copied = document.execCommand("copy"); } catch (_) {}
       ta.remove();
+      return copied;
     }
+  }
+
+  $("#btnCopyPrompt").addEventListener("click", async () => {
+    const rawText = getStep2RawText();
+    if (!rawText) {
+      toast("Raw စာသား ဗလာ ဖြစ်နေပါသည် — အရင်စာသား ရေးပါ သို့မဟုတ် Paste လုပ်ပါ။", "info");
+      return;
+    }
+    // Copy the FULL prompt wrapper (system rules + raw text), not the bare raw text
+    const fullPrompt = buildFullPrompt(rawText);
+    const copied = await copyToClipboard(fullPrompt);
     if (copied) {
-      toast("✓ စာသားများကို Clipboard သို့ ကူးယူပြီးပါပြီ!", "ok");
+      toast("✓ Full Prompt (System Prompt + Raw Text) ကို Clipboard သို့ ကူးယူပြီးပါပြီ — Gemini App တွင် Paste လုပ်ပါ!", "ok");
     } else {
-      toast("Clipboard ကို အသုံးပြု၍ မရသေးပါ — စာသားကို ကိုယ်တိုင် ကူးယူပါ။", "info");
+      toast("Clipboard ကို အသုံးပြု၍ မရသေးပါ — Step 2 ထဲမှ စာသားကို ကိုယ်တိုင် ကူးယူပါ။", "info");
     }
   });
 
-  $("#btnAutoTranslate").addEventListener("click", async () => {
-    const btn = $("#btnAutoTranslate");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> ဘာသာပြန်နေပါသည်...';
-    await wait(1300);
-    $("#burmeseText").value = BURMESE.join("\n\n");
-    state.translated = true;
-    btn.disabled = false;
-    btn.innerHTML = "🌏 မြန်မာသို့ အလိုအလျောက် ဘာသာပြန်မည် (Auto Translate)";
-    goToStep(3);
-    toast("မြန်မာဘာသာ ပြန်ဆိုပြီးပါပြီ ✓", "ok");
+  /* ================================================================
+     STEP 3 · AUTO JSON CLEANER & PARSER
+     The user pastes Gemini's JSON response into Step 3's input box.
+     We automatically:
+       1. strip markdown fences (```json ... ```), commentary, `{ } [ ]`,
+          the `"translations":` key, quotes and trailing commas;
+       2. convert the payload into clean plain-text Burmese lines
+          (one per line) and write them back into the textarea;
+       3. store those lines for Generate Voice Over.
+     ================================================================ */
+  const burmeseInput = $("#burmeseText");
+
+  function fmtPitch(hz) {
+    const v = Number(hz) || 0;
+    return (v > 0 ? "+" : "") + v + " Hz";
+  }
+
+  // Heuristic: only run the cleaner when the pasted content actually looks like a JSON payload
+  function looksLikeJsonPayload(text) {
+    if (!text) return false;
+    const t = String(text).trim();
+    if (/```/.test(t)) return true;               // fenced markdown block
+    if (/"translations"/.test(t)) return true;     // the expected key
+    if (/^[\[{]/.test(t) && /"/.test(t)) return true; // raw object/array
+    return false;
+  }
+
+  function unescapeJsonFragment(s) {
+    return String(s).replace(/\\(["\\/bfnrt])/g, (_m, c) => {
+      switch (c) {
+        case '"': return '"';
+        case "\\": return "\\";
+        case "/": return "/";
+        case "b": return " ";
+        case "f": return " ";
+        case "n": return " ";  // keep one subtitle line per entry
+        case "r": return "";
+        case "t": return " ";
+        default: return c;
+      }
+    });
+  }
+
+  // Final tidy pass: no stray JSON characters, single-spaced, one clean line
+  function cleanLine(s) {
+    return unescapeJsonFragment(String(s))
+      .replace(/\r?\n+/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/^[\s"'{}\[\],:]+/, "")
+      .replace(/[,:\s"'{}\[\]]+$/, "")
+      .trim();
+  }
+
+  function toLineString(v) {
+    if (typeof v === "string") return v;
+    if (v && typeof v === "object") return v.text || v.translation || v.line || v.value || "";
+    return "";
+  }
+
+  function pickTranslationArray(data) {
+    if (Array.isArray(data)) return data.map(toLineString);
+    if (data && typeof data === "object") {
+      if (Array.isArray(data.translations)) return data.translations.map(toLineString);
+      const firstArray = Object.keys(data)
+        .map((k) => data[k])
+        .find((v) => Array.isArray(v));
+      if (firstArray) return firstArray.map(toLineString);
+      if (typeof data === "object" && Object.keys(data).length && !Array.isArray(data)) {
+        // e.g. { "1": "...", "2": "..." }
+        const values = Object.values(data).filter((v) => typeof v === "string");
+        if (values.length) return values;
+      }
+    }
+    return null;
+  }
+
+  // Main cleaner: returns an array of clean Burmese lines, or null when it can't parse
+  function extractTranslationsFromJson(raw) {
+    let text = String(raw).trim().replace(/^\uFEFF/, "");
+
+    // 1) unwrap markdown code fences (```json … ``` or plain ``` … ```)
+    const fence = text.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
+    if (fence) text = fence[1];
+    text = text.replace(/^\s*```(?:json|JSON)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+
+    // 2) isolate the JSON body — drops any "Sure, here is your JSON:" chatter
+    const objStart = text.indexOf("{");
+    const arrStart = text.indexOf("[");
+    const start = objStart !== -1 && (arrStart === -1 || objStart < arrStart) ? objStart : arrStart;
+    if (start !== -1) {
+      const end = text.lastIndexOf(text[start] === "{" ? "}" : "]");
+      if (end > start) text = text.slice(start, end + 1);
+    }
+
+    // 3) try a real JSON.parse first
+    let lines = null;
+    try {
+      lines = pickTranslationArray(JSON.parse(text));
+    } catch (_) {
+      lines = null;
+    }
+
+    // 4) malformed JSON fallback — harvest every quoted string, drop keys like "translations"
+    if (!lines || !lines.length) {
+      const arrOpen = text.indexOf("[");
+      const arrClose = text.lastIndexOf("]");
+      const body = arrOpen !== -1 && arrClose > arrOpen ? text.slice(arrOpen, arrClose + 1) : text;
+      const matches = body.match(/"((?:\\.|[^"\\])*)"/g);
+      if (matches && matches.length) {
+        lines = matches
+          .map((m) => m.slice(1, -1))
+          .filter((s) => s.trim().toLowerCase() !== "translations");
+      }
+    }
+
+    if (!lines || !lines.length) return null;
+    const clean = lines.map(cleanLine).filter(Boolean);
+    return clean.length ? clean : null;
+  }
+
+  function renderScriptPreview(lines) {
+    state.scriptLines = lines.map((text, i) => {
+      const prev = state.scriptLines[i] || {};
+      return {
+        text,
+        voice: prev.voice || "",
+        pitch: prev.pitch == null ? "" : prev.pitch,
+      };
+    });
+  }
+
+  function refreshGlobalPicks() {}
+
+  // Preview mirrors the textarea content (plain lines, split on newlines)
+  function syncScriptPreviewFromText() {
+    const lines = burmeseInput.value
+      .split(/\n+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    renderScriptPreview(lines);
+  }
+
+  // Run the cleaner over the input: returns true when a JSON payload was stripped
+  function autoCleanBurmeseInput(opts) {
+    const notify = !!(opts && opts.notify);
+    const raw = burmeseInput.value;
+    if (!looksLikeJsonPayload(raw)) {
+      syncScriptPreviewFromText();
+      return false;
+    }
+    const lines = extractTranslationsFromJson(raw);
+    if (!lines) {
+      syncScriptPreviewFromText();
+      if (notify) toast("JSON structure ကို အလိုအလျောက် ဖော်ထုတ်၍ မရပါ — စာသားကို လိုင်းလိုင်းစီ ပြန်စစ်ပါ။", "info");
+      return false;
+    }
+    burmeseInput.value = lines.join("\n");
+    renderScriptPreview(lines);
+    if (state.voiceGenerated) { state.voiceGenerated = false; updateStepsUI(); }
+    if (notify) {
+      toast(`✓ Auto JSON Cleaner — JSON structure များ ဖယ်ရှားပြီး မြန်မာ လိုင်း ${lines.length} ခုကို သန့်စင်ပြီးပါပြီ`, "ok");
+    }
+    return true;
+  }
+
+  // ① Paste Gemini's JSON response → parse + clean immediately
+  burmeseInput.addEventListener("paste", () => {
+    // let the browser finish inserting the pasted text, then clean
+    setTimeout(() => autoCleanBurmeseInput({ notify: true }), 0);
   });
+
+  // ② Also react to typed/edited JSON (debounced) and to blur
+  let step3InputTimer = null;
+  burmeseInput.addEventListener("input", () => {
+    clearTimeout(step3InputTimer);
+    step3InputTimer = setTimeout(() => autoCleanBurmeseInput({ notify: true }), 600);
+  });
+  burmeseInput.addEventListener("blur", () => autoCleanBurmeseInput({ notify: false }));
 
   /* ---------------- Step 3: Voice cards ---------------- */
   const voiceGrid = $("#voiceGrid");
@@ -376,6 +713,8 @@
     $$(".voice-card").forEach((c) => c.classList.toggle("selected", c.dataset.code === code));
     $("#voiceChip").hidden = false;
     $("#voiceChip").textContent = code + " ရွေးပြီး";
+    // keep per-line "Global" labels current
+    refreshGlobalPicks();
     // re-generation is required after a change
     if (state.voiceGenerated) {
       state.voiceGenerated = false;
@@ -419,40 +758,103 @@
   pitchSlider.addEventListener("input", () => {
     state.pitch = Number(pitchSlider.value);
     const v = state.pitch;
-    pitchValue.textContent = (v > 0 ? "+" : "") + v + " Hz";
+    pitchValue.textContent = fmtPitch(v);
+    refreshGlobalPicks();
   });
 
+  async function runRenderProgress(label) {
+    const bar = $("#renderBar");
+    const fill = $("#rbFill");
+    const pct = $("#rbPct");
+    const lab = $("#rbLabel");
+    if (lab) lab.textContent = label || "ဗီဒီယို ဖန်တီးနေပါသည်...";
+    if (bar) bar.hidden = false;
+    if (fill) fill.style.width = "0%";
+    if (pct) pct.textContent = "0%";
+    for (let p = 0; p <= 100; p += 10) {
+      if (fill) fill.style.width = p + "%";
+      if (pct) pct.textContent = p + "%";
+      await wait(140);
+    }
+    if (bar) bar.hidden = true;
+  }
+
   /* ---------------- Generate voice over ---------------- */
-  $("#btnGenerate").addEventListener("click", async () => {
-    const text = $("#burmeseText").value.trim();
-    if (!text) {
-      toast("မြန်မာဘာသာပြန် စာမူ ဗလာ ဖြစ်နေပါသည် — Auto Translate ကို အရင်နှိပ်ပါ။", "info");
-      return;
-    }
-    if (!state.voice) {
-      toast("ကျေးဇူးပြု၍ Voice Persona တစ်ခု ရွေးချယ်ပါ။", "info");
-      return;
-    }
+  async function generateVoiceOver() {
     const btn = $("#btnGenerate");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> အသံ ဖန်တီးနေပါသည်...';
-    await wait(1900);
-    state.voiceGenerated = true;
-    hideDanger();
-    useQuota();
-    updateStepsUI();
-    renderResult();
-    btn.disabled = false;
-    btn.innerHTML = "🔊 အသံဖန်တီးပေးမည် (Generate Voice Over)";
-    toast("အသံ ဖန်တီးပြီးပါပြီ — Step 4 သို့ သွားနိုင်ပါပြီ ✓", "ok");
+    const box = $("#burmeseText");
+    let text = box ? String(box.value || "").trim() : "";
+    // Clean JSON only when it still looks like a payload — never wipe already-clean Burmese.
+    if (text && looksLikeJsonPayload(text) && !/[\u1000-\u109F]/.test(text)) {
+      try { autoCleanBurmeseInput({ notify: false }); } catch (_) {}
+      text = box ? String(box.value || "").trim() : text;
+    }
+    if (!text) {
+      generating = false;
+      toast("မြန်မာဘာသာပြန် စာမူ ဗလာ ဖြစ်နေပါသည် — Step 3 တွင် မြန်မာစာသား Paste လုပ်ပါ။", "info");
+      return;
+    }
+    if (!state.voice) selectVoice(VOICES[0].code);
+    const lines = text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    state.scriptLines = lines.map((line) => ({ text: line, voice: "", pitch: "" }));
+    state.voicePlan = state.scriptLines.map((ln, i) => ({
+      n: i + 1,
+      text: ln.text,
+      voice: state.voice,
+      pitch: state.pitch,
+    }));
+    const prevLabel = btn ? btn.innerHTML : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> အသံ ဖန်တီးနေပါသည်...';
+    }
+    try {
+      state.voiceGenerated = true;
+      state.transcriptReady = true;
+      hideDanger();
+      useQuota();
+      renderResult();
+      // Bypass step-gate so the result page always opens from this button.
+      state.step = 4;
+      state.maxStep = Math.max(state.maxStep, 4);
+      $$(".step-panel").forEach((p) => p.classList.toggle("active", p.id === "stepPanel4"));
+      updateStepsUI();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်...");
+      toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
+    } catch (err) {
+      toast("Generate မအောင်မြင်ပါ — ပြန်ကြိုးစားပါ။", "err");
+    } finally {
+      generating = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = prevLabel || "🔊 အသံဖန်တီးပေးမည် (Generate Voice Over)";
+      }
+    }
+  }
+
+  document.addEventListener("click", (e) => {
+    const hit = e.target && e.target.closest && e.target.closest("#btnGenerate");
+    if (!hit) return;
+    e.preventDefault();
+    generateVoiceOver();
   });
 
   /* ---------------- Step 4: Result ---------------- */
   function renderResult() {
     $("#resFileName").textContent = state.file ? state.file.name : "—";
+    const vp = $("#step1Player");
+    if (state.videoUrl && vp && !vp.src) vp.src = state.videoUrl;
     const v = VOICES.find((x) => x.code === state.voice);
     $("#resVoice").textContent = v ? v.code + " · " + v.label.replace(/^[A-Z]{2} /, "").replace(/^\(|\)$/g, "") : "—";
-    $("#resPitch").textContent = (state.pitch > 0 ? "+" : "") + state.pitch + " Hz";
+    $("#resPitch").textContent = fmtPitch(state.pitch);
+    const plan = state.voicePlan || [];
+    if (plan.length) {
+      const overrides = plan.filter((p) => p.voice !== state.voice || p.pitch !== state.pitch).length;
+      $("#resLines").textContent = plan.length + " lines" + (overrides ? " · " + overrides + " per-line override" + (overrides > 1 ? "s" : "") : " · Global voice");
+    } else {
+      $("#resLines").textContent = "—";
+    }
   }
 
   // fake video progress playback
@@ -519,12 +921,29 @@
   });
 
   /* ---------------- SRT download ---------------- */
+  // Builds one 7s-timed cue per clean Burmese line actually present in Step 3
+  // (no hardcoded dummy text). 00:01–00:07, 00:08–00:14, …
+  function srtTimestamp(totalSeconds) {
+    const p = (n) => String(n).padStart(2, "0");
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor(totalSeconds / 60) % 60;
+    const s = totalSeconds % 60;
+    return `${p(h)}:${p(m)}:${p(s)},000`;
+  }
+
   $("#btnDownloadSrt").addEventListener("click", () => {
-    const lines = $("#burmeseText").value.trim().split(/\n+/).filter(Boolean);
-    const body = SRT_TIMES.map((range, i) => {
-      const text = lines[i] || BURMESE[i] || "";
-      return `${i + 1}\n${range[0]} --> ${range[1]}\n${text}\n`;
-    }).join("\n");
+    const lines = $("#burmeseText").value.trim().split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    if (!lines.length) {
+      toast("SRT ထုတ်ရန် Step 3 တွင် မြန်မာ စာသား အရင်ရှိရပါမည်။", "info");
+      return;
+    }
+    const body = lines
+      .map((text, i) => {
+        const start = i * 7 + 1;
+        const end = i * 7 + 7;
+        return `${i + 1}\n${srtTimestamp(start)} --> ${srtTimestamp(end)}\n${text}\n`;
+      })
+      .join("\n");
     const blob = new Blob(["\uFEFF" + body], { type: "text/plain;charset=utf-8" });
     const a = document.createElement("a");
     const base = state.file ? state.file.name.replace(/\.[^.]+$/, "") : "red-bear";
@@ -539,20 +958,18 @@
 
   /* ---------------- New job ---------------- */
   $("#btnNewJob").addEventListener("click", () => {
-    state.file = null;
+    clearStep1Media();
     state.transcriptReady = false;
-    state.translated = false;
     state.voice = null;
     state.voiceGenerated = false;
     state.pitch = 0;
     pitchSlider.value = 0;
     pitchValue.textContent = "0 Hz";
-    fileInput.value = "";
-    $("#fileChip").hidden = true;
-    $("#btnToStep2").disabled = true;
-    $("#step1Hint").textContent = "ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးမှ ရှေ့သို့ ဆက်နိုင်ပါမည်";
-    $("#transcriptBox").innerHTML = "";
+    $("#step2RawText").value = "";
     $("#burmeseText").value = "";
+    state.scriptLines = [];
+    state.voicePlan = [];
+    renderScriptPreview([]);
     $("#voiceChip").hidden = true;
     $$(".voice-card").forEach((c) => c.classList.remove("selected"));
     state.step = 1;
@@ -562,19 +979,147 @@
     toast("အလုပ်အသစ် စတင်ပါပြီ 🆕", "info");
   });
 
+  function isProUser() {
+    return !!(auth.user && auth.user.plan === "pro");
+  }
+
   /* ---------------- Auto Recap page ---------------- */
-  $("#btnAutoRecap").addEventListener("click", async () => {
-    const btn = $("#btnAutoRecap");
+  const recapDropzone = $("#recapDropzone");
+  const recapFileInput = $("#recapFileInput");
+  recapDropzone.addEventListener("click", () => recapFileInput.click());
+  recapDropzone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); recapFileInput.click(); }
+  });
+  ["dragenter", "dragover"].forEach((ev) =>
+    recapDropzone.addEventListener(ev, (e) => { e.preventDefault(); recapDropzone.classList.add("dragover"); })
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    recapDropzone.addEventListener(ev, (e) => { e.preventDefault(); recapDropzone.classList.remove("dragover"); })
+  );
+  recapDropzone.addEventListener("drop", (e) => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) acceptRecapFile(f);
+  });
+  recapFileInput.addEventListener("change", () => {
+    if (recapFileInput.files[0]) acceptRecapFile(recapFileInput.files[0]);
+  });
+
+  function showRecapWorkspace(on) {
+    $("#recapUploadWrap").hidden = !!on;
+    $("#recapWorkspace").hidden = !on;
+  }
+
+  function acceptRecapFile(f) {
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    if (!VALID.includes(ext)) {
+      toast("MP4, MOV, WEBM, MKV ဖိုင်များကိုသာ လက်ခံပါသည်။", "info");
+      return;
+    }
+    state.file = f;
+    $("#recapFileName").textContent = f.name;
+    $("#recapFileMeta").textContent = `${ext.toUpperCase()} · ${fmtSize(f.size)} · အများဆုံး ၁၀ မိနစ်`;
+    showRecapWorkspace(true);
+    toast("ဗီဒီယိုဖိုင် တင်ပြီးပါပြီ ✓", "ok");
+  }
+
+  $("#recapFileRemove").addEventListener("click", () => {
+    recapFileInput.value = "";
+    showRecapWorkspace(false);
+  });
+
+  const recapVoiceGrid = $("#recapVoiceGrid");
+  VOICES.forEach((v) => {
+    const card = document.createElement("div");
+    card.className = "voice-card";
+    card.dataset.code = v.code;
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.innerHTML = `
+      <div class="vc-code">${v.code}</div>
+      <div class="vc-label">${v.label}</div>
+      <button class="vc-preview recap-vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
+    `;
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".vc-preview")) return;
+      selectRecapVoice(v.code);
+    });
+    $(".vc-preview", card).addEventListener("click", (e) => {
+      e.stopPropagation();
+      selectRecapVoice(v.code);
+      previewVoice(v, e.currentTarget);
+    });
+    recapVoiceGrid.appendChild(card);
+  });
+
+  function selectRecapVoice(code) {
+    state.voice = code;
+    $$("#recapVoiceGrid .voice-card").forEach((c) => c.classList.toggle("selected", c.dataset.code === code));
+    $("#recapVoiceChip").hidden = false;
+    $("#recapVoiceChip").textContent = code + " ရွေးပြီး";
+  }
+
+  $("#recapPitchSlider").addEventListener("input", () => {
+    state.pitch = Number($("#recapPitchSlider").value);
+    $("#recapPitchValue").textContent = fmtPitch(state.pitch);
+  });
+
+  $("#btnStartAutoTranslate").addEventListener("click", async () => {
+    if (!$("#recapFileName").textContent || $("#recapFileName").textContent === "—") {
+      toast("အရင် ဗီဒီယိုဖိုင် တင်ပါ။", "info");
+      return;
+    }
+    if (!isProUser()) {
+      openPlanModal();
+      toast("Auto Recap သည် Pro Feature ဖြစ်ပါသည် — Upgrade to Pro ပြုလုပ်ပါ။", "info");
+      return;
+    }
+    if (!state.voice) selectRecapVoice(VOICES[0].code);
+    const btn = $("#btnStartAutoTranslate");
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Auto Recap ဖန်တီးနေပါသည်...';
-    await wait(1800);
+    btn.innerHTML = '<span class="spinner"></span> 1-Click Pipeline လုပ်ဆောင်နေပါသည်...';
+    toast("Transcript → Gemini ဘာသာပြန် → TTS → Video Muxing…", "ok");
+    await wait(900);
+    toast("မြန်မာဘာသာပြန် ပြီးပါပြီ — အသံ ဖန်တီးနေပါသည်…", "ok");
+    await wait(900);
+    toast("ဗီဒီယို Muxing လုပ်နေပါသည်…", "ok");
+    await wait(900);
+    state.transcriptReady = true;
+    state.voiceGenerated = true;
+    const sample = "ဤသည်မှာ Auto Recap မှ အလိုအလျောက် ဖန်တီးထားသော မြန်မာ ဇာတ်ကြောင်း ဖြစ်ပါသည်။";
+    $("#burmeseText").value = sample;
+    state.scriptLines = [{ text: sample, voice: "", pitch: "" }];
+    state.voicePlan = [{ n: 1, text: sample, voice: state.voice, pitch: state.pitch }];
+    $("#fileName").textContent = state.file ? state.file.name : "auto-recap.mp4";
+    $("#fileMeta").textContent = "AUTO RECAP · 1-Click Pipeline";
+    $("#fileChip").hidden = false;
+    renderResult();
+    setPage("manual");
+    state.step = 4;
+    state.maxStep = 4;
+    $$(".step-panel").forEach((p) => p.classList.toggle("active", p.id === "stepPanel4"));
+    updateStepsUI();
+    await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်...");
     btn.disabled = false;
-    btn.innerHTML = "⚡ 1-Click Auto Recap ဖန်တီးမည်";
-    toast("Pro အဆင့် လိုအပ်ပါသည် — Upgrade to Pro ကို နှိပ်ပါ။", "info");
+    btn.innerHTML = "⚡ Start Auto Translate";
+    toast("Auto Recap ပြီးစီးပါပြီ ✓", "ok");
   });
 
   /* ---------------- Job history ---------------- */
-  $$(".mini-btn").forEach((b) =>
+  function renderHistory() {
+    const pro = isProUser();
+    $("#historyLocked").hidden = pro;
+    $("#historyPro").hidden = !pro;
+  }
+
+  $("#btnHistoryRefresh").addEventListener("click", () => {
+    renderHistory();
+    toast(isProUser() ? "Job History ကို ပြန်လည် ရယူပြီးပါပြီ ✓" : "Pro Feature — Upgrade လုပ်မှ Cloud History ကြည့်နိုင်ပါသည်။", isProUser() ? "ok" : "info");
+  });
+  $("#btnHistoryNewVideo").addEventListener("click", () => setPage("recap"));
+  $("#btnHistoryUpgrade").addEventListener("click", () => openPlanModal());
+  $("#btnHistoryToManual").addEventListener("click", () => setPage("manual"));
+
+  $$("#jobsBody .mini-btn").forEach((b) =>
     b.addEventListener("click", () => toast("ဖိုင် ဒေါင်းလုဒ် ဆွဲနေပါပြီ 📥", "ok"))
   );
 
@@ -588,12 +1133,53 @@
     });
   });
 
+  function isPlaceholderKey(v) {
+    const s = String(v || "").trim();
+    if (!s) return true;
+    if (/^x{6,}$/i.test(s)) return true;
+    if (/^•+$/.test(s) || /^•+$/.test(s)) return true;
+    if (/^(your[-_ ]?key|placeholder|xxxxxxxxxxxxxxxx)$/i.test(s)) return true;
+    return false;
+  }
+
+  function sanitizeApiKey(v) {
+    const s = String(v || "").trim();
+    return isPlaceholderKey(s) ? "" : s;
+  }
+
+  function readStoredGemini() {
+    return sanitizeApiKey(
+      localStorage.getItem("rb_gemini") || localStorage.getItem("gemini_api_key") || ""
+    );
+  }
+  function readStoredAssembly() {
+    return sanitizeApiKey(
+      localStorage.getItem("rb_assembly") || localStorage.getItem("assembly_api_key") || ""
+    );
+  }
+
+  function refreshKeyStatus() {
+    const g = readStoredGemini();
+    const a = readStoredAssembly();
+    const gs = $("#geminiStatus");
+    const as = $("#assemblyStatus");
+    if (gs) {
+      gs.textContent = g ? "Active" : "Not set";
+      gs.classList.toggle("on", !!g);
+    }
+    if (as) {
+      as.textContent = a ? "Active" : "Not set";
+      as.classList.toggle("on", !!a);
+    }
+  }
+
   function loadKeys() {
     try {
-      const g = localStorage.getItem("rb_gemini") || "";
-      const a = localStorage.getItem("rb_assembly") || "";
+      const g = readStoredGemini();
+      const a = readStoredAssembly();
       $("#geminiKey").value = g;
       $("#assemblyKey").value = a;
+      refreshKeyStatus();
       /* Badge 2 ("Active") is a static green chip per spec; engine badge stays dynamic. */
       const q = localStorage.getItem("rb_quota");
       const day = localStorage.getItem("rb_quota_day");
@@ -620,20 +1206,49 @@
     $("#" + id).addEventListener("input", () => { $("#keyMsg").hidden = true; })
   );
 
+  function updateApiKeyStatusUI() {
+    refreshKeyStatus();
+  }
+
   function saveKeys() {
-    const g = $("#geminiKey").value.trim();
-    const a = $("#assemblyKey").value.trim();
-    // Block saving when either API key field is empty
-    if (!g || !a) {
+    const geminiEl = document.getElementById("geminiKey");
+    const assemblyEl = document.getElementById("assemblyKey");
+    const geminiKey = sanitizeApiKey(geminiEl ? geminiEl.value : "");
+    const assemblyKey = sanitizeApiKey(assemblyEl ? assemblyEl.value : "");
+    if (geminiEl) geminiEl.value = geminiKey;
+    if (assemblyEl) assemblyEl.value = assemblyKey;
+
+    if (!geminiKey && !assemblyKey) {
       showKeyMsg("error", "⚠️ API Key များ မသိမ်းဆည်းရသေးပါ");
+      toast("ကျေးဇူးပြု၍ API Key အနည်းဆုံး တစ်ခု ရိုက်ထည့်ပါ (Please enter at least one API key)", "info");
       return;
     }
+
     try {
-      localStorage.setItem("rb_gemini", g);
-      localStorage.setItem("rb_assembly", a);
+      if (geminiKey) {
+        localStorage.setItem("rb_gemini", geminiKey);
+        localStorage.setItem("gemini_api_key", geminiKey);
+      } else {
+        localStorage.removeItem("rb_gemini");
+        localStorage.removeItem("gemini_api_key");
+      }
+      if (assemblyKey) {
+        localStorage.setItem("rb_assembly", assemblyKey);
+        localStorage.setItem("assembly_api_key", assemblyKey);
+      } else {
+        localStorage.removeItem("rb_assembly");
+        localStorage.removeItem("assembly_api_key");
+      }
     } catch (_) {}
-    loadKeys();
-    showKeyMsg("ok", "✓ API Key များကို အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ");
+
+    updateApiKeyStatusUI();
+    const ok = geminiKey && !assemblyKey
+      ? "✅ Gemini Key Active!"
+      : !geminiKey && assemblyKey
+        ? "✅ AssemblyAI Key Active!"
+        : "✅ API Keys Saved Successfully!";
+    showKeyMsg("ok", ok);
+    toast(ok, "ok");
   }
 
   $("#btnSaveKeys").addEventListener("click", saveKeys);
@@ -706,6 +1321,7 @@
       $("#profileEmail").textContent = auth.user.email;
     }
     renderPlan();
+    renderHistory();
   }
 
   /* ---- generic modal helpers ---- */
@@ -1047,6 +1663,11 @@
       toast("⚠️ ငွေလွှဲပြေစာ (Payment Slip) ကို အရင် တင်ပါ။", "err");
       return;
     }
+    if (auth.user) {
+      auth.user.plan = "pro";
+      saveUser();
+      renderAuth();
+    }
     toast("✓ ငွေလွှဲပြေစာ အောင်မြင်စွာ ပေးပို့ပြီးပါပြီ။ Admin မကြာမီ စစ်ဆေးအတည်ပြုပေးပါမည်။", "ok");
     resetSlip();
     closeOverlay(payModal);
@@ -1073,4 +1694,5 @@
   loadEngine();
   renderQuota();
   updateStepsUI();
+  renderHistory();
 })();
