@@ -180,53 +180,34 @@
 
           <!-- ---------- STEP 1 : UPLOAD ---------- -->
           <section class="step-panel active" id="stepPanel1">
-            <div class="card">
-              <div class="card-head">
-                <h2 class="card-title">Step 1: Upload — ဗီဒီယို တင်ပါ</h2>
-                <span class="chip chip-soft">1 / 4</span>
+            <div class="card step1-card">
+              <input type="file" id="fileInput" accept=".mp4,.mov,.webm,.mkv,video/mp4,video/quicktime,video/webm,video/x-matroska" hidden />
+
+              <div class="step1-upload-view" id="step1UploadView">
+                <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="ဗီဒီယိုဖိုင် တင်ရန်">
+                  <div class="dz-icon" aria-hidden="true">
+                    <svg viewBox="0 0 64 64" width="58" height="58" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M20 42a12 12 0 0 1 .6-23.9 16 16 0 0 1 30.6 4.2A10 10 0 0 1 49 42H20z"/>
+                      <path d="M32 26v14M27 31l5-5 5 5"/>
+                    </svg>
+                  </div>
+                  <p class="dz-title">ဗီဒီယိုဖိုင်ကို ဒီနေရာတွင် တင်ပါ သို့မဟုတ် နှိပ်၍ ရွေးချယ်ပါ</p>
+                  <p class="dz-info">MP4, MOV, WEBM, MKV ဖိုင်များကို လက်ခံပါသည် (အများဆုံး ၁၀ မိနစ်)</p>
+                </div>
               </div>
 
-              <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="ဗီဒီယိုဖိုင် တင်ရန်">
-                <input type="file" id="fileInput" accept=".mp4,.mov,.webm,.mkv,video/mp4,video/quicktime,video/webm,video/x-matroska" hidden />
-                <div class="dz-icon" aria-hidden="true">
-                  <svg viewBox="0 0 64 64" width="58" height="58" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20 42a12 12 0 0 1 .6-23.9 16 16 0 0 1 30.6 4.2A10 10 0 0 1 49 42H20z"/>
-                    <path d="M32 26v14M27 31l5-5 5 5"/>
-                  </svg>
+              <div class="video-preview-card" id="videoPreviewCard" hidden>
+                <div class="video-preview-head">
+                  <h2 class="card-title">Step 1: Video တင်ပါ</h2>
+                  <p class="video-preview-subtitle">Recap လုပ်မည့် video ကို ရွေးချယ်ပါ။ (အသံကို အရင်ဆုံးထုတ်ပါမည်)</p>
                 </div>
-                <p class="dz-title">ဗီဒီယိုဖိုင်ကို ဒီနေရာတွင် တင်ပါ သို့မဟုတ် နှိပ်၍ ရွေးချယ်ပါ</p>
-                <p class="dz-info">MP4, MOV, WEBM, MKV ဖိုင်များကို လက်ခံပါသည် (အများဆုံး ၁၀ မိနစ်)</p>
-                <div class="video-meta-card" id="videoMetaCard" hidden>
+
+                <div class="video-preview-frame">
                   <video class="step1-player" id="step1Player" controls playsinline></video>
-                  <ul class="rs-list">
-                    <li><span>Video Name</span><b id="vidName">—</b></li>
-                    <li><span>Duration</span><b id="vidDuration">—</b></li>
-                    <li><span>Size</span><b id="vidSize">—</b></li>
-                  </ul>
+                  <button class="video-change-btn" id="changeFileBtn" type="button">🔄 Change File</button>
                 </div>
-              </div>
 
-              <div class="file-chip" id="fileChip" hidden>
-                <span class="fc-icon" aria-hidden="true">🎬</span>
-                <div class="fc-meta">
-                  <p class="fc-name" id="fileName">—</p>
-                  <p class="fc-sub" id="fileMeta">—</p>
-                </div>
-                <button class="fc-remove" id="fileRemove" type="button" aria-label="ဖိုင် ဖယ်ရှားရန်">×</button>
-              </div>
-
-
-              <div class="extract-bar" id="extractBar" hidden>
-                <div class="rb-head"><span id="extractLabel">Extracting audio &amp; transcribing...</span><b id="extractPct">0%</b></div>
-                <div class="rb-track"><span id="extractFill"></span></div>
-              </div>
-
-              <div class="action-row" id="step1Actions" hidden>
-                <button class="btn btn-generate" id="btnExtractScript" type="button" disabled>🎙 Extract Raw Script</button>
-              </div>
-
-              <div class="panel-foot">
-                <span class="foot-hint" id="step1Hint">ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးမှ Extract Raw Script ကို နှိပ်နိုင်ပါမည်</span>
+                <button class="btn btn-primary step1-extract-btn" id="btnExtractScript" type="button" disabled>▶ Step 1: အသံထုတ်မည် (Next) &gt;</button>
               </div>
             </div>
           </section>
