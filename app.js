@@ -193,6 +193,7 @@
   const videoPreviewCard = $("#videoPreviewCard");
   const step1Player = $("#step1Player");
   const extractBtn = $("#btnExtractScript");
+  const sourceTextInput = $("#sourceTextInput") || $("#step2RawText");
   const processingBanner = $("#step1ProcessingBanner");
   const VALID = ["mp4", "mov", "webm", "mkv"];
 
@@ -300,7 +301,7 @@
   async function transcribeWithGemini(blob, apiKey) {
     const mime = blob.type || "audio/wav";
     const b64 = await blobToBase64(blob);
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + encodeURIComponent(apiKey);
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(apiKey);
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -308,7 +309,7 @@
         contents: [{
           parts: [
             { inline_data: { mime_type: mime, data: b64 } },
-            { text: "Transcribe this video/audio into the original spoken language (Chinese or English). Output ONLY the raw transcript as plain text. No timestamps, no commentary." }
+            { text: "Transcribe all spoken audio from this video/audio into clear, verbatim text." }
           ]
         }]
       }),
@@ -365,6 +366,10 @@
       return;
     }
     const keys = getSavedKeys();
+    // The Step 1 transcription flow explicitly uses the public LocalStorage key.
+    try {
+      keys.gemini = sanitizeApiKey(localStorage.getItem("gemini_api_key") || "") || keys.gemini;
+    } catch (_) {}
     if (!keys.gemini && !keys.assembly) {
       toast("API Key မရှိပါ — Gemini သို့မဟုတ် AssemblyAI Key တစ်ခု ထည့်ပါ။", "info");
       setPage("keys");
@@ -376,6 +381,8 @@
       btn.setAttribute("aria-busy", "true");
       btn.innerHTML = '<span class="spinner"></span> အသံထုတ်ယူနေပါသည်...';
     }
+    const processingText = processingBanner ? processingBanner.querySelector("span:last-child") : null;
+    if (processingText) processingText.textContent = "⚪ Video ထဲမှ အသံဖိုင်ကို စာသားအဖြစ် ပြောင်းလဲနေပါသည်...";
     processingBanner.hidden = false;
     try {
       const media = state.file;
@@ -400,12 +407,21 @@
         text = await runAssembly();
       }
       if (!text) throw new Error("empty transcript");
-      $("#step2RawText").value = text;
+      sourceTextInput.value = text;
       state.transcriptReady = true;
       toast("✓ Raw script ထုတ်ယူပြီးပါပြီ", "ok");
       goToStep(2);
     } catch (e) {
-      toast("စာသား ထုတ်ယူမရပါ — " + (e.message || "error"), "err");
+      const status = Number(e && e.status);
+      let message = "စာသား ထုတ်ယူမရပါ။ ကျေးဇူးပြု၍ ပြန်ကြိုးစားပါ။";
+      if (status === 400 || status === 401 || status === 403) {
+        message = "Gemini API Key မမှန်ပါ သို့မဟုတ် အသုံးပြုခွင့် မရှိပါ။ API Key ကို စစ်ဆေးပါ။";
+      } else if (e && e.name === "TypeError") {
+        message = "Network ပြဿနာကြောင့် စာသား ထုတ်ယူမရပါ။ Internet connection ကို စစ်ဆေးပါ။";
+      } else if (e && /missing|empty transcript/i.test(e.message || "")) {
+        message = "ဗီဒီယိုထဲတွင် အသံစာသား မတွေ့ပါ။ အခြားဗီဒီယိုတစ်ခုဖြင့် ပြန်ကြိုးစားပါ။";
+      }
+      toast(message, "err");
       state.transcriptReady = false;
       processingBanner.hidden = true;
     } finally {
