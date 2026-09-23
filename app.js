@@ -293,7 +293,8 @@
       const r = new FileReader();
       r.onload = () => {
         const s = String(r.result || "");
-        resolve(s.slice(s.indexOf(",") + 1));
+        // Gemini inline_data.data must contain raw Base64 only, never a data URL prefix.
+        resolve(s.split(",")[1] || s);
       };
       r.onerror = reject;
       r.readAsDataURL(blob);
@@ -406,20 +407,31 @@
         body: JSON.stringify(body),
         signal: controller.signal,
       });
+      const raw = await res.text();
+      let payload = null;
+      try { payload = raw ? JSON.parse(raw) : null; } catch (_) {}
       if (!res.ok) {
-        const err = new Error("Gemini " + res.status);
+        const details = String((payload && payload.error && payload.error.message) || raw || "No response body").trim();
+        const err = new Error("Gemini " + res.status + ": " + details);
         err.status = res.status;
+        err.details = details;
         throw err;
       }
-      return await res.json();
+      if (!payload) throw new Error("Gemini returned an invalid JSON response");
+      return payload;
     } finally {
       clearTimeout(timer);
     }
   }
 
   async function transcribeWithGemini(blob, apiKey) {
-    const mime = blob.type || "audio/webm";
-    const b64 = await blobToBase64(blob);
+    const rawMime = String(blob.type || "audio/webm").toLowerCase().split(";")[0];
+    const mime = rawMime === "video/mp4" ? "video/mp4"
+      : rawMime === "audio/mpeg" || rawMime === "audio/mp3" ? "audio/mp3"
+        : rawMime.startsWith("audio/") ? "audio/webm" : "video/mp4";
+    const encoded = String(await blobToBase64(blob) || "");
+    const b64 = encoded.split(",")[1] || encoded;
+    if (!b64.trim()) throw new Error("Gemini payload contains no Base64 audio data");
     const directUrl = buildGeminiRequestUrl(apiKey);
     const body = {
       contents: [{
@@ -448,7 +460,10 @@
       data = await fetchGeminiJson(directUrl, body);
       console.info("[Red Bear] Gemini transcription completed through direct endpoint", relayError);
     }
-    const text = ((((data.candidates || [])[0] || {}).content || {}).parts || []).map((p) => p.text || "").join("\n");
+    const firstText = data && data.candidates && data.candidates[0]
+      && data.candidates[0].content && data.candidates[0].content.parts
+      && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text;
+    const text = String(firstText || (((((data.candidates || [])[0] || {}).content || {}).parts || []).map((p) => p.text || "").join("\n")) || "");
     if (!String(text).trim()) throw new Error("Gemini empty");
     return String(text).trim();
   }
@@ -546,7 +561,9 @@
       const status = Number(e && e.status);
       let message = "စာသား ထုတ်ယူမရပါ။ ကျေးဇူးပြု၍ ပြန်ကြိုးစားပါ။";
       if (status === 400 || status === 401 || status === 403) {
-        message = "Gemini API Key မမှန်ပါ သို့မဟုတ် အသုံးပြုခွင့် မရှိပါ။ API Key ကို စစ်ဆေးပါ။";
+        message = "Gemini API Error " + status + ": " + (e.details || e.message || "API Key သို့မဟုတ် request ကို စစ်ဆေးပါ။");
+      } else if (status >= 400 && status < 600) {
+        message = "Gemini API Error " + status + ": " + (e.details || e.message || "ပြန်ကြိုးစားပါ။");
       } else if (e && e.name === "TypeError") {
         message = "Network ပြဿနာကြောင့် စာသား ထုတ်ယူမရပါ။ Internet connection ကို စစ်ဆေးပါ။";
       } else if (e && /audio extraction|audio track|video audio|missing/i.test(e.message || "")) {
