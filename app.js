@@ -382,28 +382,72 @@
     }
   }
 
+  function getGeminiRelayUrl() {
+    try {
+      const configured = String(localStorage.getItem("gemini_relay_url") || "").trim();
+      if (configured && /^https:\/\//i.test(configured)) return configured;
+    } catch (_) {}
+    // Public fallback relay. A trusted first-party relay can be configured with
+    // localStorage.setItem("gemini_relay_url", "https://your-relay.example/?url=").
+    return "https://corsproxy.io/?url=";
+  }
+
+  function buildGeminiRequestUrl(apiKey) {
+    return "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(apiKey);
+  }
+
+  async function fetchGeminiJson(url, body) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = new Error("Gemini " + res.status);
+        err.status = res.status;
+        throw err;
+      }
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function transcribeWithGemini(blob, apiKey) {
     const mime = blob.type || "audio/webm";
     const b64 = await blobToBase64(blob);
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(apiKey);
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: mime, data: b64 } },
-            { text: "Transcribe all spoken audio from this audio into clear, verbatim text." }
-          ]
-        }]
-      }),
-    });
-    if (!res.ok) {
-      const err = new Error("Gemini " + res.status);
-      err.status = res.status;
-      throw err;
+    const directUrl = buildGeminiRequestUrl(apiKey);
+    const body = {
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: mime, data: b64 } },
+          { text: "Transcribe all spoken audio from this audio into clear, verbatim text." }
+        ]
+      }]
+    };
+
+    let data;
+    let relayError;
+    const relayPrefix = getGeminiRelayUrl();
+    const relayUrl = relayPrefix.includes("{url}")
+      ? relayPrefix.replace("{url}", encodeURIComponent(directUrl))
+      : relayPrefix + encodeURIComponent(directUrl);
+    try {
+      data = await fetchGeminiJson(relayUrl, body);
+      console.info("[Red Bear] Gemini transcription completed through relay");
+    } catch (error) {
+      relayError = error;
+      console.warn("[Red Bear] Gemini relay failed; trying direct endpoint", error);
+      // A configured relay may reject valid Gemini responses with an auth error;
+      // do not hide that error behind an unnecessary second request.
+      if (error && [400, 401, 403].includes(Number(error.status))) throw error;
+      data = await fetchGeminiJson(directUrl, body);
+      console.info("[Red Bear] Gemini transcription completed through direct endpoint", relayError);
     }
-    const data = await res.json();
     const text = ((((data.candidates || [])[0] || {}).content || {}).parts || []).map((p) => p.text || "").join("\n");
     if (!String(text).trim()) throw new Error("Gemini empty");
     return String(text).trim();
