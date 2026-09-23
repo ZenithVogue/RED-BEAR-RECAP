@@ -819,7 +819,12 @@ button { cursor: pointer; }
 }
 
 /* ---- Step 1 upload and video preview ---- */
-.step1-card { padding: 20px; }
+.step1-card {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto 16px;
+  padding: 20px;
+}
 
 .step1-upload-view {
   width: 100%;
@@ -866,14 +871,15 @@ button { cursor: pointer; }
 }
 
 .video-preview-card {
-  width: min(100%, 520px);
-  max-width: 520px;
+  width: 100%;
+  max-width: 900px;
   margin: 0 auto;
   animation: fadeUp 0.25s ease;
 }
 
 #videoPreviewCard {
-  max-width: 520px;
+  width: 100%;
+  max-width: 900px;
   margin-inline: auto;
 }
 
@@ -889,8 +895,8 @@ button { cursor: pointer; }
 .video-preview-frame {
   position: relative;
   width: 100%;
-  max-width: 520px;
-  max-height: 360px;
+  max-width: 900px;
+  max-height: 520px;
   overflow: hidden;
   border-radius: var(--r-md);
   background: #171b26;
@@ -899,16 +905,17 @@ button { cursor: pointer; }
 .step1-player {
   display: block;
   width: 100%;
-  max-width: 520px;
-  max-height: 360px;
+  max-width: 900px;
+  max-height: 520px;
   height: auto;
   object-fit: contain;
   background: #171b26;
 }
 
 #videoPreviewCard .step1-player {
-  max-width: 520px;
-  max-height: 360px;
+  width: 100%;
+  max-width: 900px;
+  max-height: 520px;
 }
 
 .video-preview-actions {
