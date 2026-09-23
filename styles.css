@@ -896,7 +896,7 @@ button { cursor: pointer; }
   position: relative;
   width: 100%;
   max-width: 900px;
-  max-height: 520px;
+  max-height: 300px;
   overflow: hidden;
   border-radius: var(--r-md);
   background: #171b26;
@@ -906,7 +906,7 @@ button { cursor: pointer; }
   display: block;
   width: 100%;
   max-width: 900px;
-  max-height: 520px;
+  max-height: 300px;
   height: auto;
   object-fit: contain;
   background: #171b26;
@@ -915,13 +915,15 @@ button { cursor: pointer; }
 #videoPreviewCard .step1-player {
   width: 100%;
   max-width: 900px;
-  max-height: 520px;
+  max-height: 300px;
+  object-fit: contain;
 }
 
 .video-preview-actions {
   position: absolute;
   top: 12px;
   right: 12px;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
