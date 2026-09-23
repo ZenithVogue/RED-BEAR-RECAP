@@ -974,7 +974,15 @@ button { cursor: pointer; }
   width: 16px;
   height: 16px;
   border-width: 2px;
+  border-color: rgba(37, 99, 235, 0.25);
+  border-top-color: #2563eb;
   flex: 0 0 auto;
+}
+
+.step1-extract-btn .spinner {
+  border-color: rgba(37, 99, 235, 0.25);
+  border-top-color: #2563eb;
+  background: #fff;
 }
 
 .step1-extract-btn {

@@ -237,6 +237,7 @@
       return;
     }
     state.file = f;
+    state.audioBlob = null;
     state.transcriptReady = false;
     state.voiceGenerated = false;
     state.maxStep = 1;
@@ -254,6 +255,7 @@
     if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
     state.videoUrl = null;
     state.file = null;
+    state.audioBlob = null;
     state.durationSec = 0;
     state.transcriptReady = false;
     fileInput.value = "";
@@ -298,8 +300,90 @@
     });
   }
 
+  async function extractAudioFromVideo(videoFile) {
+    if (!videoFile) throw new Error("missing video file");
+    if (!window.MediaRecorder) throw new Error("audio extraction is not supported by this browser");
+
+    const sourceUrl = URL.createObjectURL(videoFile);
+    const media = document.createElement("video");
+    media.muted = true;
+    media.playsInline = true;
+    media.preload = "auto";
+    media.src = sourceUrl;
+
+    const cleanup = (stream) => {
+      media.pause();
+      media.removeAttribute("src");
+      media.load();
+      if (stream) stream.getTracks().forEach((track) => track.stop());
+      URL.revokeObjectURL(sourceUrl);
+    };
+
+    try {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("video audio load timeout")), 15000);
+        media.onloadedmetadata = () => { clearTimeout(timer); resolve(); };
+        media.onerror = () => { clearTimeout(timer); reject(new Error("video audio could not be loaded")); };
+        media.load();
+      });
+
+      const captureStream = typeof media.captureStream === "function"
+        ? media.captureStream()
+        : typeof media.mozCaptureStream === "function" ? media.mozCaptureStream() : null;
+      if (!captureStream) throw new Error("browser cannot capture video audio");
+      const audioTracks = captureStream.getAudioTracks();
+      if (!audioTracks.length) throw new Error("video has no audio track");
+
+      const audioStream = new MediaStream(audioTracks);
+      const mimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+      const supportsMime = typeof MediaRecorder.isTypeSupported === "function"
+        ? (type) => MediaRecorder.isTypeSupported(type)
+        : () => false;
+      const mimeType = mimeTypes.find(supportsMime) || "";
+      const recorder = mimeType ? new MediaRecorder(audioStream, { mimeType }) : new MediaRecorder(audioStream);
+      const chunks = [];
+      const timeoutMs = Math.min(Math.max((Number(media.duration) || 60) * 2000, 30000), 300000);
+
+      return await new Promise(async (resolve, reject) => {
+        let settled = false;
+        const finish = (error, blob) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          cleanup(audioStream);
+          if (error) reject(error);
+          else if (!blob || !blob.size) reject(new Error("audio extraction returned no data"));
+          else resolve(blob);
+        };
+        const timeout = setTimeout(() => {
+          if (recorder.state !== "inactive") recorder.stop();
+          finish(new Error("audio extraction timeout"));
+        }, timeoutMs);
+
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size) chunks.push(event.data);
+        };
+        recorder.onerror = () => finish(new Error("audio recorder failed"));
+        recorder.onstop = () => finish(null, new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" }));
+        media.onended = () => {
+          if (recorder.state !== "inactive") recorder.stop();
+        };
+
+        try {
+          recorder.start(1000);
+          await media.play();
+        } catch (error) {
+          finish(error instanceof Error ? error : new Error("audio extraction could not start"));
+        }
+      });
+    } catch (error) {
+      cleanup(null);
+      throw error;
+    }
+  }
+
   async function transcribeWithGemini(blob, apiKey) {
-    const mime = blob.type || "audio/wav";
+    const mime = blob.type || "audio/webm";
     const b64 = await blobToBase64(blob);
     const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(apiKey);
     const res = await fetch(url, {
@@ -309,7 +393,7 @@
         contents: [{
           parts: [
             { inline_data: { mime_type: mime, data: b64 } },
-            { text: "Transcribe all spoken audio from this video/audio into clear, verbatim text." }
+            { text: "Transcribe all spoken audio from this audio into clear, verbatim text." }
           ]
         }]
       }),
@@ -387,13 +471,15 @@
     try {
       const media = state.file;
       let text = "";
+      const audioBlob = await extractAudioFromVideo(media);
+      state.audioBlob = audioBlob;
       const useGemini = !!keys.gemini;
       const useAssembly = !!keys.assembly;
       async function runGemini() {
-        return transcribeWithGemini(media, keys.gemini);
+        return transcribeWithGemini(audioBlob, keys.gemini);
       }
       async function runAssembly() {
-        return transcribeWithAssemblyAI(media, keys.assembly);
+        return transcribeWithAssemblyAI(audioBlob, keys.assembly);
       }
       if (useGemini && useAssembly) {
         try { text = await runGemini(); }
@@ -412,13 +498,18 @@
       toast("✓ Raw script ထုတ်ယူပြီးပါပြီ", "ok");
       goToStep(2);
     } catch (e) {
+      console.error("[Red Bear] Step 1 transcription failed", e);
       const status = Number(e && e.status);
       let message = "စာသား ထုတ်ယူမရပါ။ ကျေးဇူးပြု၍ ပြန်ကြိုးစားပါ။";
       if (status === 400 || status === 401 || status === 403) {
         message = "Gemini API Key မမှန်ပါ သို့မဟုတ် အသုံးပြုခွင့် မရှိပါ။ API Key ကို စစ်ဆေးပါ။";
       } else if (e && e.name === "TypeError") {
         message = "Network ပြဿနာကြောင့် စာသား ထုတ်ယူမရပါ။ Internet connection ကို စစ်ဆေးပါ။";
-      } else if (e && /missing|empty transcript/i.test(e.message || "")) {
+      } else if (e && /audio extraction|audio track|video audio|missing/i.test(e.message || "")) {
+        message = "ဗီဒီယိုမှ အသံဖိုင် ထုတ်ယူမရပါ။ အသံပါသော ဗီဒီယိုဖြင့် ပြန်ကြိုးစားပါ။";
+      } else if (e && /timeout/i.test(e.message || "")) {
+        message = "အသံဖိုင် ထုတ်ယူရန် အချိန်ကြာနေပါသည်။ ပိုတိုသော ဗီဒီယိုဖြင့် ပြန်ကြိုးစားပါ။";
+      } else if (e && /empty transcript/i.test(e.message || "")) {
         message = "ဗီဒီယိုထဲတွင် အသံစာသား မတွေ့ပါ။ အခြားဗီဒီယိုတစ်ခုဖြင့် ပြန်ကြိုးစားပါ။";
       }
       toast(message, "err");
