@@ -821,8 +821,7 @@ button { cursor: pointer; }
 /* ---- Step 1 upload and video preview ---- */
 .step1-card { padding: 20px; }
 
-.step1-upload-view,
-.video-preview-card {
+.step1-upload-view {
   width: 100%;
 }
 
@@ -867,7 +866,15 @@ button { cursor: pointer; }
 }
 
 .video-preview-card {
+  width: min(100%, 520px);
+  max-width: 520px;
+  margin: 0 auto;
   animation: fadeUp 0.25s ease;
+}
+
+#videoPreviewCard {
+  max-width: 520px;
+  margin-inline: auto;
 }
 
 .video-preview-head { margin-bottom: 14px; }
@@ -882,6 +889,8 @@ button { cursor: pointer; }
 .video-preview-frame {
   position: relative;
   width: 100%;
+  max-width: 520px;
+  max-height: 360px;
   overflow: hidden;
   border-radius: var(--r-md);
   background: #171b26;
@@ -890,16 +899,30 @@ button { cursor: pointer; }
 .step1-player {
   display: block;
   width: 100%;
-  max-height: 480px;
-  min-height: 220px;
+  max-width: 520px;
+  max-height: 360px;
+  height: auto;
   object-fit: contain;
   background: #171b26;
 }
 
-.video-change-btn {
+#videoPreviewCard .step1-player {
+  max-width: 520px;
+  max-height: 360px;
+}
+
+.video-preview-actions {
   position: absolute;
   top: 12px;
   right: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.video-change-btn,
+.video-delete-btn {
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 10px;
   padding: 6px 11px;
@@ -912,9 +935,37 @@ button { cursor: pointer; }
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.video-change-btn:hover {
+.video-change-btn:hover,
+.video-delete-btn:hover {
   background: rgba(37, 99, 235, 0.92);
   transform: translateY(-1px);
+}
+
+.video-delete-btn:hover {
+  background: rgba(185, 28, 28, 0.94);
+}
+
+.step1-processing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--r-md);
+  color: #1d4ed8;
+  background: var(--blue-soft);
+  font-size: var(--fs-xs);
+  font-weight: var(--w-semi);
+  line-height: 1.55;
+}
+
+.step1-processing-banner .spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  flex: 0 0 auto;
 }
 
 .step1-extract-btn {
@@ -926,8 +977,9 @@ button { cursor: pointer; }
 
 @media (max-width: 560px) {
   .step1-card { padding: 14px; }
-  .step1-player { min-height: 180px; }
-  .video-change-btn { top: 8px; right: 8px; }
+  .video-preview-actions { top: 8px; right: 8px; gap: 5px; }
+  .video-change-btn,
+  .video-delete-btn { padding: 5px 8px; font-size: var(--fs-2xs); }
 }
 
 /* ---- Panel footer ---- */

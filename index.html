@@ -183,7 +183,7 @@
             <div class="card step1-card">
               <input type="file" id="fileInput" accept=".mp4,.mov,.webm,.mkv,video/mp4,video/quicktime,video/webm,video/x-matroska" hidden />
 
-              <div class="step1-upload-view" id="step1UploadView">
+              <div class="step1-upload-view" id="uploadDropZone">
                 <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="ဗီဒီယိုဖိုင် တင်ရန်">
                   <div class="dz-icon" aria-hidden="true">
                     <svg viewBox="0 0 64 64" width="58" height="58" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -202,9 +202,17 @@
                   <p class="video-preview-subtitle">Recap လုပ်မည့် video ကို ရွေးချယ်ပါ။ (အသံကို အရင်ဆုံးထုတ်ပါမည်)</p>
                 </div>
 
+                <div class="step1-processing-banner" id="step1ProcessingBanner" role="status" aria-live="polite" hidden>
+                  <span class="spinner" aria-hidden="true"></span>
+                  <span>Video ထဲမှ အသံဖိုင်ကို စာသားအဖြစ် ပြောင်းလဲနေပါသည်...</span>
+                </div>
+
                 <div class="video-preview-frame">
                   <video class="step1-player" id="step1Player" controls playsinline></video>
-                  <button class="video-change-btn" id="changeFileBtn" type="button">🔄 Change File</button>
+                  <div class="video-preview-actions">
+                    <button class="video-change-btn" id="changeFileBtn" type="button">🔄 Change File</button>
+                    <button class="video-delete-btn" id="deleteFileBtn" type="button">🗑️ ဖျက်မည် (Delete)</button>
+                  </div>
                 </div>
 
                 <button class="btn btn-primary step1-extract-btn" id="btnExtractScript" type="button" disabled>▶ Step 1: အသံထုတ်မည် (Next) &gt;</button>

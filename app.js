@@ -189,10 +189,11 @@
   /* ---------------- Step 1: Dropzone ---------------- */
   const dropzone = $("#dropzone");
   const fileInput = $("#fileInput");
-  const uploadView = $("#step1UploadView");
+  const uploadView = $("#uploadDropZone");
   const videoPreviewCard = $("#videoPreviewCard");
   const step1Player = $("#step1Player");
   const extractBtn = $("#btnExtractScript");
+  const processingBanner = $("#step1ProcessingBanner");
   const VALID = ["mp4", "mov", "webm", "mkv"];
 
   dropzone.addEventListener("click", () => fileInput.click());
@@ -257,6 +258,7 @@
     fileInput.value = "";
     uploadView.hidden = false;
     videoPreviewCard.hidden = true;
+    processingBanner.hidden = true;
     step1Player.removeAttribute("src");
     step1Player.load();
     extractBtn.disabled = true;
@@ -265,6 +267,11 @@
   $("#changeFileBtn").addEventListener("click", () => {
     clearStep1Media();
     fileInput.click();
+  });
+
+  $("#deleteFileBtn").addEventListener("click", () => {
+    clearStep1Media();
+    toast("ဗီဒီယိုဖိုင်ကို ဖျက်ပြီးပါပြီ။", "info");
   });
 
   /* ---------------- Step 1 → 2: Extract transcript ---------------- */
@@ -369,6 +376,7 @@
       btn.setAttribute("aria-busy", "true");
       btn.innerHTML = '<span class="spinner"></span> အသံထုတ်ယူနေပါသည်...';
     }
+    processingBanner.hidden = false;
     try {
       const media = state.file;
       let text = "";
@@ -399,12 +407,14 @@
     } catch (e) {
       toast("စာသား ထုတ်ယူမရပါ — " + (e.message || "error"), "err");
       state.transcriptReady = false;
+      processingBanner.hidden = true;
     } finally {
       if (btn) {
         btn.disabled = false;
         btn.removeAttribute("aria-busy");
         btn.innerHTML = "▶ Step 1: အသံထုတ်မည် (Next) &gt;";
       }
+      processingBanner.hidden = true;
     }
   }
 
