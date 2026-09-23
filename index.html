@@ -196,6 +196,14 @@
                 </div>
                 <p class="dz-title">ဗီဒီယိုဖိုင်ကို ဒီနေရာတွင် တင်ပါ သို့မဟုတ် နှိပ်၍ ရွေးချယ်ပါ</p>
                 <p class="dz-info">MP4, MOV, WEBM, MKV ဖိုင်များကို လက်ခံပါသည် (အများဆုံး ၁၀ မိနစ်)</p>
+                <div class="video-meta-card" id="videoMetaCard" hidden>
+                  <video class="step1-player" id="step1Player" controls playsinline></video>
+                  <ul class="rs-list">
+                    <li><span>Video Name</span><b id="vidName">—</b></li>
+                    <li><span>Duration</span><b id="vidDuration">—</b></li>
+                    <li><span>Size</span><b id="vidSize">—</b></li>
+                  </ul>
+                </div>
               </div>
 
               <div class="file-chip" id="fileChip" hidden>
@@ -207,14 +215,6 @@
                 <button class="fc-remove" id="fileRemove" type="button" aria-label="ဖိုင် ဖယ်ရှားရန်">×</button>
               </div>
 
-              <div class="video-meta-card" id="videoMetaCard" hidden>
-                <video class="step1-player" id="step1Player" controls playsinline></video>
-                <ul class="rs-list">
-                  <li><span>Video Name</span><b id="vidName">—</b></li>
-                  <li><span>Duration</span><b id="vidDuration">—</b></li>
-                  <li><span>Size</span><b id="vidSize">—</b></li>
-                </ul>
-              </div>
 
               <div class="extract-bar" id="extractBar" hidden>
                 <div class="rb-head"><span id="extractLabel">Extracting audio &amp; transcribing...</span><b id="extractPct">0%</b></div>
@@ -226,8 +226,7 @@
               </div>
 
               <div class="panel-foot">
-                <span class="foot-hint" id="step1Hint">ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးမှ ရှေ့သို့ ဆက်နိုင်ပါမည်</span>
-                <button class="btn btn-primary" id="btnToStep2" type="button" disabled>Next to Step 2</button>
+                <span class="foot-hint" id="step1Hint">ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးမှ Extract Raw Script ကို နှိပ်နိုင်ပါမည်</span>
               </div>
             </div>
           </section>

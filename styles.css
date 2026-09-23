@@ -841,6 +841,17 @@ button { cursor: pointer; }
   transform: scale(1.01);
 }
 
+.dropzone.has-video {
+  padding: 14px;
+  text-align: left;
+}
+
+.dropzone.has-video .dz-icon,
+.dropzone.has-video .dz-title,
+.dropzone.has-video .dz-info {
+  display: none;
+}
+
 .dz-icon { color: var(--red); margin-bottom: 10px; transition: transform 0.2s ease; }
 .dropzone:hover .dz-icon, .dropzone.dragover .dz-icon { transform: translateY(-3px); }
 
@@ -909,6 +920,12 @@ button { cursor: pointer; }
   border-radius: var(--r-md);
   overflow: hidden;
   background: var(--surface-2);
+}
+
+.dropzone > .video-meta-card {
+  margin-top: 0;
+  cursor: default;
+  text-align: left;
 }
 .step1-player {
   display: block;

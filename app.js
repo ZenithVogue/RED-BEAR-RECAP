@@ -191,6 +191,10 @@
   const fileInput = $("#fileInput");
   const VALID = ["mp4", "mov", "webm", "mkv"];
 
+  // The preview lives inside the upload box, so interacting with its controls
+  // must not reopen the file picker.
+  $("#videoMetaCard").addEventListener("click", (e) => e.stopPropagation());
+
   dropzone.addEventListener("click", () => fileInput.click());
   dropzone.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -224,6 +228,13 @@
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   }
 
+  function fmtTime(seconds) {
+    const total = Math.max(0, Math.round(Number(seconds) || 0));
+    const minutes = Math.floor(total / 60);
+    const secs = String(total % 60).padStart(2, "0");
+    return `${minutes}:${secs}`;
+  }
+
   function acceptFile(f) {
     const ext = (f.name.split(".").pop() || "").toLowerCase();
     if (!VALID.includes(ext)) {
@@ -231,48 +242,55 @@
       return;
     }
     state.file = f;
-    state.transcriptReady = true;
+    state.transcriptReady = false;
     state.voiceGenerated = false;
     state.maxStep = 1;
+    if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
+    state.videoUrl = URL.createObjectURL(f);
     $("#fileName").textContent = f.name;
     $("#fileMeta").textContent = `${ext.toUpperCase()} · ${fmtSize(f.size)}`;
     $("#fileChip").hidden = false;
-    if ($("#videoMetaCard")) {
-      $("#videoMetaCard").hidden = false;
-      $("#vidName").textContent = f.name;
-      $("#vidSize").textContent = fmtSize(f.size);
-    }
+    dropzone.classList.add("has-video");
+    $("#videoMetaCard").hidden = false;
+    $("#step1Player").src = state.videoUrl;
+    $("#vidName").textContent = f.name;
+    $("#vidSize").textContent = fmtSize(f.size);
+    $("#vidDuration").textContent = "—";
+    $("#step1Player").onloadedmetadata = () => {
+      state.durationSec = Number.isFinite($("#step1Player").duration) ? $("#step1Player").duration : 0;
+      $("#vidDuration").textContent = state.durationSec ? fmtTime(state.durationSec) : "—";
+    };
     if ($("#step1Actions")) $("#step1Actions").hidden = false;
     if ($("#btnExtractScript")) $("#btnExtractScript").disabled = false;
-    $("#btnToStep2").disabled = false;
-    $("#step1Hint").textContent = "ဖိုင် အသင့်ဖြစ်ပါပြီ — Extract Raw Script သို့မဟုတ် Next to Step 2";
+    $("#step1Hint").textContent = "ဖိုင် အသင့်ဖြစ်ပါပြီ — Extract Raw Script ကို နှိပ်ပါ";
     hideDanger();
     toast("ဗီဒီယိုဖိုင် တင်ပြီးပါပြီ ✓", "ok");
   }
 
-  $("#fileRemove").addEventListener("click", () => {
+  function clearStep1Media() {
+    if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
+    state.videoUrl = null;
     state.file = null;
+    state.durationSec = 0;
+    state.transcriptReady = false;
     fileInput.value = "";
+    dropzone.classList.remove("has-video");
     $("#fileChip").hidden = true;
-    $("#btnToStep2").disabled = true;
-    $("#step1Hint").textContent = "ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးမှ ရှေ့သို့ ဆက်နိုင်ပါမည်";
+    $("#videoMetaCard").hidden = true;
+    $("#step1Player").removeAttribute("src");
+    $("#step1Player").load();
+    $("#step1Actions").hidden = true;
+    $("#btnExtractScript").disabled = true;
+    $("#extractBar").hidden = true;
+    $("#step1Hint").textContent = "ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးမှ Extract Raw Script ကို နှိပ်နိုင်ပါမည်";
+  }
+
+  $("#fileRemove").addEventListener("click", () => {
+    clearStep1Media();
   });
 
   /* ---------------- Step 1 → 2: Extract transcript ---------------- */
   // No pre-filled dummy text — Step 2 shows ONE textarea for the real raw subtitles.
-  $("#btnToStep2").addEventListener("click", async () => {
-    if (!state.file) return;
-    const btn = $("#btnToStep2");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> စာသား ထုတ်ယူနေပါသည်...';
-    await wait(1500);
-    state.transcriptReady = true;
-    btn.disabled = false;
-    btn.textContent = "Next to Step 2";
-    goToStep(2);
-    toast("Step 2 — မူရင်း Raw စာသားကို စစ်ဆေးပါ သို့မဟုတ် Paste လုပ်ပါ ✓", "ok");
-  });
-
   function getSavedKeys() {
     let g = "", a = "";
     try {
@@ -371,7 +389,8 @@
     const bar = $("#extractBar");
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Extracting audio & transcribing...';
+      btn.setAttribute("aria-busy", "true");
+      btn.innerHTML = '<span class="spinner"></span> Extracting Script...';
     }
     if (bar) {
       bar.hidden = false;
@@ -411,10 +430,12 @@
       goToStep(2);
     } catch (e) {
       toast("စာသား ထုတ်ယူမရပါ — " + (e.message || "error"), "err");
-      state.transcriptReady = true;
+      state.transcriptReady = false;
+      if (bar) bar.hidden = true;
     } finally {
       if (btn) {
         btn.disabled = false;
+        btn.removeAttribute("aria-busy");
         btn.innerHTML = "🎙 Extract Raw Script";
       }
     }
