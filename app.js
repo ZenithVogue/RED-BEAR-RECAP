@@ -935,14 +935,22 @@
 
   function getVoiceTtsEndpoint() {
     try {
-      return String(localStorage.getItem("voice_tts_endpoint") || "/api/tts-preview").trim();
+      return String(localStorage.getItem("voice_tts_endpoint") || "").trim();
     } catch (_) {
-      return "/api/tts-preview";
+      return "";
     }
   }
 
   async function requestVoicePreview(v) {
     const endpoint = getVoiceTtsEndpoint();
+    if (!endpoint) {
+      const speed = Math.min(1.5, Math.max(0.7, Number(v.rate) || 1));
+      const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&ttsspeed="
+        + encodeURIComponent(speed.toFixed(2)) + "&q=" + encodeURIComponent(PREVIEW_TEXT);
+      const googleResponse = await fetch(googleUrl, { headers: { Accept: "audio/mpeg" } });
+      if (!googleResponse.ok) throw new Error("Myanmar Google TTS " + googleResponse.status);
+      return URL.createObjectURL(await googleResponse.blob());
+    }
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json, audio/*" },
@@ -992,7 +1000,7 @@
 
     btn.classList.add("playing");
     btn.disabled = true;
-    btn.innerHTML = '<span class="eq"><i></i><i></i><i></i></span> ဖွင့်နေသည်...';
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> အသံဖိုင် ရယူနေပါသည်...';
 
     try {
       let audioUrl;
@@ -1013,6 +1021,7 @@
         await activePreviewAudio.play();
       } catch (error) {
         console.warn("[Red Bear] TTS preview unavailable; using browser speech", error);
+        toast("Online TTS မရပါ — Browser speech fallback ဖြင့် ဖွင့်နေပါသည်။", "info");
         speakVoicePreviewFallback(v);
         previewTimer = setTimeout(() => {
           resetVoicePreviewButton(btn);
