@@ -985,7 +985,7 @@
   function resetVoicePreviewButton(btn) {
     btn.classList.remove("playing");
     btn.disabled = false;
-    btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန် (Preview)";
+    btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
   }
 
   async function previewVoice(v, btn) {
@@ -1000,37 +1000,51 @@
 
     btn.classList.add("playing");
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> အသံဖိုင် ရယူနေပါသည်...';
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> ⏳ တင်ယူနေသည်...';
 
+    let audioUrl = "";
     try {
-      let audioUrl;
-      try {
-        audioUrl = await requestVoicePreview(v);
-        activePreviewAudio = new Audio(audioUrl);
-        activePreviewAudio.onended = () => {
-          if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
-          activePreviewAudio = null;
-          resetVoicePreviewButton(btn);
-        };
-        activePreviewAudio.onerror = () => {
-          if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
-          activePreviewAudio = null;
-          resetVoicePreviewButton(btn);
-          toast("အသံနမူနာ ဖွင့်မရပါ — ပြန်ကြိုးစားပါ။", "err");
-        };
-        await activePreviewAudio.play();
-      } catch (error) {
-        console.warn("[Red Bear] TTS preview unavailable; using browser speech", error);
-        toast("Online TTS မရပါ — Browser speech fallback ဖြင့် ဖွင့်နေပါသည်။", "info");
-        speakVoicePreviewFallback(v);
-        previewTimer = setTimeout(() => {
-          resetVoicePreviewButton(btn);
-        }, 2600);
-      }
+      audioUrl = await requestVoicePreview(v);
+      const audio = new Audio(audioUrl);
+      activePreviewAudio = audio;
+      audio.onended = () => {
+        if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
+        if (activePreviewAudio === audio) activePreviewAudio = null;
+        resetVoicePreviewButton(btn);
+      };
+      audio.onerror = () => {
+        const playbackError = new Error("audio stream could not be played");
+        console.error(`[Red Bear] Voice Preview playback failed for ${v.code}`, playbackError);
+        if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
+        if (activePreviewAudio === audio) activePreviewAudio = null;
+        resetVoicePreviewButton(btn);
+        toast(`Voice Preview failed (${v.code}): ${playbackError.message}`, "err");
+      };
+
+      // Keep playback inside the async try/catch so autoplay and decode errors
+      // are visible and never leave the card stuck in its loading state.
+      await audio.play();
+      console.info(`[Red Bear] Voice Preview started for ${v.code}`);
+      btn.disabled = false;
+      btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
     } catch (error) {
-      console.error("[Red Bear] Voice preview failed", error);
-      toast("အသံနမူနာ ဖွင့်မရပါ — TTS endpoint ကို စစ်ဆေးပါ။", "err");
+      console.error(`[Red Bear] Voice Preview failed for ${v.code}`, error);
+      if (audioUrl && audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
+      activePreviewAudio = null;
+      const detail = error && error.message ? error.message : String(error || "Unknown TTS error");
+      toast(`Voice Preview failed (${v.code}): ${detail}`, "err");
       resetVoicePreviewButton(btn);
+
+      // Keep a standard browser fallback for environments that block remote audio.
+      try {
+        speakVoicePreviewFallback(v);
+        toast("Browser speech fallback ဖြင့် ဖွင့်နေပါသည်။", "info");
+        previewTimer = setTimeout(() => resetVoicePreviewButton(btn), 2600);
+      } catch (fallbackError) {
+        console.error(`[Red Bear] Browser speech fallback failed for ${v.code}`, fallbackError);
+        toast(`Voice Preview fallback failed (${v.code}): ${fallbackError.message}`, "err");
+        resetVoicePreviewButton(btn);
+      }
     }
   }
 
