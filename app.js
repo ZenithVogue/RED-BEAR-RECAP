@@ -593,20 +593,23 @@
   /* STEP 2 · "Copy Full Prompt" — copies ONLY the clean raw text currently inside
      Step 2's single text box, wrapped verbatim into the dubbing system prompt:
 
-     You are a professional video dubbing translator for movie recaps. Translate the given source subtitles into natural spoken Burmese (Myanmar script ONLY, NO Chinese, NO English).
+     You are a professional video dubbing translator. Translate the given subtitles into natural spoken Burmese (Myanmar script ONLY, NO Chinese, NO English).
 
      STRICT RULES:
 
-     1. Translate each source sentence into a natural, engaging Burmese recap line.
+     1. Translate each line into natural spoken Burmese.
 
-     2. Translate ALL terms, names, and places into Burmese script. Do NOT leave any Chinese or English characters.
-
-     3. Return ONLY a valid JSON object with a single key 'translations' containing an array of translated Burmese strings. Do NOT include 'ID' or 'Duration' in the prompt response.
+     2. Return ONLY a valid JSON inside a markdown code block using ```json ... ``` tags so it is easy to copy.
 
      Example Format:
-     { "translations": ["ဒီနေ့ ပွဲမှာ ဘာအထူးသတင်း ရှိလဲ။", "ဒီနေ့ ပွဲက လွန်ခဲ့တဲ့ ၁၀ နှစ်အတွင်း အကြီးမားဆုံးပဲ။"] }
-
-     Do NOT wrap in markdown blocks (```json). Return raw JSON only.
+     ```json
+     {
+       "translations": [
+         "ဒီနေ့ ပွဲမှာ ဘာအထူးသတင်း ရှိလဲ။",
+         "ဒီနေ့ ပွဲက လွန်ခဲ့တဲ့ ၁၀ နှစ်အတွင်း အကြီးမားဆုံးပဲ။"
+       ]
+     }
+     ```
 
      Input Text:
 
@@ -616,25 +619,23 @@
   */
   function buildFullPrompt(rawText) {
     return [
-      "You are a professional video dubbing translator for movie recaps. Translate the given source subtitles into natural spoken Burmese (Myanmar script ONLY, NO Chinese, NO English).",
+      "You are a professional video dubbing translator. Translate the given subtitles into natural spoken Burmese (Myanmar script ONLY, NO Chinese, NO English).",
       "",
       "STRICT RULES:",
       "",
-      "1. Translate each source sentence into a natural, engaging Burmese recap line.",
+      "1. Translate each line into natural spoken Burmese.",
       "",
-      "2. Translate ALL terms, names, and places into Burmese script. Do NOT leave any Chinese or English characters.",
-      "",
-      "3. Return ONLY a valid JSON object with a single key 'translations' containing an array of translated Burmese strings. Do NOT include 'ID' or 'Duration' in the prompt response.",
+      "2. Return ONLY a valid JSON inside a markdown code block using ```json ... ``` tags so it is easy to copy.",
       "",
       "Example Format:",
+      "```json",
       "{",
       '  "translations": [',
       '    "ဒီနေ့ ပွဲမှာ ဘာအထူးသတင်း ရှိလဲ။",',
       '    "ဒီနေ့ ပွဲက လွန်ခဲ့တဲ့ ၁၀ နှစ်အတွင်း အကြီးမားဆုံးပဲ။"',
       "  ]",
       "}",
-      "",
-      "Do NOT wrap in markdown blocks (```json). Return raw JSON only.",
+      "```",
       "",
       "Source subtitles:",
       "",
