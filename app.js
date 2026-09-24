@@ -929,123 +929,109 @@
     }
   }
 
-  let previewTimer = null;
+  /* ---------------- Step 3: Voice preview (static bundled samples) ----------------
+     Previews used to be produced at click time by calling an external TTS service
+     with fetch(). Any CORS rule, offline moment, or blocked host turned that into
+     "Voice Preview failed: Failed to fetch" and the card stayed stuck on loading.
+     Every persona now maps to a pre-rendered clip that ships with the app, so a
+     preview is just a same-origin <audio> load — no fetch(), no third-party host,
+     no browser speech fallback. */
+  const VOICE_SAMPLE_DIR = "assets/voice-samples/";
+  const VOICE_SAMPLES = {
+    BB: VOICE_SAMPLE_DIR + "bb.mp3",
+    NL: VOICE_SAMPLE_DIR + "nl.mp3",
+    PW: VOICE_SAMPLE_DIR + "pw.mp3",
+    KM: VOICE_SAMPLE_DIR + "km.mp3",
+    ZK: VOICE_SAMPLE_DIR + "zk.mp3",
+    HS: VOICE_SAMPLE_DIR + "hs.mp3",
+    SL: VOICE_SAMPLE_DIR + "sl.mp3",
+    YS: VOICE_SAMPLE_DIR + "ys.mp3",
+    EC: VOICE_SAMPLE_DIR + "ec.mp3",
+    TS: VOICE_SAMPLE_DIR + "ts.mp3",
+  };
+
+  const PREVIEW_LABEL_IDLE = "▶ အသံနမူနာ နားထောင်ရန်";
+  const PREVIEW_LABEL_PLAYING = "🔊 ဖွင့်နေသည်...";
+
   let activePreviewAudio = null;
-  const PREVIEW_TEXT = "မင်္ဂလာပါ၊ ဒါကတော့ နမူနာ စကားပြော အသံဖိုင် ဖြစ်ပါတယ်";
+  let activePreviewBtn = null;
 
-  function getVoiceTtsEndpoint() {
-    try {
-      return String(localStorage.getItem("voice_tts_endpoint") || "").trim();
-    } catch (_) {
-      return "";
-    }
-  }
-
-  async function requestVoicePreview(v) {
-    const endpoint = getVoiceTtsEndpoint();
-    if (!endpoint) {
-      const speed = Math.min(1.5, Math.max(0.7, Number(v.rate) || 1));
-      const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&ttsspeed="
-        + encodeURIComponent(speed.toFixed(2)) + "&q=" + encodeURIComponent(PREVIEW_TEXT);
-      const googleResponse = await fetch(googleUrl, { headers: { Accept: "audio/mpeg" } });
-      if (!googleResponse.ok) throw new Error("Myanmar Google TTS " + googleResponse.status);
-      return URL.createObjectURL(await googleResponse.blob());
-    }
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json, audio/*" },
-      body: JSON.stringify({
-        text: PREVIEW_TEXT,
-        voiceId: v.code,
-        persona: v.code,
-        locale: "my-MM",
-      }),
-    });
-    if (!response.ok) throw new Error("TTS preview endpoint " + response.status);
-
-    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-    if (contentType.startsWith("audio/")) return URL.createObjectURL(await response.blob());
-    const payload = await response.json();
-    const audioUrl = payload.audioUrl || payload.audio_url || payload.url;
-    if (!audioUrl) throw new Error("TTS response did not include an audio URL");
-    return audioUrl;
-  }
-
-  function speakVoicePreviewFallback(v) {
-    if (!("speechSynthesis" in window)) throw new Error("No browser speech fallback available");
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(PREVIEW_TEXT);
-    u.lang = "my-MM";
-    const offset = state.pitch / 60;
-    u.pitch = Math.min(2, Math.max(0.1, v.pitch + offset));
-    u.rate = v.rate;
-    window.speechSynthesis.speak(u);
+  // Static lookup: persona code -> bundled sample clip (never a network request).
+  function getVoiceSampleUrl(code) {
+    return VOICE_SAMPLES[String(code || "").trim().toUpperCase()] || "";
   }
 
   function resetVoicePreviewButton(btn) {
+    if (!btn) return;
     btn.classList.remove("playing");
     btn.disabled = false;
-    btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
+    btn.textContent = PREVIEW_LABEL_IDLE;
   }
 
-  async function previewVoice(v, btn) {
-    $$(".vc-preview").forEach((b) => {
-      resetVoicePreviewButton(b);
-    });
-    if (previewTimer) clearTimeout(previewTimer);
-    if (activePreviewAudio) {
-      activePreviewAudio.pause();
-      activePreviewAudio = null;
-    }
-
+  function markVoicePreviewPlaying(btn) {
+    if (!btn) return;
     btn.classList.add("playing");
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> ⏳ တင်ယူနေသည်...';
+    btn.textContent = PREVIEW_LABEL_PLAYING;
+  }
 
-    let audioUrl = "";
-    try {
-      audioUrl = await requestVoicePreview(v);
-      const audio = new Audio(audioUrl);
-      activePreviewAudio = audio;
-      audio.onended = () => {
-        if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
-        if (activePreviewAudio === audio) activePreviewAudio = null;
-        resetVoicePreviewButton(btn);
-      };
-      audio.onerror = () => {
-        const playbackError = new Error("audio stream could not be played");
-        console.error(`[Red Bear] Voice Preview playback failed for ${v.code}`, playbackError);
-        if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
-        if (activePreviewAudio === audio) activePreviewAudio = null;
-        resetVoicePreviewButton(btn);
-        toast(`Voice Preview failed (${v.code}): ${playbackError.message}`, "err");
-      };
-
-      // Keep playback inside the async try/catch so autoplay and decode errors
-      // are visible and never leave the card stuck in its loading state.
-      await audio.play();
-      console.info(`[Red Bear] Voice Preview started for ${v.code}`);
-      btn.disabled = false;
-      btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
-    } catch (error) {
-      console.error(`[Red Bear] Voice Preview failed for ${v.code}`, error);
-      if (audioUrl && audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
-      activePreviewAudio = null;
-      const detail = error && error.message ? error.message : String(error || "Unknown TTS error");
-      toast(`Voice Preview failed (${v.code}): ${detail}`, "err");
-      resetVoicePreviewButton(btn);
-
-      // Keep a standard browser fallback for environments that block remote audio.
+  function stopVoicePreview() {
+    const audio = activePreviewAudio;
+    activePreviewAudio = null;
+    activePreviewBtn = null;
+    if (audio) {
+      audio.onended = null;
+      audio.onerror = null;
       try {
-        speakVoicePreviewFallback(v);
-        toast("Browser speech fallback ဖြင့် ဖွင့်နေပါသည်။", "info");
-        previewTimer = setTimeout(() => resetVoicePreviewButton(btn), 2600);
-      } catch (fallbackError) {
-        console.error(`[Red Bear] Browser speech fallback failed for ${v.code}`, fallbackError);
-        toast(`Voice Preview fallback failed (${v.code}): ${fallbackError.message}`, "err");
-        resetVoicePreviewButton(btn);
-      }
+        audio.pause();
+        audio.currentTime = 0;
+      } catch (_) {}
     }
+    $$(".vc-preview").forEach(resetVoicePreviewButton);
+  }
+
+  function previewVoice(v, btn) {
+    // Only one preview at a time: stop whatever is playing and reset every card.
+    stopVoicePreview();
+
+    const sampleUrl = getVoiceSampleUrl(v.code);
+    if (!sampleUrl) {
+      console.error(`[Red Bear] No static preview sample mapped for ${v.code}`);
+      toast(`Voice Preview sample မရှိပါ (${v.code})`, "err");
+      return;
+    }
+
+    const audio = new Audio(sampleUrl);
+    audio.preload = "auto";
+    activePreviewAudio = audio;
+    activePreviewBtn = btn;
+    markVoicePreviewPlaying(btn);
+
+    const release = () => {
+      if (activePreviewAudio === audio) {
+        activePreviewAudio = null;
+        activePreviewBtn = null;
+      }
+      resetVoicePreviewButton(btn);
+    };
+
+    audio.onended = release;
+    audio.onerror = () => {
+      console.error(`[Red Bear] Voice Preview sample could not be played for ${v.code}`, sampleUrl);
+      toast(`Voice Preview failed (${v.code}): sample file မဖွင့်နိုင်ပါ`, "err");
+      release();
+    };
+
+    const playback = audio.play();
+    if (playback && typeof playback.catch === "function") {
+      playback.catch((error) => {
+        console.error(`[Red Bear] Voice Preview playback blocked for ${v.code}`, error);
+        const detail = error && error.message ? error.message : "playback blocked";
+        toast(`Voice Preview failed (${v.code}): ${detail}`, "err");
+        release();
+      });
+    }
+    console.info(`[Red Bear] Voice Preview playing ${v.code} -> ${sampleUrl}`);
   }
 
   /* ---------------- Pitch slider ---------------- */
