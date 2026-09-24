@@ -830,6 +830,22 @@ button { cursor: pointer; }
   width: 100%;
 }
 
+.step1-test-bypass {
+  display: flex;
+  width: fit-content;
+  margin: 12px auto 0;
+  border: 1px dashed #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-size: var(--fs-2xs);
+}
+
+.step1-test-bypass:hover {
+  border-color: #2563eb;
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
 .dropzone {
   border: 2px dashed var(--border-strong);
   border-radius: var(--r-lg);

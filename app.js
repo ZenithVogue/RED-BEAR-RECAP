@@ -193,8 +193,17 @@
   const videoPreviewCard = $("#videoPreviewCard");
   const step1Player = $("#step1Player");
   const extractBtn = $("#btnExtractScript");
-  const sourceTextInput = $("#sourceTextInput") || $("#step2RawText");
+  const sourceTextInput = $("#sourceTextInput");
   const processingBanner = $("#step1ProcessingBanner");
+  const DEV_MODE = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get("dev") === "1"
+        || localStorage.getItem("dev_mode") === "true";
+    } catch (_) {
+      return false;
+    }
+  })();
+  const DEV_SAMPLE_SOURCE = "今天的比赛有什么特别的消息？\nThis match is the biggest event in the last ten years.\nThe team must win before sunset.\n他们决定一起面对最后的挑战。";
   const VALID = ["mp4", "mov", "webm", "mkv"];
 
   dropzone.addEventListener("click", () => fileInput.click());
@@ -588,6 +597,17 @@
 
   if (extractBtn) extractBtn.addEventListener("click", (e) => { e.preventDefault(); runExtractScript(); });
 
+  function activateSourceTextTestMode() {
+    sourceTextInput.value = DEV_SAMPLE_SOURCE;
+    state.transcriptReady = true;
+    state.maxStep = Math.max(state.maxStep, 2);
+    goToStep(2);
+    toast("🧪 Test Mode — Sample Source Text အသင့်ဖြစ်ပါပြီ", "ok");
+  }
+
+  $("#btnSkipVideoTest").addEventListener("click", activateSourceTextTestMode);
+  if (DEV_MODE) activateSourceTextTestMode();
+
   /* ---------------- Step 2 actions ---------------- */
 
   /* STEP 2 · "Copy Full Prompt" — copies ONLY the clean raw text currently inside
@@ -645,7 +665,7 @@
 
   // Grab exactly what is inside Step 2's single text box — clean, trimmed, untouched.
   function getStep2RawText() {
-    return $("#step2RawText").value.trim();
+    return sourceTextInput.value.trim();
   }
 
   async function copyToClipboard(text) {
@@ -1218,7 +1238,7 @@
     state.pitch = 0;
     pitchSlider.value = 0;
     pitchValue.textContent = "0 Hz";
-    $("#step2RawText").value = "";
+    sourceTextInput.value = "";
     $("#burmeseText").value = "";
     state.scriptLines = [];
     state.voicePlan = [];
