@@ -1253,7 +1253,7 @@ button { cursor: pointer; }
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--red);
+  background: #2563eb;
   color: #fff;
   font-size: 10px;
   font-weight: var(--w-bold);
@@ -1324,7 +1324,8 @@ button { cursor: pointer; }
 .vc-preview:hover {
   opacity: 0.85; /* hover:opacity-85 */
 }
-.vc-preview.playing { background: var(--red); border-color: var(--red); color: #fff; }
+.vc-preview.playing { background: var(--red); border-color: var(--red); color: #fff; box-shadow: 0 4px 12px rgba(217, 45, 45, 0.2); }
+.vc-preview:disabled { cursor: wait; opacity: 0.92; }
 
 .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; margin-right: 4px; vertical-align: -1px; }
 .eq i { width: 3px; background: currentColor; border-radius: 2px; animation: eq 0.7s ease-in-out infinite; }

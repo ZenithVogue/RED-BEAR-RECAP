@@ -866,12 +866,13 @@
   const voiceGrid = $("#voiceGrid");
   VOICES.forEach((v) => {
     const card = document.createElement("div");
-    card.className = "voice-card";
+    const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    card.className = "voice-card voice-card-" + personaClass;
     card.dataset.code = v.code;
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.innerHTML = `
-      <div class="vc-code">${v.code}</div>
+      <div class="vc-code voice-avatar voice-avatar-${personaClass}">${v.code}</div>
       <div class="vc-label">${v.label}</div>
       <button class="vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
     `;
@@ -895,6 +896,7 @@
 
   function selectVoice(code) {
     state.voice = code;
+    try { localStorage.setItem("selected_voice_id", code); } catch (_) {}
     $$(".voice-card").forEach((c) => c.classList.toggle("selected", c.dataset.code === code));
     $("#voiceChip").hidden = false;
     $("#voiceChip").textContent = code + " ရွေးပြီး";
@@ -908,33 +910,99 @@
   }
 
   let previewTimer = null;
-  function previewVoice(v, btn) {
+  let activePreviewAudio = null;
+  const PREVIEW_TEXT = "မင်္ဂလာပါ၊ ဒါကတော့ နမူနာ စကားပြော အသံဖိုင် ဖြစ်ပါတယ်";
+
+  function getVoiceTtsEndpoint() {
+    try {
+      return String(localStorage.getItem("voice_tts_endpoint") || "/api/tts-preview").trim();
+    } catch (_) {
+      return "/api/tts-preview";
+    }
+  }
+
+  async function requestVoicePreview(v) {
+    const endpoint = getVoiceTtsEndpoint();
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, audio/*" },
+      body: JSON.stringify({
+        text: PREVIEW_TEXT,
+        voiceId: v.code,
+        persona: v.code,
+        locale: "my-MM",
+      }),
+    });
+    if (!response.ok) throw new Error("TTS preview endpoint " + response.status);
+
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    if (contentType.startsWith("audio/")) return URL.createObjectURL(await response.blob());
+    const payload = await response.json();
+    const audioUrl = payload.audioUrl || payload.audio_url || payload.url;
+    if (!audioUrl) throw new Error("TTS response did not include an audio URL");
+    return audioUrl;
+  }
+
+  function speakVoicePreviewFallback(v) {
+    if (!("speechSynthesis" in window)) throw new Error("No browser speech fallback available");
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(PREVIEW_TEXT);
+    u.lang = "my-MM";
+    const offset = state.pitch / 60;
+    u.pitch = Math.min(2, Math.max(0.1, v.pitch + offset));
+    u.rate = v.rate;
+    window.speechSynthesis.speak(u);
+  }
+
+  function resetVoicePreviewButton(btn) {
+    btn.classList.remove("playing");
+    btn.disabled = false;
+    btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန် (Preview)";
+  }
+
+  async function previewVoice(v, btn) {
     $$(".vc-preview").forEach((b) => {
-      b.classList.remove("playing");
-      b.innerHTML = "▶ အသံနမူနာ နားထောင်ရန် (Preview)";
+      resetVoicePreviewButton(b);
     });
     if (previewTimer) clearTimeout(previewTimer);
+    if (activePreviewAudio) {
+      activePreviewAudio.pause();
+      activePreviewAudio = null;
+    }
 
     btn.classList.add("playing");
+    btn.disabled = true;
     btn.innerHTML = '<span class="eq"><i></i><i></i><i></i></span> ဖွင့်နေသည်...';
 
-    // Best-effort audible demo via Web Speech API (persona pitch/rate)
     try {
-      if ("speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance("Red Bear Studio မှ ကြိုဆိုပါသည်။ ဤသည်မှာ အသံနမူနာ ဖြစ်ပါသည်။");
-        u.lang = "my-MM";
-        const offset = state.pitch / 60; // -30..30Hz → -0.5..0.5
-        u.pitch = Math.min(2, Math.max(0.1, v.pitch + offset));
-        u.rate = v.rate;
-        window.speechSynthesis.speak(u);
+      let audioUrl;
+      try {
+        audioUrl = await requestVoicePreview(v);
+        activePreviewAudio = new Audio(audioUrl);
+        activePreviewAudio.onended = () => {
+          if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
+          activePreviewAudio = null;
+          resetVoicePreviewButton(btn);
+        };
+        activePreviewAudio.onerror = () => {
+          if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
+          activePreviewAudio = null;
+          resetVoicePreviewButton(btn);
+          toast("အသံနမူနာ ဖွင့်မရပါ — ပြန်ကြိုးစားပါ။", "err");
+        };
+        await activePreviewAudio.play();
+      } catch (error) {
+        console.warn("[Red Bear] TTS preview unavailable; using browser speech", error);
+        speakVoicePreviewFallback(v);
+        previewTimer = setTimeout(() => {
+          resetVoicePreviewButton(btn);
+        }, 2600);
       }
-    } catch (_) {}
-
-    previewTimer = setTimeout(() => {
-      btn.classList.remove("playing");
-      btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန် (Preview)";
-    }, 2600);
+    } catch (error) {
+      console.error("[Red Bear] Voice preview failed", error);
+      toast("အသံနမူနာ ဖွင့်မရပါ — TTS endpoint ကို စစ်ဆေးပါ။", "err");
+      resetVoicePreviewButton(btn);
+    }
   }
 
   /* ---------------- Pitch slider ---------------- */
