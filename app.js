@@ -1215,12 +1215,13 @@
   const recapVoiceGrid = $("#recapVoiceGrid");
   VOICES.forEach((v) => {
     const card = document.createElement("div");
-    card.className = "voice-card";
+    const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    card.className = "voice-card voice-card-" + personaClass;
     card.dataset.code = v.code;
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.innerHTML = `
-      <div class="vc-code">${v.code}</div>
+      <div class="vc-code voice-avatar voice-avatar-${personaClass}">${v.code}</div>
       <div class="vc-label">${v.label}</div>
       <button class="vc-preview recap-vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
     `;
