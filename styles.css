@@ -1278,6 +1278,41 @@ button { cursor: pointer; }
   line-height: 1;
 }
 
+/* ---- Gender themes: male = blue gradient · female = pink/rose gradient ---- */
+.voice-card-male {
+  background: linear-gradient(160deg, #f4f8ff 0%, #dbeafe 100%);
+  border-color: #c7dcfe;
+}
+
+.voice-card-female {
+  background: linear-gradient(160deg, #fff5fa 0%, #fce7f3 100%);
+  border-color: #fbcfe8;
+}
+
+.voice-card-male:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 10px 18px -6px rgba(37, 99, 235, 0.32);
+}
+
+.voice-card-female:hover {
+  border-color: #ec4899;
+  box-shadow: 0 10px 18px -6px rgba(219, 39, 119, 0.3);
+}
+
+.voice-card-male.selected {
+  border-color: #2563eb;
+  background: linear-gradient(160deg, #dbeafe 0%, #bfdbfe 100%);
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.22), 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.voice-card-female.selected {
+  border-color: #db2777;
+  background: linear-gradient(160deg, #fce7f3 0%, #fbcfe8 100%);
+  box-shadow: 0 8px 22px rgba(219, 39, 119, 0.22), 0 0 0 3px rgba(219, 39, 119, 0.14);
+}
+
+.voice-card-female.selected::after { background: #db2777; }
+
 .vc-code {
   width: 48px;
   height: 48px;
@@ -1304,24 +1339,26 @@ button { cursor: pointer; }
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4), 0 8px 16px var(--avatar-shadow);
 }
 
-.voice-avatar-bb { background: linear-gradient(135deg, #3b82f6, #1d4ed8); --avatar-shadow: rgba(37, 99, 235, 0.42); box-shadow: 0 5px 12px rgba(37, 99, 235, 0.32); }
-.voice-avatar-nl { background: linear-gradient(135deg, #ec4899, #be185d); --avatar-shadow: rgba(190, 24, 93, 0.42); box-shadow: 0 5px 12px rgba(190, 24, 93, 0.32); }
-.voice-avatar-pw { background: linear-gradient(135deg, #f59e0b, #b45309); --avatar-shadow: rgba(180, 83, 9, 0.42); box-shadow: 0 5px 12px rgba(180, 83, 9, 0.32); }
-.voice-avatar-km { background: linear-gradient(135deg, #10b981, #047857); --avatar-shadow: rgba(4, 120, 87, 0.42); box-shadow: 0 5px 12px rgba(4, 120, 87, 0.32); }
-.voice-avatar-zk { background: linear-gradient(135deg, #8b5cf6, #6d28d9); --avatar-shadow: rgba(109, 40, 217, 0.42); box-shadow: 0 5px 12px rgba(109, 40, 217, 0.32); }
-.voice-avatar-hs { background: linear-gradient(135deg, #f43f5e, #be123c); --avatar-shadow: rgba(190, 18, 60, 0.42); box-shadow: 0 5px 12px rgba(190, 18, 60, 0.32); }
-.voice-avatar-sl { background: linear-gradient(135deg, #06b6d4, #0e7490); --avatar-shadow: rgba(14, 116, 144, 0.42); box-shadow: 0 5px 12px rgba(14, 116, 144, 0.32); }
-.voice-avatar-ys { background: linear-gradient(135deg, #84cc16, #4d7c0f); --avatar-shadow: rgba(77, 124, 15, 0.42); box-shadow: 0 5px 12px rgba(77, 124, 15, 0.32); }
-.voice-avatar-ec { background: linear-gradient(135deg, #6366f1, #4338ca); --avatar-shadow: rgba(67, 56, 202, 0.42); box-shadow: 0 5px 12px rgba(67, 56, 202, 0.32); }
-.voice-avatar-ts { background: linear-gradient(135deg, #14b8a6, #0f766e); --avatar-shadow: rgba(15, 118, 110, 0.42); box-shadow: 0 5px 12px rgba(15, 118, 110, 0.32); }
+.voice-avatar-male {
+  background: linear-gradient(135deg, #60a5fa, #1d4ed8);
+  --avatar-shadow: rgba(37, 99, 235, 0.42);
+  box-shadow: 0 5px 12px rgba(37, 99, 235, 0.32);
+}
+
+.voice-avatar-female {
+  background: linear-gradient(135deg, #f472b6, #be185d);
+  --avatar-shadow: rgba(190, 24, 93, 0.42);
+  box-shadow: 0 5px 12px rgba(190, 24, 93, 0.32);
+}
 
 .vc-label {
-  font-size: var(--fs-2xs);
-  font-weight: var(--w-med);
-  line-height: 1.55;
-  color: var(--text-2);
-  min-height: 40px;
-  margin-bottom: 7px;
+  font-size: var(--fs-sm);
+  font-weight: var(--w-semi);
+  line-height: 1.7;
+  color: var(--ink);
+  min-height: 26px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
 }
 
 .vc-preview {
@@ -1340,9 +1377,15 @@ button { cursor: pointer; }
 .vc-preview:hover {
   opacity: 0.85; /* hover:opacity-85 */
 }
+
 .vc-preview.playing { background: var(--red); border-color: var(--red); color: #fff; box-shadow: 0 4px 12px rgba(217, 45, 45, 0.2); }
 .vc-preview:disabled { cursor: wait; opacity: 0.92; }
-.vc-preview .spinner { width: 12px; height: 12px; border-width: 2px; margin-right: 4px; vertical-align: -2px; }
+
+/* Preview button follows its card theme (blue for male, pink/rose for female) */
+.voice-card-male .vc-preview { border-color: #bfdbfe; color: #1d4ed8; }
+.voice-card-female .vc-preview { border-color: #fbcfe8; color: #be185d; }
+.voice-card-male .vc-preview.playing { background: #2563eb; border-color: #2563eb; color: #fff; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.24); }
+.voice-card-female .vc-preview.playing { background: #db2777; border-color: #db2777; color: #fff; box-shadow: 0 4px 12px rgba(219, 39, 119, 0.24); }
 
 .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; margin-right: 4px; vertical-align: -1px; }
 .eq i { width: 3px; background: currentColor; border-radius: 2px; animation: eq 0.7s ease-in-out infinite; }

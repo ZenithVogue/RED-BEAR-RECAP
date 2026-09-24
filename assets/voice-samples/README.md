@@ -7,18 +7,18 @@ with `new Audio(sampleUrl)`. Nothing here is fetched from a third-party TTS serv
 runtime, which is what used to cause `Voice Preview failed: Failed to fetch` whenever
 CORS or the network blocked the request.
 
-| File | Persona | Character |
-| --- | --- | --- |
-| `bb.mp3` | BB | male · natural |
-| `nl.mp3` | NL | female · clear |
-| `pw.mp3` | PW | male · excited |
-| `km.mp3` | KM | male · deep |
-| `zk.mp3` | ZK | male · storyteller |
-| `hs.mp3` | HS | female · soft |
-| `sl.mp3` | SL | male · fast |
-| `ys.mp3` | YS | female · natural |
-| `ec.mp3` | EC | male · news anchor |
-| `ts.mp3` | TS | female · energetic |
+| File | Code | Name | Gender (card theme) |
+| --- | --- | --- | --- |
+| `bb.mp3` | BB | သီဟ | male · blue gradient |
+| `nl.mp3` | NL | နီလာ | female · pink gradient |
+| `pw.mp3` | PW | ပိုင်ဝင်း | male · blue gradient |
+| `km.mp3` | KM | ကျော်မင်း | male · blue gradient |
+| `zk.mp3` | ZK | ဇော်ကလိုင်း | male · blue gradient |
+| `hs.mp3` | HS | ဟေမာန်ဆု | female · pink gradient |
+| `sl.mp3` | SL | စိုးလင်း | male · blue gradient |
+| `ys.mp3` | YS | ယမုံရှင်း | female · pink gradient |
+| `ec.mp3` | EC | ဧကရာဇ် | male · blue gradient |
+| `ts.mp3` | TS | သီရိစိုး | female · pink gradient |
 
 Spoken line (Burmese):
 

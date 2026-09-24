@@ -32,18 +32,31 @@
     keys: { crumb: "API Keys" },
   };
 
+  // Persona display is name-only: the Myanmar name is what the card shows, the
+  // two-letter code stays the internal id (sample clip, saved selection, result row).
   const VOICES = [
-    { code: "BB", label: "BB (အမျိုးသား - သဘာဝကျသော အသံ)", rate: 0.95, pitch: 1.0 },
-    { code: "NL", label: "NL (အမျိုးသမီး - ရှင်းလင်းသော အသံ)", rate: 1.0, pitch: 1.25 },
-    { code: "PW", label: "PW (အမျိုးသား - စိတ်လှုပ်ရှားဖွယ် အသံ)", rate: 1.15, pitch: 1.1 },
-    { code: "KM", label: "KM (အမျိုးသား - လေးနက်သော အသံ)", rate: 0.85, pitch: 0.75 },
-    { code: "ZK", label: "ZK (အမျိုးသား - ဇာတ်ကြောင်းပြော အသံ)", rate: 0.9, pitch: 0.9 },
-    { code: "HS", label: "HS (အမျိုးသမီး - နူးညံ့သော အသံ)", rate: 0.95, pitch: 1.35 },
-    { code: "SL", label: "SL (အမျိုးသား - မြန်ဆန်သော အသံ)", rate: 1.3, pitch: 1.0 },
-    { code: "YS", label: "YS (အမျိုးသမီး - သဘာဝကျသော အသံ)", rate: 1.0, pitch: 1.2 },
-    { code: "EC", label: "EC (အမျိုးသား - သတင်းကြေညာ အသံ)", rate: 1.05, pitch: 0.95 },
-    { code: "TS", label: "TS (အမျိုးသမီး - တက်ကြွသော အသံ)", rate: 1.2, pitch: 1.3 },
+    { code: "BB", name: "သီဟ", gender: "male", rate: 0.95, pitch: 1.0 },
+    { code: "NL", name: "နီလာ", gender: "female", rate: 1.0, pitch: 1.25 },
+    { code: "PW", name: "ပိုင်ဝင်း", gender: "male", rate: 1.15, pitch: 1.1 },
+    { code: "KM", name: "ကျော်မင်း", gender: "male", rate: 0.85, pitch: 0.75 },
+    { code: "ZK", name: "ဇော်ကလိုင်း", gender: "male", rate: 0.9, pitch: 0.9 },
+    { code: "HS", name: "ဟေမာန်ဆု", gender: "female", rate: 0.95, pitch: 1.35 },
+    { code: "SL", name: "စိုးလင်း", gender: "male", rate: 1.3, pitch: 1.0 },
+    { code: "YS", name: "ယမုံရှင်း", gender: "female", rate: 1.0, pitch: 1.2 },
+    { code: "EC", name: "ဧကရာဇ်", gender: "male", rate: 1.05, pitch: 0.95 },
+    { code: "TS", name: "သီရိစိုး", gender: "female", rate: 1.2, pitch: 1.3 },
   ];
+
+  const voiceGenderClass = (v) => (v && v.gender === "female" ? "female" : "male");
+  const voiceName = (code) => {
+    const hit = VOICES.find((x) => x.code === code);
+    return hit ? hit.name : "";
+  };
+
+  // Preview button labels live next to the persona table: the voice grids are built
+  // further down but read these at render time.
+  const PREVIEW_LABEL_IDLE = "▶ အသံနမူနာ နားထောင်ရန်";
+  const PREVIEW_LABEL_PLAYING = "🔊 ဖွင့်နေသည်...";
 
   /* ---------------- Toasts ---------------- */
   const toastWrap = $("#toastWrap");
@@ -887,14 +900,17 @@
   VOICES.forEach((v) => {
     const card = document.createElement("div");
     const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    card.className = "voice-card voice-card-" + personaClass;
+    const genderClass = voiceGenderClass(v);
+    card.className = `voice-card voice-card-${personaClass} voice-card-${genderClass}`;
     card.dataset.code = v.code;
+    card.dataset.gender = genderClass;
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", `${v.name} (${v.code})`);
     card.innerHTML = `
-      <div class="vc-code voice-avatar voice-avatar-${personaClass}">${v.code}</div>
-      <div class="vc-label">${v.label}</div>
-      <button class="vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
+      <div class="vc-code voice-avatar voice-avatar-${genderClass}">${v.code}</div>
+      <div class="vc-label">${v.name}</div>
+      <button class="vc-preview" type="button">${PREVIEW_LABEL_IDLE}</button>
     `;
     card.addEventListener("click", (e) => {
       if (e.target.closest(".vc-preview")) return;
@@ -919,7 +935,7 @@
     try { localStorage.setItem("selected_voice_id", code); } catch (_) {}
     $$(".voice-card").forEach((c) => c.classList.toggle("selected", c.dataset.code === code));
     $("#voiceChip").hidden = false;
-    $("#voiceChip").textContent = code + " ရွေးပြီး";
+    $("#voiceChip").textContent = (voiceName(code) || code) + " ရွေးပြီး";
     // keep per-line "Global" labels current
     refreshGlobalPicks();
     // re-generation is required after a change
@@ -949,9 +965,6 @@
     EC: VOICE_SAMPLE_DIR + "ec.mp3",
     TS: VOICE_SAMPLE_DIR + "ts.mp3",
   };
-
-  const PREVIEW_LABEL_IDLE = "▶ အသံနမူနာ နားထောင်ရန်";
-  const PREVIEW_LABEL_PLAYING = "🔊 ဖွင့်နေသည်...";
 
   let activePreviewAudio = null;
   let activePreviewBtn = null;
@@ -1128,7 +1141,7 @@
     const vp = $("#step1Player");
     if (state.videoUrl && vp && !vp.src) vp.src = state.videoUrl;
     const v = VOICES.find((x) => x.code === state.voice);
-    $("#resVoice").textContent = v ? v.code + " · " + v.label.replace(/^[A-Z]{2} /, "").replace(/^\(|\)$/g, "") : "—";
+    $("#resVoice").textContent = v ? v.code + " · " + v.name : "—";
     $("#resPitch").textContent = fmtPitch(state.pitch);
     const plan = state.voicePlan || [];
     if (plan.length) {
@@ -1313,14 +1326,17 @@
   VOICES.forEach((v) => {
     const card = document.createElement("div");
     const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    card.className = "voice-card voice-card-" + personaClass;
+    const genderClass = voiceGenderClass(v);
+    card.className = `voice-card voice-card-${personaClass} voice-card-${genderClass}`;
     card.dataset.code = v.code;
+    card.dataset.gender = genderClass;
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", `${v.name} (${v.code})`);
     card.innerHTML = `
-      <div class="vc-code voice-avatar voice-avatar-${personaClass}">${v.code}</div>
-      <div class="vc-label">${v.label}</div>
-      <button class="vc-preview recap-vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
+      <div class="vc-code voice-avatar voice-avatar-${genderClass}">${v.code}</div>
+      <div class="vc-label">${v.name}</div>
+      <button class="vc-preview recap-vc-preview" type="button">${PREVIEW_LABEL_IDLE}</button>
     `;
     card.addEventListener("click", (e) => {
       if (e.target.closest(".vc-preview")) return;
@@ -1338,7 +1354,7 @@
     state.voice = code;
     $$("#recapVoiceGrid .voice-card").forEach((c) => c.classList.toggle("selected", c.dataset.code === code));
     $("#recapVoiceChip").hidden = false;
-    $("#recapVoiceChip").textContent = code + " ရွေးပြီး";
+    $("#recapVoiceChip").textContent = (voiceName(code) || code) + " ရွေးပြီး";
   }
 
   $("#recapPitchSlider").addEventListener("input", () => {
