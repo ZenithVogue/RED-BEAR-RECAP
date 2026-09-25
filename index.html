@@ -288,8 +288,9 @@
           <section class="step-panel" id="stepPanel4">
             <div class="card">
               <div class="card-head">
-                <h2 class="card-title">ဖန်တီးပြီးစီးသော ဗီဒီယိုနှင့် အသံ</h2>
-                <span class="chip chip-green">✓ ပြီးစီးပါပြီ</span>
+                <!-- [VIDEO-EXPORT] title was "ဖန်တီးပြီးစီးသော ဗီဒီယိုနှင့် အသံ" before audio-only test mode -->
+                <h2 class="card-title">ဖန်တီးပြီးစီးသော အသံဖိုင် (Audio Only Test)</h2>
+                <span class="chip chip-gold">🎵 Audio-Only Test Mode</span>
               </div>
 
               <div class="result-grid">
@@ -330,7 +331,12 @@
 
               <div class="action-row">
                 <button class="btn btn-ghost" id="btnRerender" type="button">🔄 ပြန်လည် ဖန်တီးမည် (Re-render)</button>
-                <button class="btn btn-primary" id="btnDownloadSrt" type="button">📥 စာတန်းထိုး ဒေါင်းလုဒ်ဆွဲရန် (.srt)</button>
+                <!-- [VIDEO-EXPORT] this slot held the MP4 download button:
+                <button class="btn btn-primary" id="btnDownloadVideo" type="button">🎬 ဗီဒီယို ဒေါင်းလုဒ်လုပ်ရန် (Video Download)</button>
+                -->
+                <button class="btn btn-primary" id="btnDownloadAudio" type="button">🎵 ဒေါင်းလုဒ်လုပ်ရန် (Test Audio MP3)</button>
+                <!-- [VIDEO-EXPORT] .srt button was btn-primary before audio-only test mode -->
+                <button class="btn btn-ghost" id="btnDownloadSrt" type="button">📥 စာတန်းထိုး ဒေါင်းလုဒ်ဆွဲရန် (.srt)</button>
               </div>
 
               <div class="panel-foot">

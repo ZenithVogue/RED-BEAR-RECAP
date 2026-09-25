@@ -1134,7 +1134,8 @@
     const fill = $("#rbFill");
     const pct = $("#rbPct");
     const lab = $("#rbLabel");
-    if (lab) lab.textContent = label || "ဗီဒီယို ဖန်တီးနေပါသည်...";
+    // [VIDEO-EXPORT] default was "ဗီဒီယို ဖန်တီးနေပါသည်..." before audio-only test mode.
+    if (lab) lab.textContent = label || "အသံဖိုင် ဖန်တီးနေပါသည်...";
     if (bar) bar.hidden = false;
     if (fill) fill.style.width = "0%";
     if (pct) pct.textContent = "0%";
@@ -1145,6 +1146,301 @@
     }
     if (bar) bar.hidden = true;
   }
+
+  /* ================================================================
+     TEST MODE — AUDIO-ONLY RENDER / EXPORT
+     ----------------------------------------------------------------
+     While TEST_AUDIO_ONLY_EXPORT is true the final step skips the video
+     side of the pipeline (canvas composition + FFmpeg video layer) and
+     bounces the voice-over timeline straight to one downloadable MP3.
+
+     TO REVERT TO FULL VIDEO EXPORT:
+       1. set TEST_AUDIO_ONLY_EXPORT = false;
+       2. restore every commented block tagged [VIDEO-EXPORT] (here, in
+          generateVoiceOver(), in the Re-render handler and in Auto Recap);
+       3. in index.html swap #btnDownloadAudio back to the video download
+          button (also tagged [VIDEO-EXPORT]).
+
+     NOTE: this build has no TTS backend, so each script line is voiced by
+     the bundled sample clip of the persona assigned to that line. Swap
+     loadVoiceClipBuffer() for the real per-line TTS audio when it exists —
+     the mixdown/encode path below stays exactly the same.
+     ================================================================ */
+  const TEST_AUDIO_ONLY_EXPORT = true;
+  const TEST_AUDIO_MP3_KBPS = 96;
+  const TEST_AUDIO_SAMPLE_RATE = 44100;
+  const TEST_AUDIO_GAP_SEC = 0.28;       // silence between two script lines
+  const TEST_AUDIO_MIN_LINE_SEC = 2.2;   // shortest slice used for one line
+  const TEST_AUDIO_PER_CHAR_SEC = 0.055; // line length -> slice length
+  const TEST_AUDIO_BGM_GAIN = 0.16;      // background music sits under the voice
+  const MP3_ENCODER_SRC = "assets/vendor/lamejs/lame.min.js";
+
+  /* [VIDEO-EXPORT] original video export constants
+  const VIDEO_EXPORT_MIME = "video/mp4";
+  const VIDEO_EXPORT_FPS = 30;
+  */
+
+  let mp3EncoderPromise = null;
+  let decodeCtx = null;
+  const voiceClipCache = new Map();
+
+  // The encoder is only pulled in when the user actually exports (local file,
+  // no CDN), so normal page loads stay light.
+  function loadMp3Encoder() {
+    if (window.lamejs && window.lamejs.Mp3Encoder) return Promise.resolve(window.lamejs);
+    if (mp3EncoderPromise) return mp3EncoderPromise;
+    mp3EncoderPromise = new Promise((resolve, reject) => {
+      const el = document.createElement("script");
+      el.src = MP3_ENCODER_SRC;
+      el.onload = () => {
+        if (window.lamejs && window.lamejs.Mp3Encoder) resolve(window.lamejs);
+        else reject(new Error("MP3 encoder did not initialise"));
+      };
+      el.onerror = () => reject(new Error("MP3 encoder could not be loaded"));
+      document.head.appendChild(el);
+    });
+    return mp3EncoderPromise;
+  }
+
+  function getAudioCtxClass() { return window.AudioContext || window.webkitAudioContext || null; }
+  function getOfflineCtxClass() { return window.OfflineAudioContext || window.webkitOfflineAudioContext || null; }
+
+  function getDecodeContext() {
+    const Ctx = getAudioCtxClass();
+    if (!Ctx) throw new Error("Web Audio API is not available in this browser");
+    if (!decodeCtx) decodeCtx = new Ctx();
+    return decodeCtx;
+  }
+
+  function decodeAudioBytes(bytes) {
+    const ctx = getDecodeContext();
+    return new Promise((resolve, reject) => {
+      const done = ctx.decodeAudioData(bytes, resolve, reject);
+      if (done && typeof done.then === "function") done.then(resolve, reject);
+    });
+  }
+
+  // Stand-in for per-line TTS audio: the persona's bundled sample clip.
+  async function loadVoiceClipBuffer(code) {
+    const url = getVoiceSampleUrl(code) || getVoiceSampleUrl(VOICES[0].code);
+    if (!url) throw new Error("no sample clip for voice " + code);
+    if (voiceClipCache.has(url)) return voiceClipCache.get(url);
+    const res = await fetch(url); // same-origin asset, never a third-party API
+    if (!res.ok) throw new Error("sample clip " + res.status);
+    const buffer = await decodeAudioBytes(await res.arrayBuffer());
+    voiceClipCache.set(url, buffer);
+    return buffer;
+  }
+
+  // Optional background music — wired for a future picker; inert until one exists.
+  function getBackgroundMusicUrl() {
+    const el = document.getElementById("bgmSelect");
+    if (el && el.value) return el.value;
+    try { return String(localStorage.getItem("rb_bgm_url") || "").trim(); } catch (_) { return ""; }
+  }
+
+  async function loadBackgroundMusicBuffer() {
+    const url = getBackgroundMusicUrl();
+    if (!url) return null;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("background music " + res.status);
+      return await decodeAudioBytes(await res.arrayBuffer());
+    } catch (error) {
+      console.warn("[Red Bear] background music skipped:", error);
+      toast("နောက်ခံသီချင်း ထည့်၍ မရပါ — အသံသာ ထုတ်ပါမည်။", "info");
+      return null;
+    }
+  }
+
+  function pitchOffsetToRate(hz) {
+    const v = Number(hz);
+    if (!isFinite(v) || !v) return 1;
+    return Math.min(1.35, Math.max(0.75, 1 + v / 200));
+  }
+
+  function currentExportPlan() {
+    const plan = (state.voicePlan || []).filter((p) => p && String(p.text || "").trim());
+    if (plan.length) return plan;
+    return (state.scriptLines || [])
+      .filter((l) => l && String(l.text || "").trim())
+      .map((l, i) => ({
+        n: i + 1,
+        text: l.text,
+        voice: l.voice || state.voice,
+        pitch: l.pitch === "" || l.pitch === undefined ? state.pitch : l.pitch,
+      }));
+  }
+
+  // Lay the per-line clips on one timeline and bounce it to a single buffer.
+  async function buildTestAudioBuffer(onStage) {
+    const plan = currentExportPlan();
+    if (!plan.length) throw new Error("no script lines to export");
+    const OfflineCtx = getOfflineCtxClass();
+    if (!OfflineCtx) throw new Error("Web Audio API is not available in this browser");
+
+    if (onStage) onStage("clips");
+    const segments = [];
+    let cursor = 0;
+    for (const line of plan) {
+      const code = line.voice || state.voice || VOICES[0].code;
+      const buffer = await loadVoiceClipBuffer(code);
+      const rate = pitchOffsetToRate(line.pitch);
+      const natural = buffer.duration / rate;
+      const wanted = Math.min(natural, Math.max(TEST_AUDIO_MIN_LINE_SEC,
+        TEST_AUDIO_MIN_LINE_SEC + String(line.text || "").length * TEST_AUDIO_PER_CHAR_SEC));
+      segments.push({ buffer, rate, start: cursor, duration: wanted });
+      cursor += wanted + TEST_AUDIO_GAP_SEC;
+    }
+
+    const bgm = await loadBackgroundMusicBuffer();
+    const total = Math.max(0.5, cursor - TEST_AUDIO_GAP_SEC + 0.35);
+    const offline = new OfflineCtx(1, Math.ceil(total * TEST_AUDIO_SAMPLE_RATE), TEST_AUDIO_SAMPLE_RATE);
+
+    if (onStage) onStage("mix");
+    segments.forEach((seg) => {
+      const src = offline.createBufferSource();
+      src.buffer = seg.buffer;
+      src.playbackRate.value = seg.rate;
+      const gain = offline.createGain();
+      const fade = Math.min(0.06, seg.duration / 4);
+      gain.gain.setValueAtTime(0.0001, seg.start);
+      gain.gain.linearRampToValueAtTime(1, seg.start + fade);
+      gain.gain.setValueAtTime(1, seg.start + seg.duration - fade);
+      gain.gain.linearRampToValueAtTime(0.0001, seg.start + seg.duration);
+      src.connect(gain);
+      gain.connect(offline.destination);
+      // offset/duration are in buffer time, so scale by the playback rate.
+      src.start(seg.start, 0, seg.duration * seg.rate);
+    });
+
+    if (bgm) {
+      const music = offline.createBufferSource();
+      music.buffer = bgm;
+      music.loop = true;
+      const musicGain = offline.createGain();
+      musicGain.gain.setValueAtTime(TEST_AUDIO_BGM_GAIN, 0);
+      musicGain.gain.setValueAtTime(TEST_AUDIO_BGM_GAIN, Math.max(0, total - 1.2));
+      musicGain.gain.linearRampToValueAtTime(0.0001, total);
+      music.connect(musicGain);
+      musicGain.connect(offline.destination);
+      music.start(0);
+      music.stop(total);
+    }
+
+    const rendered = await offline.startRendering();
+    return { buffer: rendered, lines: plan.length, withMusic: !!bgm };
+  }
+
+  function floatToPcm16(input) {
+    const out = new Int16Array(input.length);
+    for (let i = 0; i < input.length; i++) {
+      const s = Math.max(-1, Math.min(1, input[i]));
+      out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return out;
+  }
+
+  function audioBufferToMp3Blob(buffer, kbps) {
+    const lame = window.lamejs;
+    if (!lame || !lame.Mp3Encoder) throw new Error("MP3 encoder is not ready");
+    const channels = Math.min(2, buffer.numberOfChannels || 1);
+    const encoder = new lame.Mp3Encoder(channels, buffer.sampleRate, kbps || TEST_AUDIO_MP3_KBPS);
+    const left = floatToPcm16(buffer.getChannelData(0));
+    const right = channels > 1 ? floatToPcm16(buffer.getChannelData(1)) : null;
+    const blockSize = 1152;
+    const chunks = [];
+    for (let i = 0; i < left.length; i += blockSize) {
+      const l = left.subarray(i, i + blockSize);
+      const encoded = right
+        ? encoder.encodeBuffer(l, right.subarray(i, i + blockSize))
+        : encoder.encodeBuffer(l);
+      if (encoded && encoded.length) chunks.push(new Uint8Array(encoded));
+    }
+    const tail = encoder.flush();
+    if (tail && tail.length) chunks.push(new Uint8Array(tail));
+    return new Blob(chunks, { type: "audio/mpeg" });
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  function exportBaseName() {
+    const raw = state.file && state.file.name ? state.file.name : "red-bear-recap";
+    return String(raw).replace(/\.[^.]+$/, "").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60) || "red-bear-recap";
+  }
+
+  function setRenderBar(label, pct) {
+    const bar = $("#renderBar");
+    const fill = $("#rbFill");
+    const p = $("#rbPct");
+    const lab = $("#rbLabel");
+    if (bar) bar.hidden = false;
+    if (lab && label) lab.textContent = label;
+    if (fill) fill.style.width = pct + "%";
+    if (p) p.textContent = Math.round(pct) + "%";
+  }
+
+  function hideRenderBar() {
+    const bar = $("#renderBar");
+    if (bar) bar.hidden = true;
+  }
+
+  async function exportTestAudio() {
+    const btn = $("#btnDownloadAudio");
+    if (!currentExportPlan().length) {
+      toast("စာမူ မရှိသေးပါ — Step 3 တွင် အသံ အရင်ဖန်တီးပါ။", "info");
+      return;
+    }
+    const label = btn ? btn.innerHTML : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> အသံဖိုင် ပြင်ဆင်နေပါသည်...';
+    }
+    try {
+      setRenderBar("အသံဖိုင် ပေါင်းစပ်နေပါသည်...", 10);
+      const lamePromise = loadMp3Encoder();
+      const mix = await buildTestAudioBuffer((stage) => {
+        setRenderBar(stage === "clips" ? "အသံနမူနာများ ဖတ်နေပါသည်..." : "အသံလိုင်း ပေါင်းစပ်နေပါသည်...",
+          stage === "clips" ? 30 : 55);
+      });
+      setRenderBar("MP3 အဖြစ် ပြောင်းနေပါသည်...", 75);
+      await lamePromise;
+      const blob = audioBufferToMp3Blob(mix.buffer, TEST_AUDIO_MP3_KBPS);
+      setRenderBar("ဒေါင်းလုဒ် စတင်နေပါသည်...", 100);
+      downloadBlob(blob, exportBaseName() + ".test-audio.mp3");
+      const secs = Math.round(mix.buffer.duration);
+      toast(`🎵 Test Audio MP3 ရပါပြီ — ${mix.lines} lines · ${secs}s${mix.withMusic ? " · +music" : ""}`, "ok");
+    } catch (error) {
+      console.error("[Red Bear] Test audio export failed", error);
+      toast("အသံဖိုင် ထုတ်၍ မရပါ — " + (error && error.message ? error.message : "unknown error"), "err");
+    } finally {
+      hideRenderBar();
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = label || "🎵 ဒေါင်းလုဒ်လုပ်ရန် (Test Audio MP3)";
+      }
+    }
+  }
+
+  const btnDownloadAudio = $("#btnDownloadAudio");
+  if (btnDownloadAudio) btnDownloadAudio.addEventListener("click", exportTestAudio);
+
+  /* [VIDEO-EXPORT] original MP4 download handler
+  $("#btnDownloadVideo").addEventListener("click", async () => {
+    // canvas composition + FFmpeg mux produced state.renderedVideoBlob here
+    downloadBlob(state.renderedVideoBlob, exportBaseName() + ".mp4");
+  });
+  */
 
   /* ---------------- Generate voice over ---------------- */
   async function generateVoiceOver() {
@@ -1187,8 +1483,13 @@
       $$(".step-panel").forEach((p) => p.classList.toggle("active", p.id === "stepPanel4"));
       updateStepsUI();
       window.scrollTo({ top: 0, behavior: "smooth" });
+      /* [VIDEO-EXPORT] full render: HTML5 canvas composition + FFmpeg video layer
       await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်...");
       toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
+      */
+      // TEST MODE: audio only — nothing is drawn to a canvas and no video is muxed.
+      await runRenderProgress("အသံဖိုင် ဖန်တီးနေပါသည်... (Audio Only Test)");
+      toast("အသံဖိုင် ဖန်တီးပြီးပါပြီ ✓ — 🎵 Test Audio MP3 ဖြင့် ဒေါင်းလုဒ်ဆွဲပါ။", "ok");
     } catch (err) {
       toast("Generate မအောင်မြင်ပါ — ပြန်ကြိုးစားပါ။", "err");
     } finally {
@@ -1273,6 +1574,12 @@
     const bar = $("#renderBar");
     const fill = $("#rbFill");
     const pct = $("#rbPct");
+    const lab = $("#rbLabel");
+    /* [VIDEO-EXPORT] original label
+    if (lab) lab.textContent = "ဗီဒီယို ဖန်တီးနေပါသည်...";
+    */
+    // TEST MODE: the re-render only rebuilds the audio mix.
+    if (lab) lab.textContent = "အသံဖိုင် ပြန်လည် ဖန်တီးနေပါသည်... (Audio Only Test)";
     btn.disabled = true;
     bar.hidden = false;
     fill.style.width = "0%";
@@ -1284,7 +1591,7 @@
     bar.hidden = true;
     btn.disabled = false;
     renderResult();
-    toast("ပြန်လည် ဖန်တီးပြီးပါပြီ ✓", "ok");
+    toast("အသံဖိုင် ပြန်လည် ဖန်တီးပြီးပါပြီ ✓ (Audio Only Test)", "ok");
   });
 
   /* ---------------- SRT download ---------------- */
@@ -1425,11 +1732,13 @@
     const btn = $("#btnStartAutoTranslate");
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> 1-Click Pipeline လုပ်ဆောင်နေပါသည်...';
-    toast("Transcript → Gemini ဘာသာပြန် → TTS → Video Muxing…", "ok");
+    /* [VIDEO-EXPORT] toast("Transcript → Gemini ဘာသာပြန် → TTS → Video Muxing…", "ok"); */
+    toast("Transcript → Gemini ဘာသာပြန် → TTS → Audio Mixdown… (Audio Only Test)", "ok");
     await wait(900);
     toast("မြန်မာဘာသာပြန် ပြီးပါပြီ — အသံ ဖန်တီးနေပါသည်…", "ok");
     await wait(900);
-    toast("ဗီဒီယို Muxing လုပ်နေပါသည်…", "ok");
+    /* [VIDEO-EXPORT] toast("ဗီဒီယို Muxing လုပ်နေပါသည်…", "ok"); */
+    toast("အသံဖိုင် ပေါင်းစပ်နေပါသည်…", "ok");
     await wait(900);
     state.transcriptReady = true;
     state.voiceGenerated = true;
@@ -1443,7 +1752,8 @@
     state.maxStep = 4;
     $$(".step-panel").forEach((p) => p.classList.toggle("active", p.id === "stepPanel4"));
     updateStepsUI();
-    await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်...");
+    /* [VIDEO-EXPORT] await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်..."); */
+    await runRenderProgress("အသံဖိုင် ဖန်တီးနေပါသည်... (Audio Only Test)");
     btn.disabled = false;
     btn.innerHTML = "⚡ Start Auto Translate";
     toast("Auto Recap ပြီးစီးပါပြီ ✓", "ok");
