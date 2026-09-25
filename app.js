@@ -895,12 +895,26 @@
   });
   burmeseInput.addEventListener("blur", () => autoCleanBurmeseInput({ notify: false }));
 
-  /* ---------------- Step 3: Voice cards ---------------- */
-  const voiceGrid = $("#voiceGrid");
-  VOICES.forEach((v) => {
-    const card = document.createElement("div");
+  /* ---------------- Voice cards: grouped by gender ----------------
+     Male personas render in an upper blue section, female personas in a lower
+     pink/rose section, so the two gradients never share a row. Both the Step 3
+     grid and the Auto Recap grid are built from the same VOICES data. */
+  const VOICE_GROUPS = [
+    { gender: "male", my: "အမျိုးသား အသံများ", en: "Male Voices", symbol: "♂" },
+    { gender: "female", my: "အမျိုးသမီး အသံများ", en: "Female Voices", symbol: "♀" },
+  ];
+
+  const VOICE_FILTERS = [
+    { key: "all", label: "အားလုံး" },
+    { key: "male", label: "အမျိုးသား" },
+    { key: "female", label: "အမျိုးသမီး" },
+  ];
+
+  function createVoiceCard(v, opts) {
+    const onSelect = opts.onSelect;
     const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
     const genderClass = voiceGenderClass(v);
+    const card = document.createElement("div");
     card.className = `voice-card voice-card-${personaClass} voice-card-${genderClass}`;
     card.dataset.code = v.code;
     card.dataset.gender = genderClass;
@@ -910,25 +924,83 @@
     card.innerHTML = `
       <div class="vc-code voice-avatar voice-avatar-${genderClass}">${v.code}</div>
       <div class="vc-label">${v.name}</div>
-      <button class="vc-preview" type="button">${PREVIEW_LABEL_IDLE}</button>
+      <button class="vc-preview${opts.previewClass ? " " + opts.previewClass : ""}" type="button">${PREVIEW_LABEL_IDLE}</button>
     `;
     card.addEventListener("click", (e) => {
       if (e.target.closest(".vc-preview")) return;
-      selectVoice(v.code);
+      onSelect(v.code);
     });
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        selectVoice(v.code);
+        onSelect(v.code);
       }
     });
     $(".vc-preview", card).addEventListener("click", (e) => {
       e.stopPropagation();
-      selectVoice(v.code);
+      onSelect(v.code);
       previewVoice(v, e.currentTarget);
     });
-    voiceGrid.appendChild(card);
-  });
+    return card;
+  }
+
+  function buildVoiceSections(container, opts) {
+    if (!container) return;
+    const options = opts || {};
+    container.innerHTML = "";
+    container.dataset.filter = "all";
+
+    const filterBar = document.createElement("div");
+    filterBar.className = "voice-filter";
+    filterBar.setAttribute("role", "group");
+    filterBar.setAttribute("aria-label", "ကျား/မ အလိုက် စစ်ထုတ်ရန်");
+    VOICE_FILTERS.forEach((f) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "voice-filter-chip" + (f.key === "all" ? " active" : "");
+      chip.dataset.filter = f.key;
+      chip.textContent = f.label;
+      chip.setAttribute("aria-pressed", String(f.key === "all"));
+      chip.addEventListener("click", () => {
+        stopVoicePreview();
+        container.dataset.filter = f.key;
+        $$(".voice-filter-chip", filterBar).forEach((c) => {
+          const on = c.dataset.filter === f.key;
+          c.classList.toggle("active", on);
+          c.setAttribute("aria-pressed", String(on));
+        });
+      });
+      filterBar.appendChild(chip);
+    });
+    container.appendChild(filterBar);
+
+    VOICE_GROUPS.forEach((group) => {
+      const voices = VOICES.filter((v) => voiceGenderClass(v) === group.gender);
+      if (!voices.length) return;
+
+      const section = document.createElement("section");
+      section.className = `voice-group voice-group-${group.gender}`;
+      section.dataset.gender = group.gender;
+
+      const head = document.createElement("div");
+      head.className = "voice-group-head";
+      head.innerHTML = `
+        <span class="voice-group-icon" aria-hidden="true">${group.symbol}</span>
+        <h4 class="voice-group-title">${group.my} <span class="voice-group-en">(${group.en})</span></h4>
+        <span class="voice-group-count">${voices.length}</span>
+      `;
+      section.appendChild(head);
+
+      const grid = document.createElement("div");
+      grid.className = "voice-grid-inner";
+      voices.forEach((v) => grid.appendChild(createVoiceCard(v, options)));
+      section.appendChild(grid);
+
+      container.appendChild(section);
+    });
+  }
+
+  buildVoiceSections($("#voiceGrid"), { onSelect: (code) => selectVoice(code) });
 
   function selectVoice(code) {
     state.voice = code;
@@ -1322,32 +1394,9 @@
     showRecapWorkspace(false);
   });
 
-  const recapVoiceGrid = $("#recapVoiceGrid");
-  VOICES.forEach((v) => {
-    const card = document.createElement("div");
-    const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    const genderClass = voiceGenderClass(v);
-    card.className = `voice-card voice-card-${personaClass} voice-card-${genderClass}`;
-    card.dataset.code = v.code;
-    card.dataset.gender = genderClass;
-    card.setAttribute("role", "button");
-    card.setAttribute("tabindex", "0");
-    card.setAttribute("aria-label", `${v.name} (${v.code})`);
-    card.innerHTML = `
-      <div class="vc-code voice-avatar voice-avatar-${genderClass}">${v.code}</div>
-      <div class="vc-label">${v.name}</div>
-      <button class="vc-preview recap-vc-preview" type="button">${PREVIEW_LABEL_IDLE}</button>
-    `;
-    card.addEventListener("click", (e) => {
-      if (e.target.closest(".vc-preview")) return;
-      selectRecapVoice(v.code);
-    });
-    $(".vc-preview", card).addEventListener("click", (e) => {
-      e.stopPropagation();
-      selectRecapVoice(v.code);
-      previewVoice(v, e.currentTarget);
-    });
-    recapVoiceGrid.appendChild(card);
+  buildVoiceSections($("#recapVoiceGrid"), {
+    previewClass: "recap-vc-preview",
+    onSelect: (code) => selectRecapVoice(code),
   });
 
   function selectRecapVoice(code) {
