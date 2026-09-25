@@ -1162,9 +1162,19 @@
           button (also tagged [VIDEO-EXPORT]).
 
      NOTE: this build has no TTS backend, so each script line is voiced by
-     the bundled sample clip of the persona assigned to that line. Swap
-     loadVoiceClipBuffer() for the real per-line TTS audio when it exists —
-     the mixdown/encode path below stays exactly the same.
+     the bundled sample clip of the persona assigned to that line. Point
+     clipUrlForSentence() inside fetchPlanAudio() at the real per-line TTS
+     endpoint when it exists — every later phase stays exactly the same.
+
+     PIPELINE (one phase must finish before the next one starts):
+       currentExportPlan()  -> one entry per subtitle line
+       fetchPlanAudio()     -> Promise.all() of every clip, byte size logged,
+                               any failure aborts with "Audio fetch failed for
+                               sentence X" instead of exporting silence
+       decodePlanAudio()    -> decode on a RESUMED AudioContext
+       mixPlanAudio()       -> OfflineAudioContext mixdown (+ background music)
+       peak check           -> silence is rejected, falls back to a plain
+                               new Blob([...], { type: "audio/mp3" }) concat
      ================================================================ */
   const TEST_AUDIO_ONLY_EXPORT = true;
   const TEST_AUDIO_MP3_KBPS = 96;
@@ -1173,6 +1183,9 @@
   const TEST_AUDIO_MIN_LINE_SEC = 2.2;   // shortest slice used for one line
   const TEST_AUDIO_PER_CHAR_SEC = 0.055; // line length -> slice length
   const TEST_AUDIO_BGM_GAIN = 0.16;      // background music sits under the voice
+  const TEST_AUDIO_DEBUG = true;         // byte-size logging while the test build is on
+  const TEST_AUDIO_ALERT_ON_FAIL = true; // hard alert instead of a silent export
+  const TEST_AUDIO_SILENCE_PEAK = 0.0008; // anything quieter counts as "silent"
   const MP3_ENCODER_SRC = "assets/vendor/lamejs/lame.min.js";
 
   /* [VIDEO-EXPORT] original video export constants
@@ -1182,7 +1195,8 @@
 
   let mp3EncoderPromise = null;
   let decodeCtx = null;
-  const voiceClipCache = new Map();
+  const clipBytesCache = new Map();   // url -> ArrayBuffer (kept intact for the fallback)
+  const clipBufferCache = new Map();  // url -> decoded AudioBuffer
 
   // The encoder is only pulled in when the user actually exports (local file,
   // no CDN), so normal page loads stay light.
@@ -1212,24 +1226,141 @@
     return decodeCtx;
   }
 
-  function decodeAudioBytes(bytes) {
+  // A context created outside a user gesture comes back "suspended"; decoding on
+  // a suspended context is one of the ways an export ends up silent, so always
+  // resume before touching audio data.
+  async function getReadyDecodeContext() {
     const ctx = getDecodeContext();
+    if (ctx.state === "suspended" && typeof ctx.resume === "function") {
+      try {
+        await ctx.resume();
+        console.info("[Red Bear] AudioContext resumed →", ctx.state);
+      } catch (error) {
+        console.warn("[Red Bear] AudioContext could not be resumed", error);
+      }
+    }
+    return ctx;
+  }
+
+  function decodeAudioBytes(bytes, ctx) {
+    const context = ctx || getDecodeContext();
     return new Promise((resolve, reject) => {
-      const done = ctx.decodeAudioData(bytes, resolve, reject);
-      if (done && typeof done.then === "function") done.then(resolve, reject);
+      const maybe = context.decodeAudioData(bytes, resolve, reject);
+      if (maybe && typeof maybe.then === "function") maybe.then(resolve, reject);
     });
   }
 
-  // Stand-in for per-line TTS audio: the persona's bundled sample clip.
-  async function loadVoiceClipBuffer(code) {
-    const url = getVoiceSampleUrl(code) || getVoiceSampleUrl(VOICES[0].code);
-    if (!url) throw new Error("no sample clip for voice " + code);
-    if (voiceClipCache.has(url)) return voiceClipCache.get(url);
-    const res = await fetch(url); // same-origin asset, never a third-party API
-    if (!res.ok) throw new Error("sample clip " + res.status);
-    const buffer = await decodeAudioBytes(await res.arrayBuffer());
-    voiceClipCache.set(url, buffer);
-    return buffer;
+  // Loud, unmissable failure — better than handing the user a silent file.
+  function notifyAudioFailure(message) {
+    console.error("[Red Bear] " + message);
+    try { toast(message, "err"); } catch (_) {}
+    if (TEST_AUDIO_ALERT_ON_FAIL && typeof window.alert === "function") {
+      try { window.alert(message); } catch (_) {}
+    }
+  }
+
+  function bufferPeak(buffer) {
+    let peak = 0;
+    const channels = buffer.numberOfChannels || 1;
+    for (let c = 0; c < channels; c++) {
+      const data = buffer.getChannelData(c);
+      const step = Math.max(1, Math.floor(data.length / 200000));
+      for (let i = 0; i < data.length; i += step) {
+        const v = Math.abs(data[i]);
+        if (v > peak) peak = v;
+      }
+    }
+    return peak;
+  }
+
+  /* ---- 1. FETCH PHASE ------------------------------------------------------
+     Every sentence's audio is downloaded and resolved to an ArrayBuffer before
+     any merging starts: the whole plan goes through one await Promise.all(),
+     so concatenation can never begin while a request is still pending. */
+  async function fetchClipBytes(url, sentence, code) {
+    if (clipBytesCache.has(url)) return clipBytesCache.get(url);
+    let res = null;
+    try {
+      res = await fetch(url);
+    } catch (error) {
+      throw new Error(`Audio fetch failed for sentence ${sentence} (${code}) — ${error && error.message ? error.message : "network error"}`);
+    }
+    if (!res || !res.ok) {
+      throw new Error(`Audio fetch failed for sentence ${sentence} (${code}) — HTTP ${res ? res.status : "no response"}`);
+    }
+    const bytes = await res.arrayBuffer();
+    if (!bytes || !bytes.byteLength) {
+      throw new Error(`Audio fetch failed for sentence ${sentence} (${code}) — empty audio payload`);
+    }
+    clipBytesCache.set(url, bytes);
+    return bytes;
+  }
+
+  async function settleAll(promises) {
+    return Promise.all(promises.map((p) => p.then((value) => ({ value }), (error) => ({ error }))));
+  }
+
+  async function fetchPlanAudio(plan) {
+    const jobs = plan.map(async (line, i) => {
+      const sentence = i + 1;
+      const code = line.voice || state.voice || VOICES[0].code;
+      const url = getVoiceSampleUrl(code) || getVoiceSampleUrl(VOICES[0].code);
+      if (!url) throw new Error(`Audio fetch failed for sentence ${sentence} — no audio clip mapped for voice ${code}`);
+      const bytes = await fetchClipBytes(url, sentence, code);
+      console.log(`[Red Bear] TTS chunk ${sentence}/${plan.length} · ${code} · ${bytes.byteLength.toLocaleString()} bytes · ${url}`);
+      return { sentence, code, url, bytes, line };
+    });
+
+    const settled = await settleAll(jobs);                 // <- nothing proceeds until all are done
+    const failures = settled.filter((r) => r.error);
+    if (failures.length) {
+      failures.forEach((f) => console.error("[Red Bear]", f.error.message));
+      notifyAudioFailure(failures[0].error.message);
+      throw failures[0].error;
+    }
+
+    const chunks = settled.map((r) => r.value);
+    const totalBytes = chunks.reduce((n, c) => n + c.bytes.byteLength, 0);
+    console.info(`[Red Bear] all ${chunks.length} TTS chunks fetched · ${totalBytes.toLocaleString()} bytes total`);
+    if (TEST_AUDIO_DEBUG && typeof console.table === "function") {
+      console.table(chunks.map((c) => ({ sentence: c.sentence, voice: c.code, bytes: c.bytes.byteLength, clip: c.url })));
+    }
+    return chunks;
+  }
+
+  /* ---- 2. DECODE PHASE (also awaited as a whole) ---- */
+  async function decodePlanAudio(chunks) {
+    const ctx = await getReadyDecodeContext();
+    const jobs = chunks.map(async (chunk) => {
+      if (clipBufferCache.has(chunk.url)) {
+        chunk.buffer = clipBufferCache.get(chunk.url);
+        return chunk;
+      }
+      let buffer = null;
+      try {
+        // decodeAudioData detaches the ArrayBuffer it is given, so decode a copy
+        // and keep chunk.bytes intact for the blob-concat fallback.
+        buffer = await decodeAudioBytes(chunk.bytes.slice(0), ctx);
+      } catch (error) {
+        throw new Error(`Audio decode failed for sentence ${chunk.sentence} (${chunk.code}) — ${error && error.message ? error.message : "decode error"}`);
+      }
+      if (!buffer || !buffer.length) {
+        throw new Error(`Audio decode failed for sentence ${chunk.sentence} (${chunk.code}) — empty buffer`);
+      }
+      console.log(`[Red Bear] decoded sentence ${chunk.sentence} · ${chunk.code} · ${buffer.duration.toFixed(2)}s @ ${buffer.sampleRate}Hz`);
+      clipBufferCache.set(chunk.url, buffer);
+      chunk.buffer = buffer;
+      return chunk;
+    });
+
+    const settled = await settleAll(jobs);
+    const failures = settled.filter((r) => r.error);
+    if (failures.length) {
+      failures.forEach((f) => console.error("[Red Bear]", f.error.message));
+      notifyAudioFailure(failures[0].error.message);
+      throw failures[0].error;
+    }
+    return settled.map((r) => r.value);
   }
 
   // Optional background music — wired for a future picker; inert until one exists.
@@ -1239,13 +1370,15 @@
     try { return String(localStorage.getItem("rb_bgm_url") || "").trim(); } catch (_) { return ""; }
   }
 
-  async function loadBackgroundMusicBuffer() {
+  async function loadBackgroundMusicBuffer(ctx) {
     const url = getBackgroundMusicUrl();
     if (!url) return null;
     try {
       const res = await fetch(url);
-      if (!res.ok) throw new Error("background music " + res.status);
-      return await decodeAudioBytes(await res.arrayBuffer());
+      if (!res || !res.ok) throw new Error("HTTP " + (res ? res.status : "no response"));
+      const bytes = await res.arrayBuffer();
+      console.log(`[Red Bear] background music · ${bytes.byteLength.toLocaleString()} bytes · ${url}`);
+      return await decodeAudioBytes(bytes.slice(0), ctx);
     } catch (error) {
       console.warn("[Red Bear] background music skipped:", error);
       toast("နောက်ခံသီချင်း ထည့်၍ မရပါ — အသံသာ ထုတ်ပါမည်။", "info");
@@ -1272,32 +1405,29 @@
       }));
   }
 
-  // Lay the per-line clips on one timeline and bounce it to a single buffer.
-  async function buildTestAudioBuffer(onStage) {
-    const plan = currentExportPlan();
-    if (!plan.length) throw new Error("no script lines to export");
+  /* ---- 3. MIX PHASE: every clip is already in memory before this runs ---- */
+  async function mixPlanAudio(chunks) {
     const OfflineCtx = getOfflineCtxClass();
-    if (!OfflineCtx) throw new Error("Web Audio API is not available in this browser");
+    if (!OfflineCtx) throw new Error("OfflineAudioContext is not available in this browser");
 
-    if (onStage) onStage("clips");
     const segments = [];
     let cursor = 0;
-    for (const line of plan) {
-      const code = line.voice || state.voice || VOICES[0].code;
-      const buffer = await loadVoiceClipBuffer(code);
-      const rate = pitchOffsetToRate(line.pitch);
+    chunks.forEach((chunk) => {
+      const buffer = chunk.buffer;
+      const rate = pitchOffsetToRate(chunk.line && chunk.line.pitch);
       const natural = buffer.duration / rate;
+      const text = String((chunk.line && chunk.line.text) || "");
       const wanted = Math.min(natural, Math.max(TEST_AUDIO_MIN_LINE_SEC,
-        TEST_AUDIO_MIN_LINE_SEC + String(line.text || "").length * TEST_AUDIO_PER_CHAR_SEC));
+        TEST_AUDIO_MIN_LINE_SEC + text.length * TEST_AUDIO_PER_CHAR_SEC));
       segments.push({ buffer, rate, start: cursor, duration: wanted });
       cursor += wanted + TEST_AUDIO_GAP_SEC;
-    }
+    });
 
-    const bgm = await loadBackgroundMusicBuffer();
+    const ctx = await getReadyDecodeContext();
+    const bgm = await loadBackgroundMusicBuffer(ctx);
     const total = Math.max(0.5, cursor - TEST_AUDIO_GAP_SEC + 0.35);
     const offline = new OfflineCtx(1, Math.ceil(total * TEST_AUDIO_SAMPLE_RATE), TEST_AUDIO_SAMPLE_RATE);
 
-    if (onStage) onStage("mix");
     segments.forEach((seg) => {
       const src = offline.createBufferSource();
       src.buffer = seg.buffer;
@@ -1329,7 +1459,87 @@
     }
 
     const rendered = await offline.startRendering();
-    return { buffer: rendered, lines: plan.length, withMusic: !!bgm };
+    if (!rendered || !rendered.length) throw new Error("mixdown returned an empty buffer");
+    return { buffer: rendered, lines: chunks.length, withMusic: !!bgm };
+  }
+
+  // Fallback used when Web Audio cannot produce a usable mixdown: the fetched
+  // MP3 chunks are already same-format (44.1 kHz mono CBR), so a straight blob
+  // concatenation plays fine and still contains every sentence.
+  /**
+   * Strip the ID3v2 tag, the ID3v1 trailer and the Xing/Info header frame from a
+   * standalone MP3 so several clips can be glued together into one clean stream.
+   * Without this the concatenated file carries metadata blocks in the middle of
+   * the audio and the leading Xing frame misreports the total duration.
+   * Anything unexpected falls through and returns the untouched bytes.
+   */
+  function stripMp3Container(bytes) {
+    try {
+      const view = new Uint8Array(bytes);
+      let start = 0;
+      let end = view.length;
+
+      // ID3v2 header: "ID3" + ver(2) + flags(1) + syncsafe size(4)
+      if (view.length > 10 && view[0] === 0x49 && view[1] === 0x44 && view[2] === 0x33) {
+        const size =
+          ((view[6] & 0x7f) << 21) | ((view[7] & 0x7f) << 14) | ((view[8] & 0x7f) << 7) | (view[9] & 0x7f);
+        start = 10 + size + (view[5] & 0x10 ? 10 : 0); // optional footer
+      }
+      // ID3v1 trailer: "TAG" in the last 128 bytes
+      if (end - start > 128 && view[end - 128] === 0x54 && view[end - 127] === 0x41 && view[end - 126] === 0x47) {
+        end -= 128;
+      }
+      // Re-sync in case the tag size was slightly off.
+      let guard = 0;
+      while (start < end - 4 && !(view[start] === 0xff && (view[start + 1] & 0xe0) === 0xe0) && guard++ < 8192) start++;
+      if (start >= end - 4) return bytes;
+
+      // Drop the Xing/Info (or VBRI) header frame — it is a silent frame that only carries metadata.
+      const frame = readMp3FrameSize(view, start);
+      if (frame > 0 && start + frame <= end) {
+        const tail = Math.min(start + frame, start + 200);
+        for (let i = start + 4; i < tail - 3; i++) {
+          const tag = String.fromCharCode(view[i], view[i + 1], view[i + 2], view[i + 3]);
+          if (tag === "Xing" || tag === "Info" || tag === "VBRI") {
+            start += frame;
+            break;
+          }
+        }
+      }
+      return start === 0 && end === view.length ? bytes : view.subarray(start, end).slice().buffer;
+    } catch (_) {
+      return bytes;
+    }
+  }
+
+  const MP3_BITRATES_V1_L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
+  const MP3_BITRATES_V2_L3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
+  const MP3_RATES = { 3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000] };
+
+  function readMp3FrameSize(view, at) {
+    const b1 = view[at + 1];
+    const b2 = view[at + 2];
+    const versionBits = (b1 >> 3) & 0x03; // 3 = MPEG1, 2 = MPEG2, 0 = MPEG2.5
+    const layerBits = (b1 >> 1) & 0x03; // 1 = Layer III
+    const rates = MP3_RATES[versionBits];
+    if (layerBits !== 1 || !rates) return 0;
+    const bitrate = (versionBits === 3 ? MP3_BITRATES_V1_L3 : MP3_BITRATES_V2_L3)[(b2 >> 4) & 0x0f];
+    const sampleRate = rates[(b2 >> 2) & 0x03];
+    if (!bitrate || !sampleRate) return 0;
+    const padding = (b2 >> 1) & 0x01;
+    const samplesPerFrame = versionBits === 3 ? 1152 : 576;
+    return Math.floor((samplesPerFrame / 8) * bitrate * 1000 / sampleRate) + padding;
+  }
+
+  function concatenateClipsBlob(chunks) {
+    const parts = chunks.map((c) => stripMp3Container(c.bytes));
+    const raw = chunks.reduce((n, c) => n + c.bytes.byteLength, 0);
+    const bytes = parts.reduce((n, b) => n + b.byteLength, 0);
+    console.info(
+      `[Red Bear] blob concatenation fallback · ${parts.length} chunks · ${bytes.toLocaleString()} bytes ` +
+        `(${(raw - bytes).toLocaleString()} bytes of container metadata stripped)`
+    );
+    return new Blob(parts, { type: "audio/mp3" });
   }
 
   function floatToPcm16(input) {
@@ -1397,7 +1607,8 @@
 
   async function exportTestAudio() {
     const btn = $("#btnDownloadAudio");
-    if (!currentExportPlan().length) {
+    const plan = currentExportPlan();
+    if (!plan.length) {
       toast("စာမူ မရှိသေးပါ — Step 3 တွင် အသံ အရင်ဖန်တီးပါ။", "info");
       return;
     }
@@ -1406,24 +1617,57 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> အသံဖိုင် ပြင်ဆင်နေပါသည်...';
     }
+    console.group ? console.group(`[Red Bear] Test Audio export · ${plan.length} sentences`) : console.info("[Red Bear] Test Audio export");
     try {
-      setRenderBar("အသံဖိုင် ပေါင်းစပ်နေပါသည်...", 10);
       const lamePromise = loadMp3Encoder();
-      const mix = await buildTestAudioBuffer((stage) => {
-        setRenderBar(stage === "clips" ? "အသံနမူနာများ ဖတ်နေပါသည်..." : "အသံလိုင်း ပေါင်းစပ်နေပါသည်...",
-          stage === "clips" ? 30 : 55);
-      });
-      setRenderBar("MP3 အဖြစ် ပြောင်းနေပါသည်...", 75);
-      await lamePromise;
-      const blob = audioBufferToMp3Blob(mix.buffer, TEST_AUDIO_MP3_KBPS);
+
+      // (1) fetch everything first — no merging while a request is pending
+      setRenderBar("အသံဖိုင်များ ဆွဲယူနေပါသည်...", 20);
+      const chunks = await fetchPlanAudio(plan);
+
+      let blob = null;
+      let seconds = 0;
+      let withMusic = false;
+      let mode = "mixdown";
+
+      try {
+        // (2) decode + merge sequentially on one Web Audio timeline
+        setRenderBar("အသံလိုင်း ပေါင်းစပ်နေပါသည်...", 50);
+        const decoded = await decodePlanAudio(chunks);
+        const mix = await mixPlanAudio(decoded);
+        const peak = bufferPeak(mix.buffer);
+        console.info(`[Red Bear] mixdown ${mix.buffer.duration.toFixed(2)}s · peak ${peak.toFixed(4)}`);
+        // (3) never ship a silent file
+        if (peak < TEST_AUDIO_SILENCE_PEAK) throw new Error(`mixdown is silent (peak ${peak.toFixed(5)})`);
+        setRenderBar("MP3 အဖြစ် ပြောင်းနေပါသည်...", 78);
+        await lamePromise;
+        blob = audioBufferToMp3Blob(mix.buffer, TEST_AUDIO_MP3_KBPS);
+        seconds = Math.round(mix.buffer.duration);
+        withMusic = mix.withMusic;
+      } catch (mixError) {
+        console.warn("[Red Bear] Web Audio mixdown unusable → blob concatenation fallback:", mixError);
+        toast("Web Audio mixdown မရပါ — MP3 chunk များ တိုက်ရိုက် ပေါင်းစပ်ပါမည်။", "info");
+        setRenderBar("MP3 chunk များ ပေါင်းစပ်နေပါသည်...", 78);
+        blob = concatenateClipsBlob(chunks);
+        mode = "concat";
+      }
+
+      if (!blob || blob.size < 1024) {
+        throw new Error(`exported audio is empty (${blob ? blob.size : 0} bytes)`);
+      }
+      console.info(`[Red Bear] export ready · mode=${mode} · ${blob.size.toLocaleString()} bytes · type=${blob.type}`);
+
       setRenderBar("ဒေါင်းလုဒ် စတင်နေပါသည်...", 100);
       downloadBlob(blob, exportBaseName() + ".test-audio.mp3");
-      const secs = Math.round(mix.buffer.duration);
-      toast(`🎵 Test Audio MP3 ရပါပြီ — ${mix.lines} lines · ${secs}s${mix.withMusic ? " · +music" : ""}`, "ok");
+      const sizeKb = Math.round(blob.size / 1024);
+      toast(`🎵 Test Audio MP3 ရပါပြီ — ${plan.length} lines${seconds ? " · " + seconds + "s" : ""} · ${sizeKb} KB${withMusic ? " · +music" : ""}`, "ok");
     } catch (error) {
       console.error("[Red Bear] Test audio export failed", error);
-      toast("အသံဖိုင် ထုတ်၍ မရပါ — " + (error && error.message ? error.message : "unknown error"), "err");
+      const message = error && error.message ? error.message : "unknown error";
+      // Fetch/decode problems already alerted with the per-sentence message.
+      if (!/^Audio (fetch|decode) failed/.test(message)) notifyAudioFailure("Audio export failed — " + message);
     } finally {
+      if (console.groupEnd) console.groupEnd();
       hideRenderBar();
       if (btn) {
         btn.disabled = false;
