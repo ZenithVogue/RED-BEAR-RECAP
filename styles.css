@@ -1745,6 +1745,40 @@ button { cursor: pointer; }
   font-weight: var(--w-med);
   color: var(--text-3);
   line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Real <audio> element that holds the generated voice-over blob URL. */
+.audio-player {
+  width: 100%;
+  margin-top: 9px;
+  border-radius: 99px;
+  outline: none;
+}
+
+.audio-player[hidden] { display: none; }
+
+.audio-player-hint {
+  margin: 6px 2px 0;
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+  line-height: 1.6;
+}
+
+.audio-player-hint.ready { color: var(--red); font-weight: var(--w-med); }
+
+/* Empty translated-script warning (Step 3 generate guard) */
+.textarea.input-error,
+.input.input-error {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+  animation: inputShake 0.32s ease;
+}
+
+@keyframes inputShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
 }
 
 .render-bar {

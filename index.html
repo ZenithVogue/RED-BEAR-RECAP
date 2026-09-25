@@ -311,7 +311,7 @@
                     <li><span>Voice Persona</span><b id="resVoice">—</b></li>
                     <li><span>Pitch Offset</span><b id="resPitch">0 Hz</b></li>
                     <li><span>Script Lines</span><b id="resLines">—</b></li>
-                    <li><span>အသံ ကြာချိန်</span><b>~ 00:28</b></li>
+                    <li><span>အသံ ကြာချိန်</span><b id="resDuration">—</b></li>
                   </ul>
 
                   <div class="audio-mock">
@@ -319,8 +319,13 @@
                     <div class="am-wave" id="amWave" aria-hidden="true">
                       <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
                     </div>
-                    <span class="am-time">00:28</span>
+                    <span class="am-time" id="amTime">00:00</span>
                   </div>
+
+                  <!-- Real playback target: generateVoiceOver() merges the TTS chunks into one
+                       Blob and attaches its object URL to #audioPlayer (src + load()). -->
+                  <audio class="audio-player" id="audioPlayer" controls preload="metadata" hidden></audio>
+                  <p class="audio-player-hint" id="audioPlayerHint">🔊 အသံ ဖန်တီးပြီးပါက ဤနေရာတွင် နားဆင်နိုင်ပါသည်။</p>
                 </div>
               </div>
 

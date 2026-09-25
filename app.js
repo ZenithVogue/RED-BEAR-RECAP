@@ -14,7 +14,11 @@
     maxStep: 1,
     file: null,
     videoUrl: null,
-    audioBlob: null,
+    audioBlob: null,    // merged voice-over MP3 attached to #audioPlayer
+    audioUrl: null,     // object URL currently held by the player
+    audioMeta: null,    // { blob, seconds, withMusic, mode, lines }
+    audioPlanKey: "",   // signature of the plan the blob was built from
+    audioSeconds: 0,    // duration of the generated voice over
     durationSec: 0,
     transcriptReady: false,
     voice: null,        // persona code
@@ -1186,6 +1190,7 @@
   const TEST_AUDIO_DEBUG = true;         // byte-size logging while the test build is on
   const TEST_AUDIO_ALERT_ON_FAIL = true; // hard alert instead of a silent export
   const TEST_AUDIO_SILENCE_PEAK = 0.0008; // anything quieter counts as "silent"
+  const TEST_AUDIO_MIME = "audio/mp3";    // MIME used for the merged blob + <audio> src
   const MP3_ENCODER_SRC = "assets/vendor/lamejs/lame.min.js";
 
   /* [VIDEO-EXPORT] original video export constants
@@ -1395,14 +1400,22 @@
   function currentExportPlan() {
     const plan = (state.voicePlan || []).filter((p) => p && String(p.text || "").trim());
     if (plan.length) return plan;
-    return (state.scriptLines || [])
+    const lines = (state.scriptLines || [])
       .filter((l) => l && String(l.text || "").trim())
       .map((l, i) => ({
         n: i + 1,
         text: l.text,
-        voice: l.voice || state.voice,
+        voice: l.voice || state.voice || VOICES[0].code,
         pitch: l.pitch === "" || l.pitch === undefined ? state.pitch : l.pitch,
       }));
+    if (lines.length) return lines;
+    // Last resort: read the translated textarea directly so the export never
+    // falls back to an empty (silent) plan while real text is on screen.
+    return getTranslatedText()
+      .split(/\n+/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .map((text, i) => ({ n: i + 1, text, voice: state.voice || VOICES[0].code, pitch: state.pitch }));
   }
 
   /* ---- 3. MIX PHASE: every clip is already in memory before this runs ---- */
@@ -1539,7 +1552,7 @@
       `[Red Bear] blob concatenation fallback · ${parts.length} chunks · ${bytes.toLocaleString()} bytes ` +
         `(${(raw - bytes).toLocaleString()} bytes of container metadata stripped)`
     );
-    return new Blob(parts, { type: "audio/mp3" });
+    return new Blob(parts, { type: TEST_AUDIO_MIME });
   }
 
   function floatToPcm16(input) {
@@ -1569,7 +1582,7 @@
     }
     const tail = encoder.flush();
     if (tail && tail.length) chunks.push(new Uint8Array(tail));
-    return new Blob(chunks, { type: "audio/mpeg" });
+    return new Blob(chunks, { type: TEST_AUDIO_MIME });
   }
 
   function downloadBlob(blob, filename) {
@@ -1605,11 +1618,255 @@
     if (bar) bar.hidden = true;
   }
 
+  /* ================================================================
+     STEP 3 GUARD — no translated text, no generation
+     ----------------------------------------------------------------
+     An empty script used to sail straight through and produce an empty
+     (silent) audio file, so the textarea is validated up front and the
+     user gets a blocking alert instead. */
+  const EMPTY_TRANSLATION_ALERT = "ကျေးဇူးပြု၍ မြန်မာဘာသာပြန် စာသားထည့်သွင်းပါ";
+
+  // #translatedTextInput is supported for future markup; today the Burmese
+  // script textarea (#burmeseText) is the translated-text field.
+  function getTranslatedTextEl() {
+    return document.querySelector("#translatedTextInput") || document.querySelector("#burmeseText");
+  }
+
+  function getTranslatedText() {
+    const el = getTranslatedTextEl();
+    return el ? String(el.value || "").trim() : "";
+  }
+
+  function alertMissingTranslation() {
+    console.warn("[Red Bear] generation blocked — translated text is empty");
+    if (typeof window.alert === "function") {
+      try { window.alert(EMPTY_TRANSLATION_ALERT); } catch (_) {}
+    }
+    try { toast(EMPTY_TRANSLATION_ALERT, "err"); } catch (_) {}
+    const el = getTranslatedTextEl();
+    if (el) {
+      el.classList.add("input-error");
+      try { el.focus(); } catch (_) {}
+      setTimeout(() => el.classList.remove("input-error"), 2200);
+    }
+  }
+
+  /* ================================================================
+     SHARED AUDIO BUILD + PREVIEW PLAYER
+     ----------------------------------------------------------------
+     Generate, Re-render and Download all go through buildPlanAudioBlob()
+     so what you hear in #audioPlayer is byte-for-byte what you download. */
+  function planSignature(plan) {
+    return JSON.stringify((plan || []).map((p) => [String(p.text || ""), p.voice || "", p.pitch === "" || p.pitch === undefined ? "" : p.pitch]));
+  }
+
+  async function buildPlanAudioBlob(plan, onStage) {
+    const stage = typeof onStage === "function" ? onStage : function () {};
+    const lamePromise = loadMp3Encoder();
+
+    // (1) fetch everything first — no merging while a request is pending
+    stage("အသံဖိုင်များ ဆွဲယူနေပါသည်...", 20);
+    const chunks = await fetchPlanAudio(plan);
+
+    let blob = null;
+    let seconds = 0;
+    let withMusic = false;
+    let mode = "mixdown";
+
+    try {
+      // (2) decode + merge sequentially on one Web Audio timeline
+      stage("အသံလိုင်း ပေါင်းစပ်နေပါသည်...", 50);
+      const decoded = await decodePlanAudio(chunks);
+      const mix = await mixPlanAudio(decoded);
+      const peak = bufferPeak(mix.buffer);
+      console.info(`[Red Bear] mixdown ${mix.buffer.duration.toFixed(2)}s · peak ${peak.toFixed(4)}`);
+      // (3) never ship a silent file
+      if (peak < TEST_AUDIO_SILENCE_PEAK) throw new Error(`mixdown is silent (peak ${peak.toFixed(5)})`);
+      stage("MP3 အဖြစ် ပြောင်းနေပါသည်...", 78);
+      await lamePromise;
+      blob = audioBufferToMp3Blob(mix.buffer, TEST_AUDIO_MP3_KBPS);
+      seconds = mix.buffer.duration;
+      withMusic = mix.withMusic;
+    } catch (mixError) {
+      console.warn("[Red Bear] Web Audio mixdown unusable → blob concatenation fallback:", mixError);
+      toast("Web Audio mixdown မရပါ — MP3 chunk များ တိုက်ရိုက် ပေါင်းစပ်ပါမည်။", "info");
+      stage("MP3 chunk များ ပေါင်းစပ်နေပါသည်...", 78);
+      blob = concatenateClipsBlob(chunks);
+      mode = "concat";
+    }
+
+    if (!blob || blob.size < 1024) {
+      throw new Error(`generated audio is empty (${blob ? blob.size : 0} bytes)`);
+    }
+    console.info(`[Red Bear] audio ready · mode=${mode} · ${blob.size.toLocaleString()} bytes · type=${blob.type}`);
+    return { blob, seconds, withMusic, mode, lines: plan.length };
+  }
+
+  /** Put a freshly built blob behind the preview player. */
+  function attachAudioToPlayer(blob) {
+    // Merged chunks are one MP3 stream; keep the MIME the <audio> tag expects.
+    const audioBlob = blob && blob.type === TEST_AUDIO_MIME ? blob : new Blob([blob], { type: TEST_AUDIO_MIME });
+    console.log("Generated Audio Blob Size:", audioBlob.size);
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const previousUrl = state.audioUrl;
+    state.audioBlob = audioBlob;
+    state.audioUrl = audioUrl;
+
+    const player = document.querySelector("#audioPlayer");
+    if (!player) {
+      console.warn("[Red Bear] #audioPlayer is missing — audio was generated but cannot be previewed");
+      return audioUrl;
+    }
+    wirePreviewPlayer();
+    try { player.pause(); } catch (_) {}
+    player.src = audioUrl;
+    player.load(); // the ONLY place that reloads the element — Play never does
+    player.hidden = false;
+    player.dataset.ready = "1";
+    setPreviewPlayingUI(false);
+    updatePreviewTime(0, state.audioSeconds || 0);
+    const hint = document.querySelector("#audioPlayerHint");
+    if (hint) {
+      hint.classList.add("ready");
+      hint.textContent = `✓ အသံဖိုင် အသင့်ဖြစ်ပါပြီ — ${Math.round(audioBlob.size / 1024).toLocaleString()} KB`;
+    }
+
+    // Release the previous URL only once the new one is attached; revoking it
+    // any earlier is what used to leave the player with a dead src.
+    if (previousUrl && previousUrl !== audioUrl) {
+      setTimeout(() => { try { URL.revokeObjectURL(previousUrl); } catch (_) {} }, 1500);
+    }
+    return audioUrl;
+  }
+
+  /** Build (or reuse) the audio for a plan and hand it to the player. */
+  async function ensurePlanAudio(plan, opts) {
+    const options = opts || {};
+    const key = planSignature(plan);
+    if (!options.force && state.audioMeta && state.audioBlob && state.audioPlanKey === key) {
+      console.info(`[Red Bear] reusing generated audio · ${state.audioBlob.size.toLocaleString()} bytes`);
+      return Object.assign({}, state.audioMeta, { blob: state.audioBlob, reused: true });
+    }
+    const result = await buildPlanAudioBlob(plan, options.onStage);
+    state.audioPlanKey = key;
+    state.audioSeconds = result.seconds;
+    state.audioMeta = result;
+    attachAudioToPlayer(result.blob);
+    result.blob = state.audioBlob; // normalised MIME
+    state.audioMeta = result;
+    return result;
+  }
+
+  function clearPreviewAudio() {
+    const player = document.querySelector("#audioPlayer");
+    if (player) {
+      try { player.pause(); } catch (_) {}
+      player.removeAttribute("src");
+      player.dataset.ready = "";
+      try { player.load(); } catch (_) {}
+      player.hidden = true;
+    }
+    if (state.audioUrl) {
+      try { URL.revokeObjectURL(state.audioUrl); } catch (_) {}
+    }
+    state.audioUrl = null;
+    state.audioBlob = null;
+    state.audioMeta = null;
+    state.audioPlanKey = "";
+    state.audioSeconds = 0;
+    const hint = document.querySelector("#audioPlayerHint");
+    if (hint) {
+      hint.classList.remove("ready");
+      hint.textContent = "🔊 အသံ ဖန်တီးပြီးပါက ဤနေရာတွင် နားဆင်နိုင်ပါသည်။";
+    }
+    setPreviewPlayingUI(false);
+    updatePreviewTime(0, 0);
+    const fill = $("#vpProgressFill");
+    if (fill) fill.style.width = "0%";
+  }
+
+  function fmtClock(sec) {
+    const s = Math.max(0, Math.round(Number(sec) || 0));
+    return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  }
+
+  function hasPreviewAudio() {
+    const player = document.querySelector("#audioPlayer");
+    return !!(player && player.dataset.ready === "1" && player.src);
+  }
+
+  function setPreviewPlayingUI(playing) {
+    const btn = $("#amPlay");
+    const wave = $("#amWave");
+    if (btn) {
+      btn.classList.toggle("playing", !!playing);
+      btn.textContent = playing ? "❚❚" : "▶";
+    }
+    if (wave) wave.classList.toggle("playing", !!playing);
+  }
+
+  function updatePreviewTime(current, duration) {
+    const total = isFinite(duration) && duration > 0 ? duration : state.audioSeconds || 0;
+    const time = $("#amTime");
+    if (time) time.textContent = total ? `${fmtClock(current)} / ${fmtClock(total)}` : fmtClock(current);
+    const res = $("#resDuration");
+    if (res) res.textContent = total ? "~ " + fmtClock(total) : "—";
+    const fill = $("#vpProgressFill");
+    if (fill && total) fill.style.width = Math.min(100, (current / total) * 100) + "%";
+  }
+
+  /**
+   * Playback is owned by the single <audio id="audioPlayer"> element: the mock
+   * play buttons only toggle it, so a click can never rebuild the blob URL,
+   * reset src or restart the stream from zero.
+   */
+  function togglePreviewPlayback() {
+    if (!hasPreviewAudio()) return false;
+    const player = document.querySelector("#audioPlayer");
+    if (player.paused || player.ended) {
+      const started = player.play();
+      if (started && typeof started.catch === "function") {
+        started.catch((error) => {
+          console.warn("[Red Bear] playback was blocked:", error);
+          toast("Play မဖွင့်နိုင်ပါ — အောက်က Player ရှိ ▶ ခလုတ်ကို နှိပ်ပါ။", "info");
+        });
+      }
+    } else {
+      player.pause();
+    }
+    return true;
+  }
+
+  function wirePreviewPlayer() {
+    const player = document.querySelector("#audioPlayer");
+    if (!player || player.dataset.wired === "1") return;
+    player.dataset.wired = "1";
+    player.addEventListener("play", () => setPreviewPlayingUI(true));
+    player.addEventListener("pause", () => setPreviewPlayingUI(false));
+    player.addEventListener("ended", () => {
+      setPreviewPlayingUI(false);
+      updatePreviewTime(player.duration || state.audioSeconds || 0, player.duration);
+    });
+    player.addEventListener("loadedmetadata", () => {
+      const seconds = isFinite(player.duration) && player.duration > 0 ? player.duration : state.audioSeconds || 0;
+      state.audioSeconds = seconds || state.audioSeconds;
+      updatePreviewTime(0, seconds);
+      console.info(`[Red Bear] preview player ready · ${fmtClock(seconds)} · ${state.audioBlob ? state.audioBlob.size.toLocaleString() + " bytes" : "no blob"}`);
+    });
+    player.addEventListener("timeupdate", () => updatePreviewTime(player.currentTime, player.duration));
+    player.addEventListener("error", () => {
+      if (!player.src) return;
+      notifyAudioFailure("Audio player could not load the generated file — please generate the voice over again.");
+    });
+  }
+  wirePreviewPlayer();
+
   async function exportTestAudio() {
     const btn = $("#btnDownloadAudio");
     const plan = currentExportPlan();
     if (!plan.length) {
-      toast("စာမူ မရှိသေးပါ — Step 3 တွင် အသံ အရင်ဖန်တီးပါ။", "info");
+      // No script at all — alerting beats downloading an empty file.
+      alertMissingTranslation();
       return;
     }
     const label = btn ? btn.innerHTML : "";
@@ -1619,48 +1876,15 @@
     }
     console.group ? console.group(`[Red Bear] Test Audio export · ${plan.length} sentences`) : console.info("[Red Bear] Test Audio export");
     try {
-      const lamePromise = loadMp3Encoder();
-
-      // (1) fetch everything first — no merging while a request is pending
-      setRenderBar("အသံဖိုင်များ ဆွဲယူနေပါသည်...", 20);
-      const chunks = await fetchPlanAudio(plan);
-
-      let blob = null;
-      let seconds = 0;
-      let withMusic = false;
-      let mode = "mixdown";
-
-      try {
-        // (2) decode + merge sequentially on one Web Audio timeline
-        setRenderBar("အသံလိုင်း ပေါင်းစပ်နေပါသည်...", 50);
-        const decoded = await decodePlanAudio(chunks);
-        const mix = await mixPlanAudio(decoded);
-        const peak = bufferPeak(mix.buffer);
-        console.info(`[Red Bear] mixdown ${mix.buffer.duration.toFixed(2)}s · peak ${peak.toFixed(4)}`);
-        // (3) never ship a silent file
-        if (peak < TEST_AUDIO_SILENCE_PEAK) throw new Error(`mixdown is silent (peak ${peak.toFixed(5)})`);
-        setRenderBar("MP3 အဖြစ် ပြောင်းနေပါသည်...", 78);
-        await lamePromise;
-        blob = audioBufferToMp3Blob(mix.buffer, TEST_AUDIO_MP3_KBPS);
-        seconds = Math.round(mix.buffer.duration);
-        withMusic = mix.withMusic;
-      } catch (mixError) {
-        console.warn("[Red Bear] Web Audio mixdown unusable → blob concatenation fallback:", mixError);
-        toast("Web Audio mixdown မရပါ — MP3 chunk များ တိုက်ရိုက် ပေါင်းစပ်ပါမည်။", "info");
-        setRenderBar("MP3 chunk များ ပေါင်းစပ်နေပါသည်...", 78);
-        blob = concatenateClipsBlob(chunks);
-        mode = "concat";
-      }
-
-      if (!blob || blob.size < 1024) {
-        throw new Error(`exported audio is empty (${blob ? blob.size : 0} bytes)`);
-      }
-      console.info(`[Red Bear] export ready · mode=${mode} · ${blob.size.toLocaleString()} bytes · type=${blob.type}`);
+      // Reuses the blob already loaded in the player when the script is unchanged.
+      const result = await ensurePlanAudio(plan, { onStage: setRenderBar });
+      const blob = result.blob;
+      const seconds = Math.round(result.seconds || state.audioSeconds || 0);
 
       setRenderBar("ဒေါင်းလုဒ် စတင်နေပါသည်...", 100);
       downloadBlob(blob, exportBaseName() + ".test-audio.mp3");
       const sizeKb = Math.round(blob.size / 1024);
-      toast(`🎵 Test Audio MP3 ရပါပြီ — ${plan.length} lines${seconds ? " · " + seconds + "s" : ""} · ${sizeKb} KB${withMusic ? " · +music" : ""}`, "ok");
+      toast(`🎵 Test Audio MP3 ရပါပြီ — ${plan.length} lines${seconds ? " · " + seconds + "s" : ""} · ${sizeKb} KB${result.withMusic ? " · +music" : ""}`, "ok");
     } catch (error) {
       console.error("[Red Bear] Test audio export failed", error);
       const message = error && error.message ? error.message : "unknown error";
@@ -1689,16 +1913,18 @@
   /* ---------------- Generate voice over ---------------- */
   async function generateVoiceOver() {
     const btn = $("#btnGenerate");
-    const box = $("#burmeseText");
+    const box = getTranslatedTextEl();
     let text = box ? String(box.value || "").trim() : "";
     // Clean JSON only when it still looks like a payload — never wipe already-clean Burmese.
     if (text && looksLikeJsonPayload(text) && !/[\u1000-\u109F]/.test(text)) {
       try { autoCleanBurmeseInput({ notify: false }); } catch (_) {}
       text = box ? String(box.value || "").trim() : text;
     }
+    // (1) GUARD: no translated text -> alert and stop, never build an empty file.
     if (!text) {
       generating = false;
-      toast("မြန်မာဘာသာပြန် စာမူ ဗလာ ဖြစ်နေပါသည် — Step 3 တွင် မြန်မာစာသား Paste လုပ်ပါ။", "info");
+      state.voiceGenerated = false;
+      alertMissingTranslation();
       return;
     }
     if (!state.voice) selectVoice(VOICES[0].code);
@@ -1715,6 +1941,7 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> အသံ ဖန်တီးနေပါသည်...';
     }
+    console.group ? console.group(`[Red Bear] Generate voice over · ${lines.length} sentences`) : console.info("[Red Bear] Generate voice over");
     try {
       state.voiceGenerated = true;
       state.transcriptReady = true;
@@ -1732,11 +1959,26 @@
       toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
       */
       // TEST MODE: audio only — nothing is drawn to a canvas and no video is muxed.
-      await runRenderProgress("အသံဖိုင် ဖန်တီးနေပါသည်... (Audio Only Test)");
-      toast("အသံဖိုင် ဖန်တီးပြီးပါပြီ ✓ — 🎵 Test Audio MP3 ဖြင့် ဒေါင်းလုဒ်ဆွဲပါ။", "ok");
+      // (2) Real audio: every sentence is fetched (Promise.all), merged into one
+      //     Blob and attached to #audioPlayer, so Step 4 plays actual sound.
+      setRenderBar("အသံဖိုင် ဖန်တီးနေပါသည်... (Audio Only Test)", 8);
+      const result = await ensurePlanAudio(state.voicePlan, { force: true, onStage: setRenderBar });
+      setRenderBar("အသံဖိုင် အသင့်ဖြစ်ပါပြီ ✓", 100);
+      await wait(180);
+      const sizeKb = Math.round(result.blob.size / 1024);
+      const seconds = Math.round(result.seconds || state.audioSeconds || 0);
+      toast(`🔊 အသံဖိုင် ဖန်တီးပြီးပါပြီ ✓ — ${lines.length} lines${seconds ? " · " + seconds + "s" : ""} · ${sizeKb} KB · ▶ နှိပ်၍ နားဆင်ပါ။`, "ok");
     } catch (err) {
-      toast("Generate မအောင်မြင်ပါ — ပြန်ကြိုးစားပါ။", "err");
+      state.voiceGenerated = false;
+      console.error("[Red Bear] voice over generation failed", err);
+      const message = err && err.message ? err.message : "unknown error";
+      // Per-sentence fetch/decode failures already raised their own alert.
+      if (!/^Audio (fetch|decode) failed/.test(message)) {
+        notifyAudioFailure("Audio generation failed — " + message);
+      }
     } finally {
+      if (console.groupEnd) console.groupEnd();
+      hideRenderBar();
       generating = false;
       if (btn) {
         btn.disabled = false;
@@ -1767,11 +2009,15 @@
     } else {
       $("#resLines").textContent = "—";
     }
+    const dur = $("#resDuration");
+    if (dur) dur.textContent = state.audioSeconds ? "~ " + fmtClock(state.audioSeconds) : "—";
   }
 
-  // fake video progress playback
+  // Preview play button: drives the real <audio> when audio exists,
+  // otherwise falls back to the original mock progress animation.
   let vpTimer = null;
   $("#vpPlay").addEventListener("click", () => {
+    if (togglePreviewPlayback()) return;
     const fill = $("#vpProgressFill");
     if (vpTimer) {
       clearInterval(vpTimer);
@@ -1791,6 +2037,8 @@
 
   let amTimer = null;
   $("#amPlay").addEventListener("click", () => {
+    // Real audio wins; the click only toggles play/pause and never touches src.
+    if (togglePreviewPlayback()) return;
     const wave = $("#amWave");
     const btn = $("#amPlay");
     if (amTimer) {
@@ -1832,10 +2080,23 @@
       pct.textContent = p + "%";
       await wait(140);
     }
-    bar.hidden = true;
-    btn.disabled = false;
-    renderResult();
-    toast("အသံဖိုင် ပြန်လည် ဖန်တီးပြီးပါပြီ ✓ (Audio Only Test)", "ok");
+    // TEST MODE: rebuild the real mixdown and re-attach it to the player.
+    try {
+      const plan = currentExportPlan();
+      if (!plan.length) {
+        alertMissingTranslation();
+      } else {
+        const result = await ensurePlanAudio(plan, { force: true, onStage: setRenderBar });
+        toast(`အသံဖိုင် ပြန်လည် ဖန်တီးပြီးပါပြီ ✓ — ${Math.round(result.blob.size / 1024)} KB`, "ok");
+      }
+    } catch (error) {
+      const message = error && error.message ? error.message : "unknown error";
+      if (!/^Audio (fetch|decode) failed/.test(message)) notifyAudioFailure("Audio re-render failed — " + message);
+    } finally {
+      bar.hidden = true;
+      btn.disabled = false;
+      renderResult();
+    }
   });
 
   /* ---------------- SRT download ---------------- */
@@ -1850,9 +2111,10 @@
   }
 
   $("#btnDownloadSrt").addEventListener("click", () => {
-    const lines = $("#burmeseText").value.trim().split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    const lines = getTranslatedText().split(/\n+/).map((s) => s.trim()).filter(Boolean);
     if (!lines.length) {
-      toast("SRT ထုတ်ရန် Step 3 တွင် မြန်မာ စာသား အရင်ရှိရပါမည်။", "info");
+      // Same guard as the voice generator: no translated text, no empty file.
+      alertMissingTranslation();
       return;
     }
     const body = lines
@@ -1887,6 +2149,7 @@
     $("#burmeseText").value = "";
     state.scriptLines = [];
     state.voicePlan = [];
+    clearPreviewAudio();
     renderScriptPreview([]);
     $("#voiceChip").hidden = true;
     $$(".voice-card").forEach((c) => c.classList.remove("selected"));
@@ -1997,10 +2260,19 @@
     $$(".step-panel").forEach((p) => p.classList.toggle("active", p.id === "stepPanel4"));
     updateStepsUI();
     /* [VIDEO-EXPORT] await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်..."); */
-    await runRenderProgress("အသံဖိုင် ဖန်တီးနေပါသည်... (Audio Only Test)");
-    btn.disabled = false;
-    btn.innerHTML = "⚡ Start Auto Translate";
-    toast("Auto Recap ပြီးစီးပါပြီ ✓", "ok");
+    // TEST MODE: same audio pipeline as Step 3 so the player gets a real file.
+    try {
+      setRenderBar("အသံဖိုင် ဖန်တီးနေပါသည်... (Audio Only Test)", 8);
+      await ensurePlanAudio(state.voicePlan, { force: true, onStage: setRenderBar });
+      toast("Auto Recap ပြီးစီးပါပြီ ✓ — ▶ နှိပ်၍ နားဆင်ပါ။", "ok");
+    } catch (error) {
+      const message = error && error.message ? error.message : "unknown error";
+      if (!/^Audio (fetch|decode) failed/.test(message)) notifyAudioFailure("Audio generation failed — " + message);
+    } finally {
+      hideRenderBar();
+      btn.disabled = false;
+      btn.innerHTML = "⚡ Start Auto Translate";
+    }
   });
 
   /* ---------------- Job history ---------------- */
