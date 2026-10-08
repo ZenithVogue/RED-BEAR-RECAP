@@ -14,7 +14,9 @@
     maxStep: 1,
     file: null,
     videoUrl: null,
-    audioBlob: null,
+    audioBlob: null,       // extracted source audio used for transcription
+    voiceAudioBlob: null,  // generated Myanmar voice-over audio
+    voiceAudioUrl: null,
     durationSec: 0,
     transcriptReady: false,
     voice: null,        // persona code
@@ -24,6 +26,7 @@
     scriptLines: [],    // Step 3 clean lines: { text, voice (override | ""), pitch (override | "") }
     voicePlan: [],      // resolved per-line plan at generation time
   };
+  let generating = false;
 
   const PAGES = {
     manual: { crumb: "Manual Video Editor" },
@@ -245,6 +248,7 @@
       toast("MP4, MOV, WEBM, MKV ဖိုင်များကိုသာ လက်ခံပါသည်။", "info");
       return;
     }
+    clearGeneratedVoiceAudio();
     state.file = f;
     state.audioBlob = null;
     state.transcriptReady = false;
@@ -261,6 +265,7 @@
   }
 
   function clearStep1Media() {
+    clearGeneratedVoiceAudio();
     if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
     state.videoUrl = null;
     state.file = null;
@@ -941,6 +946,140 @@
     }
   }
 
+  const MAX_TTS_CHUNK_LENGTH = 180;
+
+  // Google Translate TTS accepts short requests; split long lines at natural
+  // punctuation/space boundaries while preserving Burmese characters.
+  function splitTtsText(text, maxLength = MAX_TTS_CHUNK_LENGTH) {
+    let remaining = String(text || "").trim();
+    const chunks = [];
+    while (remaining.length > maxLength) {
+      let splitAt = -1;
+      for (let i = 0; i < maxLength; i += 1) {
+        if (/\s|[၊။,.!?;:]/u.test(remaining[i])) splitAt = i + 1;
+      }
+      if (splitAt < Math.floor(maxLength * 0.6)) splitAt = maxLength;
+      const chunk = remaining.slice(0, splitAt).trim();
+      if (chunk) chunks.push(chunk);
+      remaining = remaining.slice(splitAt).trim();
+    }
+    if (remaining) chunks.push(remaining);
+    return chunks;
+  }
+
+  function decodeBase64Audio(value) {
+    let encoded = String(value || "").trim();
+    encoded = encoded.replace(/^data:audio\/[^,]*;base64,/i, "").replace(/\s/g, "");
+    encoded = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const binary = window.atob(encoded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  async function fetchVoiceAudioBuffer(url) {
+    const response = await fetch(url, { headers: { Accept: "audio/mpeg, audio/*" } });
+    if (!response.ok) throw new Error("TTS audio URL " + response.status);
+    return readVoiceAudioBuffer(response);
+  }
+
+  async function readVoiceAudioBuffer(response) {
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    if (contentType.startsWith("audio/") || contentType.includes("octet-stream")) {
+      return response.arrayBuffer();
+    }
+
+    const responseText = await response.text();
+    let payload;
+    try {
+      payload = JSON.parse(responseText);
+    } catch (_) {
+      const value = responseText.trim();
+      if (/^(https?:\/\/|\/|blob:|data:)/i.test(value)) return fetchVoiceAudioBuffer(value);
+      if (/^[a-z0-9+/=_-]+$/i.test(value) && value.length > 32) return decodeBase64Audio(value);
+      throw new Error("TTS response did not contain audio data");
+    }
+
+    const bytes = payload && (payload.audioBytes || payload.audio_bytes);
+    if (Array.isArray(bytes)) return new Uint8Array(bytes).buffer;
+
+    const encoded = payload && (
+      payload.audioBase64 || payload.audio_base64 || payload.audioContent || payload.audio_content ||
+      payload.base64Audio || payload.base64_audio
+    );
+    if (encoded) return decodeBase64Audio(encoded);
+
+    const audioValue = payload && payload.audio;
+    const audioUrl = payload && (payload.audioUrl || payload.audio_url || payload.url);
+    if (audioUrl) return fetchVoiceAudioBuffer(audioUrl);
+    if (typeof audioValue === "string") {
+      if (/^(https?:\/\/|\/|blob:|data:)/i.test(audioValue)) return fetchVoiceAudioBuffer(audioValue);
+      return decodeBase64Audio(audioValue);
+    }
+
+    throw new Error((payload && payload.error) || "TTS response did not include audio data");
+  }
+
+  async function requestVoiceAudioChunk(text, line) {
+    const endpoint = getVoiceTtsEndpoint();
+    const voice = VOICES.find((candidate) => candidate.code === (line && line.voice)) || VOICES[0];
+    let response;
+
+    if (endpoint) {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json, audio/*" },
+        body: JSON.stringify({
+          text,
+          voiceId: voice.code,
+          persona: voice.code,
+          locale: "my-MM",
+          rate: voice.rate,
+          pitch: Number(line && line.pitch) || 0,
+        }),
+      });
+    } else {
+      const speed = Math.min(1.5, Math.max(0.7, Number(voice.rate) || 1));
+      const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&ttsspeed="
+        + encodeURIComponent(speed.toFixed(2)) + "&q=" + encodeURIComponent(text);
+      response = await fetch(googleUrl, { headers: { Accept: "audio/mpeg" } });
+    }
+
+    if (!response.ok) throw new Error("Myanmar TTS " + response.status);
+    const audioBuffer = await readVoiceAudioBuffer(response);
+    if (!audioBuffer || !audioBuffer.byteLength) throw new Error("Myanmar TTS returned an empty audio chunk");
+    return audioBuffer;
+  }
+
+  async function generateVoiceAudioBuffers(plan) {
+    const audioBuffers = [];
+    for (const line of plan) {
+      for (const textChunk of splitTtsText(line.text)) {
+        audioBuffers.push(await requestVoiceAudioChunk(textChunk, line));
+      }
+    }
+    return audioBuffers;
+  }
+
+  function clearGeneratedVoiceAudio() {
+    const player = document.querySelector("#audioPlayer");
+    if (player) {
+      player.pause();
+      player.removeAttribute("src");
+      player.load();
+    }
+    if (state.voiceAudioUrl) URL.revokeObjectURL(state.voiceAudioUrl);
+    state.voiceAudioUrl = null;
+    state.voiceAudioBlob = null;
+    const wave = $("#amWave");
+    const button = $("#amPlay");
+    if (wave) wave.classList.remove("playing");
+    if (button) {
+      button.classList.remove("playing");
+      button.textContent = "▶";
+    }
+  }
+
   async function requestVoicePreview(v) {
     const endpoint = getVoiceTtsEndpoint();
     if (!endpoint) {
@@ -1077,19 +1216,22 @@
 
   /* ---------------- Generate voice over ---------------- */
   async function generateVoiceOver() {
+    if (generating) return;
     const btn = $("#btnGenerate");
-    const box = $("#burmeseText");
+    const box = document.querySelector("#translatedTextInput") || document.querySelector("#burmeseText");
     let text = box ? String(box.value || "").trim() : "";
+
     // Clean JSON only when it still looks like a payload — never wipe already-clean Burmese.
-    if (text && looksLikeJsonPayload(text) && !/[\u1000-\u109F]/.test(text)) {
+    if (box === burmeseInput && text && looksLikeJsonPayload(text) && !/[\u1000-\u109F]/.test(text)) {
       try { autoCleanBurmeseInput({ notify: false }); } catch (_) {}
-      text = box ? String(box.value || "").trim() : text;
+      text = String(box.value || "").trim();
     }
     if (!text) {
-      generating = false;
-      toast("မြန်မာဘာသာပြန် စာမူ ဗလာ ဖြစ်နေပါသည် — Step 3 တွင် မြန်မာစာသား Paste လုပ်ပါ။", "info");
+      window.alert("ကျေးဇူးပြု၍ မြန်မာဘာသာပြန် စာသားထည့်သွင်းပါ");
       return;
     }
+
+    generating = true;
     if (!state.voice) selectVoice(VOICES[0].code);
     const lines = text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
     state.scriptLines = lines.map((line) => ({ text: line, voice: "", pitch: "" }));
@@ -1099,12 +1241,35 @@
       voice: state.voice,
       pitch: state.pitch,
     }));
+    state.voiceGenerated = false;
+    updateStepsUI();
+
     const prevLabel = btn ? btn.innerHTML : "";
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> အသံ ဖန်တီးနေပါသည်...';
     }
     try {
+      const audioBuffers = await generateVoiceAudioBuffers(state.voicePlan);
+      if (!audioBuffers.length) throw new Error("Myanmar TTS returned no audio chunks");
+      const audioBlob = new Blob(audioBuffers, { type: 'audio/mp3' });
+      console.log("Generated Audio Blob Size:", audioBlob.size);
+      if (!audioBlob.size) throw new Error("Myanmar TTS generated an empty audio file");
+
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const player = document.querySelector('#audioPlayer');
+      if (!player) {
+        URL.revokeObjectURL(audioUrl);
+        throw new Error("Audio preview player was not found");
+      }
+      const previousAudioUrl = state.voiceAudioUrl;
+      player.pause();
+      player.src = audioUrl;
+      player.load();
+      state.voiceAudioBlob = audioBlob;
+      state.voiceAudioUrl = audioUrl;
+      if (previousAudioUrl) URL.revokeObjectURL(previousAudioUrl);
+
       state.voiceGenerated = true;
       state.transcriptReady = true;
       hideDanger();
@@ -1119,7 +1284,9 @@
       await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်...");
       toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
     } catch (err) {
-      toast("Generate မအောင်မြင်ပါ — ပြန်ကြိုးစားပါ။", "err");
+      console.error("[Red Bear] Voice-over generation failed", err);
+      const detail = err && err.message ? ": " + err.message : "";
+      toast("Generate မအောင်မြင်ပါ" + detail + " — ပြန်ကြိုးစားပါ။", "err");
     } finally {
       generating = false;
       if (btn) {
@@ -1173,27 +1340,64 @@
     }, 120);
   });
 
-  let amTimer = null;
-  $("#amPlay").addEventListener("click", () => {
-    const wave = $("#amWave");
-    const btn = $("#amPlay");
-    if (amTimer) {
-      clearInterval(amTimer);
-      amTimer = null;
-      wave.classList.remove("playing");
-      btn.classList.remove("playing");
-      btn.textContent = "▶";
+  const audioPlayer = document.querySelector("#audioPlayer");
+  const audioWave = $("#amWave");
+  const audioPlayButton = $("#amPlay");
+  const audioTime = $("#amTime");
+
+  function formatAudioTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
+    const wholeSeconds = Math.floor(seconds);
+    return String(Math.floor(wholeSeconds / 60)).padStart(2, "0") + ":" + String(wholeSeconds % 60).padStart(2, "0");
+  }
+
+  function syncAudioPlaybackUi() {
+    const isPlaying = !!(audioPlayer && !audioPlayer.paused && !audioPlayer.ended);
+    if (audioWave) audioWave.classList.toggle("playing", isPlaying);
+    if (audioPlayButton) {
+      audioPlayButton.classList.toggle("playing", isPlaying);
+      audioPlayButton.textContent = isPlaying ? "❚❚" : "▶";
+    }
+    if (audioTime) {
+      const currentTime = audioPlayer && Number.isFinite(audioPlayer.currentTime) ? audioPlayer.currentTime : 0;
+      const duration = audioPlayer && Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
+      audioTime.textContent = duration
+        ? formatAudioTime(currentTime) + " / " + formatAudioTime(duration)
+        : formatAudioTime(currentTime);
+    }
+  }
+
+  if (audioPlayer) {
+    ["play", "pause", "ended", "timeupdate", "loadedmetadata", "durationchange"].forEach((eventName) => {
+      audioPlayer.addEventListener(eventName, syncAudioPlaybackUi);
+    });
+    audioPlayer.addEventListener("error", () => {
+      syncAudioPlaybackUi();
+      if (audioPlayer.getAttribute("src")) {
+        console.error("[Red Bear] Generated audio playback failed", audioPlayer.error);
+        toast("ဖန်တီးထားသော အသံဖိုင်ကို ဖွင့်၍မရပါ။ ပြန်လည် Generate လုပ်ပါ။", "err");
+      }
+    });
+  }
+
+  audioPlayButton.addEventListener("click", () => {
+    if (!audioPlayer || !audioPlayer.getAttribute("src")) {
+      toast("အသံဖိုင် မရှိသေးပါ — Step 3 တွင် Generate Voice Over ကို အရင်နှိပ်ပါ။", "info");
       return;
     }
-    wave.classList.add("playing");
-    btn.classList.add("playing");
-    btn.textContent = "❚❚";
-    amTimer = setTimeout(() => {
-      wave.classList.remove("playing");
-      btn.classList.remove("playing");
-      btn.textContent = "▶";
-      amTimer = null;
-    }, 3000);
+    if (!audioPlayer.paused) {
+      audioPlayer.pause();
+      return;
+    }
+    if (audioPlayer.ended) audioPlayer.currentTime = 0;
+    const playback = audioPlayer.play();
+    if (playback && typeof playback.catch === "function") {
+      playback.catch((error) => {
+        console.error("[Red Bear] Generated audio playback could not start", error);
+        syncAudioPlaybackUi();
+        toast("အသံဖွင့်ရန် မအောင်မြင်ပါ — ပြန်ကြိုးစားပါ။", "err");
+      });
+    }
   });
 
   /* ---------------- Re-render ---------------- */
