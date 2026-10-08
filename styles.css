@@ -727,37 +727,6 @@ button { cursor: pointer; }
 
 .step-line.filled .step-line-fill { width: 100%; }
 
-/* ---- Alert ---- */
-.alert-danger {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  background: var(--red-soft);
-  border: 1.5px solid var(--red-line);
-  color: var(--red-dark);
-  border-radius: var(--r-md);
-  padding: 10px 14px;
-  font-weight: var(--w-semi);
-  font-size: var(--fs-sm);
-  line-height: 1.6;
-  margin-bottom: 16px;
-  animation: fadeUp 0.25s ease;
-}
-
-.alert-text { flex: 1; line-height: 1.6; }
-
-.alert-close {
-  border: none;
-  background: transparent;
-  color: var(--red-dark);
-  font-size: 18px;
-  line-height: 1.2;
-  padding: 2px 6px;
-  border-radius: 6px;
-}
-
-.alert-close:hover { background: rgba(217, 45, 45, 0.1); }
-
 /* ---- Cards ---- */
 .step-panel { display: none; animation: fadeUp 0.3s ease; }
 .step-panel.active { display: block; }
@@ -2656,26 +2625,28 @@ button { cursor: pointer; }
 /* ============================== TOASTS ============================== */
 .toast-wrap {
   position: fixed;
+  top: 18px;
   right: 18px;
-  bottom: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  width: min(380px, calc(100vw - 36px));
   z-index: 120;
+  pointer-events: none;
 }
 
 .toast {
+  box-sizing: border-box;
+  width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 4px solid var(--red);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-lg);
-  padding: 10px 15px;
+  padding: 12px 16px;
   font-size: var(--fs-xs);
   font-weight: var(--w-semi);
   line-height: 1.65;
-  max-width: 330px;
-  animation: toastIn 0.3s ease;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+  animation: toastIn 0.25s ease;
 }
 
 .toast.ok { border-left-color: var(--green); }
@@ -2683,11 +2654,17 @@ button { cursor: pointer; }
 .toast.err { border-left-color: var(--red); }
 
 @keyframes toastIn {
-  from { opacity: 0; transform: translateX(24px); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translate3d(20px, -6px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
-.toast.out { opacity: 0; transform: translateX(24px); transition: all 0.3s ease; }
+@media (max-width: 480px) {
+  .toast-wrap {
+    top: 12px;
+    right: 12px;
+    width: calc(100vw - 24px);
+  }
+}
 
 /* ---- spinner ---- */
 .spinner {

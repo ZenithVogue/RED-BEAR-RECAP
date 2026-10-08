@@ -106,7 +106,7 @@
         <!-- Unauthenticated -->
         <div id="signinCard">
           <p class="auth-hint">အလုပ်များကို သိမ်းဆည်းရန် အကောင့် ဝင်ပါ</p>
-          <button class="btn-signin" id="btnSignIn" type="button">Sign In / Sign Up</button>
+          <button class="btn-signin" id="btnSignIn" type="button">အကောင့်ဝင်ရန်</button>
         </div>
 
         <!-- Authenticated -->
@@ -169,13 +169,6 @@
               <div class="step-rail"><span class="step-circle">4</span></div>
               <div class="step-label">Step 4: Result<br class="lb-br" /><span class="lb-my">(ရလဒ်များ)</span></div>
             </div>
-          </div>
-
-          <!-- Red alert (blocked navigation) -->
-          <div class="alert-danger" id="alertDanger" role="alert" hidden>
-            <span class="alert-icon">⚠️</span>
-            <span class="alert-text">⚠️ ကျေးဇူးပြု၍ Generate Voice Over ကို အရင်နှိပ်ပါ။</span>
-            <button class="alert-close" id="alertClose" type="button" aria-label="Close">×</button>
           </div>
 
           <!-- ---------- STEP 1 : UPLOAD ---------- -->
@@ -632,8 +625,8 @@
       </div>
       <div class="modal-body">
         <div class="auth-tabs" role="tablist">
-          <button class="auth-tab active" data-atab="signin" type="button">Sign In (အကောင့်ဝင်ရန်)</button>
-          <button class="auth-tab" data-atab="signup" type="button">Sign Up (အကောင့်သစ်ဖွင့်ရန်)</button>
+          <button class="auth-tab active" data-atab="signin" type="button">အကောင့်ဝင်ရန်</button>
+          <button class="auth-tab" data-atab="signup" type="button">အကောင့်သစ်ဖွင့်ရန်</button>
         </div>
 
         <!-- Sign In -->
@@ -649,7 +642,7 @@
               <button class="auth-forgot" id="btnForgot" type="button">Forgot Password?(စကားဝှက်မေ့နေပါသလား)</button>
             </div>
           </div>
-          <button class="btn-auth" type="submit">Sign In (အကောင့်ဝင်မည်)</button>
+          <button class="btn-auth" type="submit">အကောင့်ဝင်ရန်</button>
           <div class="auth-divider"><span>OR</span></div>
           <button class="btn btn-google btn-block" id="btnGoogle" type="button">
             <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4c-7.7 0-14.4 4.4-17.7 10.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C41 35.4 44 30.2 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>

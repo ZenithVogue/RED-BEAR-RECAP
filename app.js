@@ -50,15 +50,27 @@
 
   /* ---------------- Toasts ---------------- */
   const toastWrap = $("#toastWrap");
+  let activeToast = null;
+  let activeToastTimer = null;
   function toast(msg, type = "") {
+    if (!toastWrap) return;
+    if (activeToastTimer !== null) clearTimeout(activeToastTimer);
+    toastWrap.querySelectorAll(".toast").forEach((existingToast) => existingToast.remove());
+    activeToast = null;
+
     const el = document.createElement("div");
     el.className = "toast" + (type ? " " + type : "");
+    el.setAttribute("role", type === "err" ? "alert" : "status");
     el.textContent = msg;
     toastWrap.appendChild(el);
-    setTimeout(() => {
-      el.classList.add("out");
-      setTimeout(() => el.remove(), 320);
-    }, 3200);
+    activeToast = el;
+    activeToastTimer = setTimeout(() => {
+      if (activeToast === el) {
+        el.remove();
+        activeToast = null;
+        activeToastTimer = null;
+      }
+    }, 3000);
   }
 
   /* ---------------- Quota & Plan (SidebarQuota equivalent) ---------------- */
@@ -123,7 +135,7 @@
     if (n === 4) {
       return state.voiceGenerated
         ? { ok: true }
-        : { ok: false, warn: true, msg: "⚠️ ကျေးဇူးပြု၍ Generate Voice Over ကို အရင်နှိပ်ပါ။" };
+        : { ok: false, warn: true, msg: "ကျေးဇူးပြု၍ Generate Voice Over ကို အရင်နှိပ်ပါ။" };
     }
     return { ok: false, msg: "ဤအဆင့်သို့ မသွားနိုင်သေးပါ။" };
   }
@@ -132,16 +144,14 @@
     const gate = canOpenStep(n);
     if (!gate.ok) {
       if (gate.warn) {
-        showDanger(gate.msg);
         const item = $(`.step-item[data-step="${n}"]`);
         item.classList.remove("shake");
         void item.offsetWidth;
         item.classList.add("shake");
       }
-      toast(gate.msg, gate.warn ? "" : "info");
+      toast(gate.msg, "info");
       return;
     }
-    hideDanger();
     state.step = n;
     state.maxStep = Math.max(state.maxStep, n);
     $$(".step-panel").forEach((p, i) => p.classList.toggle("active", i + 1 === n));
@@ -155,17 +165,6 @@
 
   $$("[data-back]").forEach((b) => b.addEventListener("click", () => goToStep(Number(b.dataset.back))));
   $$("[data-next]").forEach((b) => b.addEventListener("click", () => goToStep(Number(b.dataset.next))));
-
-  /* ---------------- Danger alert ---------------- */
-  function showDanger(msg) {
-    const a = $("#alertDanger");
-    $(".alert-text", a).textContent = msg;
-    a.hidden = false;
-  }
-  function hideDanger() {
-    $("#alertDanger").hidden = true;
-  }
-  $("#alertClose").addEventListener("click", hideDanger);
 
   /* ---------------- Help modal ---------------- */
   const helpModal = $("#helpModal");
@@ -260,7 +259,6 @@
     videoPreviewCard.hidden = false;
     step1Player.src = state.videoUrl;
     extractBtn.disabled = false;
-    hideDanger();
     toast("ဗီဒီယိုဖိုင် တင်ပြီးပါပြီ ✓", "ok");
   }
 
@@ -1272,7 +1270,6 @@
 
       state.voiceGenerated = true;
       state.transcriptReady = true;
-      hideDanger();
       useQuota();
       renderResult();
       // Bypass step-gate so the result page always opens from this button.
