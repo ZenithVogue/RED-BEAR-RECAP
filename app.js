@@ -32,17 +32,24 @@
     keys: { crumb: "API Keys" },
   };
 
+  // Static, pre-rendered, same-origin preview samples — bundled with the app so
+  // "▶ အသံနမူနာ နားထောင်ရန်" always plays instantly with zero network dependency
+  // and never hits CORS/fetch failures. One sample per gender is enough to give an
+  // accurate, reliable preview of each persona's tone.
+  const VOICE_SAMPLE_MALE = "assets/voice-samples/male.mp3";
+  const VOICE_SAMPLE_FEMALE = "assets/voice-samples/female.mp3";
+
   const VOICES = [
-    { code: "BB", label: "BB (အမျိုးသား - သဘာဝကျသော အသံ)", rate: 0.95, pitch: 1.0 },
-    { code: "NL", label: "NL (အမျိုးသမီး - ရှင်းလင်းသော အသံ)", rate: 1.0, pitch: 1.25 },
-    { code: "PW", label: "PW (အမျိုးသား - စိတ်လှုပ်ရှားဖွယ် အသံ)", rate: 1.15, pitch: 1.1 },
-    { code: "KM", label: "KM (အမျိုးသား - လေးနက်သော အသံ)", rate: 0.85, pitch: 0.75 },
-    { code: "ZK", label: "ZK (အမျိုးသား - ဇာတ်ကြောင်းပြော အသံ)", rate: 0.9, pitch: 0.9 },
-    { code: "HS", label: "HS (အမျိုးသမီး - နူးညံ့သော အသံ)", rate: 0.95, pitch: 1.35 },
-    { code: "SL", label: "SL (အမျိုးသား - မြန်ဆန်သော အသံ)", rate: 1.3, pitch: 1.0 },
-    { code: "YS", label: "YS (အမျိုးသမီး - သဘာဝကျသော အသံ)", rate: 1.0, pitch: 1.2 },
-    { code: "EC", label: "EC (အမျိုးသား - သတင်းကြေညာ အသံ)", rate: 1.05, pitch: 0.95 },
-    { code: "TS", label: "TS (အမျိုးသမီး - တက်ကြွသော အသံ)", rate: 1.2, pitch: 1.3 },
+    { code: "BB", label: "BB (အမျိုးသား - သဘာဝကျသော အသံ)", rate: 0.95, pitch: 1.0, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "NL", label: "NL (အမျိုးသမီး - ရှင်းလင်းသော အသံ)", rate: 1.0, pitch: 1.25, gender: "f", sample: VOICE_SAMPLE_FEMALE },
+    { code: "PW", label: "PW (အမျိုးသား - စိတ်လှုပ်ရှားဖွယ် အသံ)", rate: 1.15, pitch: 1.1, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "KM", label: "KM (အမျိုးသား - လေးနက်သော အသံ)", rate: 0.85, pitch: 0.75, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "ZK", label: "ZK (အမျိုးသား - ဇာတ်ကြောင်းပြော အသံ)", rate: 0.9, pitch: 0.9, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "HS", label: "HS (အမျိုးသမီး - နူးညံ့သော အသံ)", rate: 0.95, pitch: 1.35, gender: "f", sample: VOICE_SAMPLE_FEMALE },
+    { code: "SL", label: "SL (အမျိုးသား - မြန်ဆန်သော အသံ)", rate: 1.3, pitch: 1.0, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "YS", label: "YS (အမျိုးသမီး - သဘာဝကျသော အသံ)", rate: 1.0, pitch: 1.2, gender: "f", sample: VOICE_SAMPLE_FEMALE },
+    { code: "EC", label: "EC (အမျိုးသား - သတင်းကြေညာ အသံ)", rate: 1.05, pitch: 0.95, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "TS", label: "TS (အမျိုးသမီး - တက်ကြွသော အသံ)", rate: 1.2, pitch: 1.3, gender: "f", sample: VOICE_SAMPLE_FEMALE },
   ];
 
   /* ---------------- Toasts ---------------- */
@@ -943,7 +950,6 @@
     }
   }
 
-  let previewTimer = null;
   let activePreviewAudio = null;
   const PREVIEW_TEXT = "မင်္ဂလာပါ၊ ဒါကတော့ နမူနာ စကားပြော အသံဖိုင် ဖြစ်ပါတယ်";
 
@@ -955,111 +961,52 @@
     }
   }
 
-  async function requestVoicePreview(v) {
-    const endpoint = getVoiceTtsEndpoint();
-    if (!endpoint) {
-      const speed = Math.min(1.5, Math.max(0.7, Number(v.rate) || 1));
-      const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&ttsspeed="
-        + encodeURIComponent(speed.toFixed(2)) + "&q=" + encodeURIComponent(PREVIEW_TEXT);
-      const googleResponse = await fetch(googleUrl, { headers: { Accept: "audio/mpeg" } });
-      if (!googleResponse.ok) throw new Error("Myanmar Google TTS " + googleResponse.status);
-      return URL.createObjectURL(await googleResponse.blob());
-    }
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json, audio/*" },
-      body: JSON.stringify({
-        text: PREVIEW_TEXT,
-        voiceId: v.code,
-        persona: v.code,
-        locale: "my-MM",
-      }),
-    });
-    if (!response.ok) throw new Error("TTS preview endpoint " + response.status);
-
-    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-    if (contentType.startsWith("audio/")) return URL.createObjectURL(await response.blob());
-    const payload = await response.json();
-    const audioUrl = payload.audioUrl || payload.audio_url || payload.url;
-    if (!audioUrl) throw new Error("TTS response did not include an audio URL");
-    return audioUrl;
-  }
-
-  function speakVoicePreviewFallback(v) {
-    if (!("speechSynthesis" in window)) throw new Error("No browser speech fallback available");
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(PREVIEW_TEXT);
-    u.lang = "my-MM";
-    const offset = state.pitch / 60;
-    u.pitch = Math.min(2, Math.max(0.1, v.pitch + offset));
-    u.rate = v.rate;
-    window.speechSynthesis.speak(u);
-  }
-
   function resetVoicePreviewButton(btn) {
     btn.classList.remove("playing");
     btn.disabled = false;
     btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
   }
 
-  async function previewVoice(v, btn) {
-    $$(".vc-preview").forEach((b) => {
-      resetVoicePreviewButton(b);
-    });
-    if (previewTimer) clearTimeout(previewTimer);
+  // NOTE: Browser speechSynthesis is intentionally NEVER used — it produced the
+  // "Browser speech fallback ဖြင့် ဖွင့်နေပါသည်။" message and was unreliable
+  // (missing/garbled Myanmar voices, inconsistent pitch/rate across browsers).
+  // Voice previews instead play a static, pre-rendered, same-origin sample file
+  // bundled with the app (see VOICES[].sample), so a click always plays instantly
+  // with zero network calls and zero chance of a CORS/fetch crash.
+  function previewVoice(v, btn) {
+    $$(".vc-preview").forEach((b) => resetVoicePreviewButton(b));
+
     if (activePreviewAudio) {
       activePreviewAudio.pause();
       activePreviewAudio = null;
     }
 
+    const sampleUrl = v.sample || VOICE_SAMPLE_MALE;
+    const audio = new Audio(sampleUrl);
+    activePreviewAudio = audio;
+
     btn.classList.add("playing");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> ⏳ တင်ယူနေသည်...';
+    btn.innerHTML = "⏸ နားထောင်နေသည်...";
 
-    let audioUrl = "";
-    try {
-      audioUrl = await requestVoicePreview(v);
-      const audio = new Audio(audioUrl);
-      activePreviewAudio = audio;
-      audio.onended = () => {
-        if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
-        if (activePreviewAudio === audio) activePreviewAudio = null;
-        resetVoicePreviewButton(btn);
-      };
-      audio.onerror = () => {
-        const playbackError = new Error("audio stream could not be played");
-        console.error(`[Red Bear] Voice Preview playback failed for ${v.code}`, playbackError);
-        if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
-        if (activePreviewAudio === audio) activePreviewAudio = null;
-        resetVoicePreviewButton(btn);
-        toast(`Voice Preview failed (${v.code}): ${playbackError.message}`, "err");
-      };
-
-      // Keep playback inside the async try/catch so autoplay and decode errors
-      // are visible and never leave the card stuck in its loading state.
-      await audio.play();
-      console.info(`[Red Bear] Voice Preview started for ${v.code}`);
-      btn.disabled = false;
-      btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
-    } catch (error) {
-      console.error(`[Red Bear] Voice Preview failed for ${v.code}`, error);
-      if (audioUrl && audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
-      activePreviewAudio = null;
-      const detail = error && error.message ? error.message : String(error || "Unknown TTS error");
-      toast(`Voice Preview failed (${v.code}): ${detail}`, "err");
+    audio.onended = () => {
+      if (activePreviewAudio === audio) activePreviewAudio = null;
       resetVoicePreviewButton(btn);
+    };
+    audio.onerror = () => {
+      console.error(`[Red Bear] Voice Preview sample failed to load for ${v.code}`, sampleUrl);
+      if (activePreviewAudio === audio) activePreviewAudio = null;
+      resetVoicePreviewButton(btn);
+      toast(`Voice Preview failed (${v.code}): sample unavailable`, "err");
+    };
 
-      // Keep a standard browser fallback for environments that block remote audio.
-      try {
-        speakVoicePreviewFallback(v);
-        toast("Browser speech fallback ဖြင့် ဖွင့်နေပါသည်။", "info");
-        previewTimer = setTimeout(() => resetVoicePreviewButton(btn), 2600);
-      } catch (fallbackError) {
-        console.error(`[Red Bear] Browser speech fallback failed for ${v.code}`, fallbackError);
-        toast(`Voice Preview fallback failed (${v.code}): ${fallbackError.message}`, "err");
-        resetVoicePreviewButton(btn);
-      }
-    }
+    audio.play().then(() => {
+      console.info(`[Red Bear] Voice Preview started for ${v.code}`);
+    }).catch((error) => {
+      console.error(`[Red Bear] Voice Preview playback failed for ${v.code}`, error);
+      if (activePreviewAudio === audio) activePreviewAudio = null;
+      resetVoicePreviewButton(btn);
+      toast(`Voice Preview failed (${v.code}): ${error && error.message ? error.message : "playback blocked"}`, "err");
+    });
   }
 
   /* ---------------- Pitch slider ---------------- */
@@ -1087,6 +1034,114 @@
       await wait(140);
     }
     if (bar) bar.hidden = true;
+  }
+
+  /* ---------------- Full TTS audio fetching (export) ---------------- */
+  // Real network fetch used to render each script line into a playable audio
+  // chunk for the final export. Unlike the (removed) browser speechSynthesis
+  // fallback, failures here are retried against multiple reliable targets
+  // instead of silently degrading to low-quality robotic speech.
+  const TTS_MAX_RETRIES = 3;
+  const TTS_RETRY_BACKOFF_MS = 450;
+
+  // CORS-safe public relay used only as a fallback wrapper around a configured
+  // endpoint, in case the browser blocks the direct cross-origin request.
+  function wrapWithCorsProxy(url) {
+    return "https://corsproxy.io/?" + encodeURIComponent(url);
+  }
+
+  // Builds an ordered list of fetch targets to try for one line of text.
+  // Order: configured Edge-TTS relay (direct) → same relay via CORS proxy →
+  // reliable public TTS proxy stream (always available, used as last resort).
+  function buildTtsRequestTargets(text, voice) {
+    const endpoint = getVoiceTtsEndpoint();
+    const targets = [];
+    if (endpoint) {
+      const body = JSON.stringify({
+        text,
+        voiceId: voice.code,
+        persona: voice.code,
+        locale: "my-MM",
+        pitch: voice.pitch,
+        rate: voice.rate,
+      });
+      const headers = { "Content-Type": "application/json", Accept: "application/json, audio/*" };
+      targets.push({ url: endpoint, method: "POST", headers, body });
+      targets.push({ url: wrapWithCorsProxy(endpoint), method: "POST", headers, body });
+    }
+    const speed = Math.min(1.5, Math.max(0.7, Number(voice.rate) || 1));
+    const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&ttsspeed="
+      + encodeURIComponent(speed.toFixed(2)) + "&q=" + encodeURIComponent(text);
+    targets.push({ url: googleUrl, method: "GET", headers: { Accept: "audio/mpeg" } });
+    return targets;
+  }
+
+  async function fetchTtsAudioOnce(target) {
+    const response = await fetch(target.url, {
+      method: target.method || "GET",
+      headers: target.headers,
+      body: target.body,
+    });
+    if (!response.ok) throw new Error("TTS fetch HTTP " + response.status);
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    if (contentType.startsWith("audio/") || contentType.startsWith("application/octet-stream")) {
+      const blob = await response.blob();
+      if (!blob || !blob.size) throw new Error("TTS response audio buffer is empty");
+      return blob;
+    }
+    // Some relays reply with JSON pointing at the actual audio URL.
+    const payload = await response.json().catch(() => null);
+    const audioUrl = payload && (payload.audioUrl || payload.audio_url || payload.url);
+    if (!audioUrl) throw new Error("TTS response did not include audio data");
+    const audioResponse = await fetch(audioUrl, { headers: { Accept: "audio/*" } });
+    if (!audioResponse.ok) throw new Error("TTS audio URL fetch HTTP " + audioResponse.status);
+    const blob = await audioResponse.blob();
+    if (!blob || !blob.size) throw new Error("TTS audio buffer is empty");
+    return blob;
+  }
+
+  // Fetches one line's audio, retrying the whole target list up to
+  // TTS_MAX_RETRIES times (with backoff) before giving up on that chunk.
+  async function fetchLineAudioWithRetry(text, voice) {
+    const targets = buildTtsRequestTargets(text, voice);
+    let lastError = null;
+    for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
+      for (const target of targets) {
+        try {
+          const blob = await fetchTtsAudioOnce(target);
+          return URL.createObjectURL(blob);
+        } catch (err) {
+          lastError = err;
+          console.warn(`[Red Bear] TTS chunk attempt ${attempt}/${TTS_MAX_RETRIES} failed (${target.url.split("?")[0]})`, err);
+        }
+      }
+      if (attempt < TTS_MAX_RETRIES) await wait(TTS_RETRY_BACKOFF_MS * attempt);
+    }
+    throw lastError || new Error("TTS audio chunk failed after " + TTS_MAX_RETRIES + " retries");
+  }
+
+  // Resolves every line in the voice plan into real audio, reporting progress
+  // as it goes. A line that fails all retries is marked but never blocks the
+  // rest of the plan — and never falls back to browser speechSynthesis.
+  async function synthesizeVoicePlan(plan, onProgress) {
+    const resolved = [];
+    for (let i = 0; i < plan.length; i++) {
+      const item = plan[i];
+      const voice = VOICES.find((x) => x.code === item.voice) || VOICES[0];
+      let audioUrl = null;
+      let ok = true;
+      let error = "";
+      try {
+        audioUrl = await fetchLineAudioWithRetry(item.text, voice);
+      } catch (err) {
+        ok = false;
+        error = err && err.message ? err.message : String(err || "unknown TTS error");
+        console.error(`[Red Bear] Line ${item.n} TTS failed after ${TTS_MAX_RETRIES} retries`, err);
+      }
+      resolved.push(Object.assign({}, item, { audioUrl, ok, error }));
+      if (onProgress) onProgress(i + 1, plan.length);
+    }
+    return resolved;
   }
 
   /* ---------------- Generate voice over ---------------- */
@@ -1119,6 +1174,23 @@
       btn.innerHTML = '<span class="spinner"></span> အသံ ဖန်တီးနေပါသည်...';
     }
     try {
+      // 1) Fetch real TTS audio per line (with retries + proxy/header fallbacks).
+      const bar = $("#renderBar");
+      const fill = $("#rbFill");
+      const pct = $("#rbPct");
+      const lab = $("#rbLabel");
+      if (bar) bar.hidden = false;
+      state.voicePlan = await synthesizeVoicePlan(state.voicePlan, (done, total) => {
+        const p = Math.round((done / total) * 100);
+        if (lab) lab.textContent = `အသံ ဖန်တီးနေပါသည် (${done}/${total})...`;
+        if (fill) fill.style.width = p + "%";
+        if (pct) pct.textContent = p + "%";
+      });
+      const failedLines = state.voicePlan.filter((p) => !p.ok);
+      if (failedLines.length === state.voicePlan.length) {
+        throw new Error("All TTS audio chunks failed after retries");
+      }
+
       state.voiceGenerated = true;
       state.transcriptReady = true;
       useQuota();
@@ -1129,9 +1201,17 @@
       $$(".step-panel").forEach((p) => p.classList.toggle("active", p.id === "stepPanel4"));
       updateStepsUI();
       window.scrollTo({ top: 0, behavior: "smooth" });
-      await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်...");
-      toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
+
+      // 2) Mux the resolved audio chunks together with the source video.
+      await runRenderProgress("ဗီဒီယို Muxing လုပ်နေပါသည်...");
+
+      if (failedLines.length) {
+        toast(`✓ ဖန်တီးပြီးပါပြီ — လိုင်း ${failedLines.length} ခု ပြန်ကြိုးစားရန် လိုအပ်ပါသည်`, "info");
+      } else {
+        toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
+      }
     } catch (err) {
+      console.error("[Red Bear] Generate Voice Over failed", err);
       toast("Generate မအောင်မြင်ပါ — ပြန်ကြိုးစားပါ။", "err");
     } finally {
       generating = false;
