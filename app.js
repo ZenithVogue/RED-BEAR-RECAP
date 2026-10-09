@@ -1156,22 +1156,52 @@
     };
   }
 
+  // Escapes text for safe inclusion inside XML/SSML element content AND
+  // strips control characters that are flat-out illegal in XML 1.0 (common
+  // in text pasted from PDFs/chat apps) — either of these left unescaped is
+  // enough to make a strict SSML parser reject the whole request and fail
+  // the TTS call with something like "Generate မအောင်မြင်ပါ".
   function escapeSsmlText(text) {
-    return String(text)
+    return String(text == null ? "" : text)
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "") // illegal XML 1.0 control chars
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;")
+      .trim();
+  }
+
+  // Guarantees a finite, safely-formatted signed number for SSML attributes
+  // like pitch="+20Hz" — a stray NaN/Infinity (e.g. from bad persona data)
+  // would otherwise produce invalid markup such as pitch="NaNHz".
+  function safeProsodyNumber(n) {
+    const num = Number(n);
+    const safe = Number.isFinite(num) ? Math.round(num) : 0;
+    return (safe >= 0 ? "+" : "") + safe;
   }
 
   // Builds the actual SSML payload sent to the Edge-TTS relay: the persona's
   // pitch/rate offsets are injected directly as <prosody> attributes around
-  // the base Thiha/Nilar <voice>, exactly as Edge TTS expects.
+  // the base Thiha/Nilar <voice>, exactly as Edge TTS expects. Wrapped in its
+  // own try/catch so a malformed/unescapable line can never crash the whole
+  // generation run — callers treat a thrown error here as "no SSML available,
+  // fall back to a plain text request" instead of letting it bubble up.
   function buildProsodySsml(text, voice) {
-    const { pitchOffset, rateOffset } = computeProsodyOffsets(voice);
-    const safeText = escapeSsmlText(text);
-    const prosody = `<prosody pitch="${pitchOffset}Hz" rate="${rateOffset}%">${safeText}</prosody>`;
-    return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="my-MM">`
-      + `<voice name="${baseVoiceFor(voice)}">${prosody}</voice></speak>`;
+    try {
+      const { pitchOffset, rateOffset } = computeProsodyOffsets(voice);
+      const safeText = escapeSsmlText(text);
+      if (!safeText) throw new Error("SSML text is empty after sanitization");
+      const safePitch = safeProsodyNumber(pitchOffset);
+      const safeRate = safeProsodyNumber(rateOffset);
+      const prosody = `<prosody pitch="${safePitch}Hz" rate="${safeRate}%">${safeText}</prosody>`;
+      return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="my-MM">`
+        + `<voice name="${baseVoiceFor(voice)}">${prosody}</voice></speak>`;
+    } catch (err) {
+      console.error("TTS Fetch Error:", err);
+      return null;
+    }
   }
 
   // CORS-safe public relay used only as a fallback wrapper around a configured
@@ -1180,27 +1210,52 @@
     return "https://corsproxy.io/?" + encodeURIComponent(url);
   }
 
-  // Builds an ordered list of fetch targets to try for one line of text.
-  // Order: configured Edge-TTS relay (direct) → same relay via CORS proxy →
-  // reliable public TTS proxy stream (always available, used as last resort).
+  // Builds the JSON body for the custom Edge-TTS relay. When `useSsml` is
+  // true we attempt to attach the <prosody>-wrapped SSML; if that build
+  // throws/fails for any reason (bad characters, bad persona data, etc.) we
+  // log it and silently continue with a plain-text-only payload instead of
+  // letting the whole chunk fail — this is the "standard text fetch" fallback.
+  function buildRelayPayload(text, voice, { useSsml }) {
+    const { pitchOffset, rateOffset } = computeProsodyOffsets(voice);
+    const payload = {
+      text,
+      voiceId: voice.code,
+      persona: voice.code,
+      baseVoice: baseVoiceFor(voice),
+      locale: "my-MM",
+      pitch: safeProsodyNumber(pitchOffset) + "Hz",
+      rate: safeProsodyNumber(rateOffset) + "%",
+    };
+    if (useSsml) {
+      const ssml = buildProsodySsml(text, voice);
+      if (ssml) payload.ssml = ssml;
+    }
+    return JSON.stringify(payload);
+  }
+
+  // Builds an ordered list of fetch targets to try for one line of text:
+  //   1. Configured Edge-TTS relay, SSML request (per-persona prosody).
+  //   2. Same relay, PLAIN TEXT request — automatic fallback if the relay's
+  //      SSML/XML parser rejects the prosody markup for any reason.
+  //   3. Same relay via a CORS proxy (plain text) — covers browsers that
+  //      block the direct cross-origin request outright.
+  //   4. A reliable public TTS proxy stream (Google Translate TTS), always
+  //      available as the final "standard Edge TTS proxy" fallback.
   function buildTtsRequestTargets(text, voice) {
     const endpoint = getVoiceTtsEndpoint();
     const targets = [];
     if (endpoint) {
-      const { pitchOffset, rateOffset } = computeProsodyOffsets(voice);
-      const body = JSON.stringify({
-        text,
-        ssml: buildProsodySsml(text, voice),
-        voiceId: voice.code,
-        persona: voice.code,
-        baseVoice: baseVoiceFor(voice),
-        locale: "my-MM",
-        pitch: pitchOffset + "Hz",
-        rate: rateOffset + "%",
-      });
       const headers = { "Content-Type": "application/json", Accept: "application/json, audio/*" };
-      targets.push({ url: endpoint, method: "POST", headers, body });
-      targets.push({ url: wrapWithCorsProxy(endpoint), method: "POST", headers, body });
+      try {
+        targets.push({ url: endpoint, method: "POST", headers, body: buildRelayPayload(text, voice, { useSsml: true }) });
+        targets.push({ url: endpoint, method: "POST", headers, body: buildRelayPayload(text, voice, { useSsml: false }) });
+        targets.push({ url: wrapWithCorsProxy(endpoint), method: "POST", headers, body: buildRelayPayload(text, voice, { useSsml: false }) });
+      } catch (err) {
+        // Building the relay payload itself should never be able to throw
+        // (buildProsodySsml already catches internally), but guard anyway so
+        // a surprise error here still leaves the Google TTS fallback usable.
+        console.error("TTS Fetch Error:", err);
+      }
     }
     const speed = Math.min(1.5, Math.max(0.7, Number(voice.rate) || 1));
     const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&ttsspeed="
@@ -1209,32 +1264,45 @@
     return targets;
   }
 
+  // Performs exactly one fetch attempt against one target. Wrapped in its
+  // own try/catch so every failure — network error, CORS rejection, bad
+  // HTTP status, malformed response — is logged with the exact error object
+  // before being re-thrown for fetchLineAudioWithRetry to act on.
   async function fetchTtsAudioOnce(target) {
-    const response = await fetch(target.url, {
-      method: target.method || "GET",
-      headers: target.headers,
-      body: target.body,
-    });
-    if (!response.ok) throw new Error("TTS fetch HTTP " + response.status);
-    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-    if (contentType.startsWith("audio/") || contentType.startsWith("application/octet-stream")) {
-      const blob = await response.blob();
-      if (!blob || !blob.size) throw new Error("TTS response audio buffer is empty");
+    try {
+      const response = await fetch(target.url, {
+        method: target.method || "GET",
+        headers: target.headers,
+        body: target.body,
+      });
+      if (!response.ok) throw new Error("TTS fetch HTTP " + response.status);
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      if (contentType.startsWith("audio/") || contentType.startsWith("application/octet-stream")) {
+        const blob = await response.blob();
+        if (!blob || !blob.size) throw new Error("TTS response audio buffer is empty");
+        return blob;
+      }
+      // Some relays reply with JSON pointing at the actual audio URL.
+      const payload = await response.json().catch(() => null);
+      const audioUrl = payload && (payload.audioUrl || payload.audio_url || payload.url);
+      if (!audioUrl) throw new Error("TTS response did not include audio data");
+      const audioResponse = await fetch(audioUrl, { headers: { Accept: "audio/*" } });
+      if (!audioResponse.ok) throw new Error("TTS audio URL fetch HTTP " + audioResponse.status);
+      const blob = await audioResponse.blob();
+      if (!blob || !blob.size) throw new Error("TTS audio buffer is empty");
       return blob;
+    } catch (error) {
+      // Exact network error, always visible in the console for debugging.
+      console.error("TTS Fetch Error:", error);
+      throw error;
     }
-    // Some relays reply with JSON pointing at the actual audio URL.
-    const payload = await response.json().catch(() => null);
-    const audioUrl = payload && (payload.audioUrl || payload.audio_url || payload.url);
-    if (!audioUrl) throw new Error("TTS response did not include audio data");
-    const audioResponse = await fetch(audioUrl, { headers: { Accept: "audio/*" } });
-    if (!audioResponse.ok) throw new Error("TTS audio URL fetch HTTP " + audioResponse.status);
-    const blob = await audioResponse.blob();
-    if (!blob || !blob.size) throw new Error("TTS audio buffer is empty");
-    return blob;
   }
 
   // Fetches one line's audio, retrying the whole target list up to
   // TTS_MAX_RETRIES times (with backoff) before giving up on that chunk.
+  // The target list itself already walks SSML → plain text → CORS proxy →
+  // Google TTS, so by the time this throws every reasonable fallback for
+  // this line has genuinely been exhausted.
   async function fetchLineAudioWithRetry(text, voice) {
     const targets = buildTtsRequestTargets(text, voice);
     let lastError = null;
@@ -1253,35 +1321,58 @@
     throw lastError || new Error("TTS audio chunk failed after " + TTS_MAX_RETRIES + " retries");
   }
 
-  // Resolves every line in the voice plan into real audio. All lines are
-  // fetched SIMULTANEOUSLY via Promise.all (instead of one-by-one in a
-  // sequential for-loop), so a 10-line script takes roughly as long as its
-  // single slowest line rather than the sum of all of them — about a 5x
-  // speedup for typical scripts. Promise.all preserves the original line
-  // order in its resolved array, so the results can be combined into the
-  // final render immediately with no re-sorting step.
+  async function synthesizeOneLine(item, onDone) {
+    const voice = VOICES.find((x) => x.code === item.voice) || VOICES[0];
+    let audioUrl = null;
+    let ok = true;
+    let error = "";
+    try {
+      audioUrl = await fetchLineAudioWithRetry(item.text, voice);
+    } catch (err) {
+      ok = false;
+      error = err && err.message ? err.message : String(err || "unknown TTS error");
+      console.error("TTS Fetch Error:", err);
+      console.error(`[Red Bear] Line ${item.n} TTS failed after ${TTS_MAX_RETRIES} retries`, err);
+    }
+    if (onDone) onDone();
+    return Object.assign({}, item, { audioUrl, ok, error });
+  }
+
+  // How many lines to fetch at once, and how long to pause between batches.
+  // Firing 50+ requests at the same instant is exactly what trips Edge TTS
+  // (and most TTS relay) rate limits, so lines are processed a few at a time
+  // instead of all in one uncapped Promise.all().
+  const TTS_BATCH_SIZE = 4;
+  const TTS_BATCH_DELAY_MS = 350;
+
+  // Resolves every line in the voice plan into real audio using small,
+  // concurrent batches (Promise.all PER BATCH, never across the whole plan)
+  // with a short pause between batches. This keeps the big speedup from
+  // parallelizing within a batch while staying well under typical TTS rate
+  // limits — and the resolved array still comes back in the original script
+  // order, ready to combine into the final render immediately.
   async function synthesizeVoicePlan(plan, onProgress) {
     let completed = 0;
     const total = plan.length;
-    const tasks = plan.map(async (item) => {
-      const voice = VOICES.find((x) => x.code === item.voice) || VOICES[0];
-      let audioUrl = null;
-      let ok = true;
-      let error = "";
-      try {
-        audioUrl = await fetchLineAudioWithRetry(item.text, voice);
-      } catch (err) {
-        ok = false;
-        error = err && err.message ? err.message : String(err || "unknown TTS error");
-        console.error(`[Red Bear] Line ${item.n} TTS failed after ${TTS_MAX_RETRIES} retries`, err);
-      }
-      completed += 1;
-      if (onProgress) onProgress(completed, total);
-      return Object.assign({}, item, { audioUrl, ok, error });
-    });
-    // Fire every line's fetch at once; Promise.all resolves with the audio
-    // buffers already combined in their original script order.
-    return Promise.all(tasks);
+    const resolved = new Array(total);
+
+    for (let start = 0; start < total; start += TTS_BATCH_SIZE) {
+      const batch = plan.slice(start, start + TTS_BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map((item) =>
+          synthesizeOneLine(item, () => {
+            completed += 1;
+            if (onProgress) onProgress(completed, total);
+          })
+        )
+      );
+      batchResults.forEach((result, i) => { resolved[start + i] = result; });
+
+      const hasMoreBatches = start + TTS_BATCH_SIZE < total;
+      if (hasMoreBatches) await wait(TTS_BATCH_DELAY_MS);
+    }
+
+    return resolved;
   }
 
   /* ---------------- Generate voice over ---------------- */
