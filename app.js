@@ -46,16 +46,43 @@
   ];
 
   /* ---------------- Toasts ---------------- */
+  // Single, unified toast utility: TOP-RIGHT, max 1 active toast at a time.
+  // Any previously active toast is dismissed immediately before a new one is shown,
+  // and the new toast auto-dismisses after 3 seconds.
   const toastWrap = $("#toastWrap");
+  let activeToast = null;
+  let activeToastTimer = null;
+
+  function dismissToast(el) {
+    if (!el || !el.isConnected) return;
+    el.classList.add("out");
+    setTimeout(() => el.remove(), 220);
+  }
+
   function toast(msg, type = "") {
+    // Enforce a hard cap of 1 toast: remove any existing toast(s) first.
+    if (activeToastTimer) {
+      clearTimeout(activeToastTimer);
+      activeToastTimer = null;
+    }
+    if (activeToast) {
+      activeToast.remove();
+      activeToast = null;
+    }
+    // Safety net: clear anything else left in the toast container.
+    toastWrap.innerHTML = "";
+
     const el = document.createElement("div");
     el.className = "toast" + (type ? " " + type : "");
     el.textContent = msg;
     toastWrap.appendChild(el);
-    setTimeout(() => {
-      el.classList.add("out");
-      setTimeout(() => el.remove(), 320);
-    }, 3200);
+    activeToast = el;
+
+    activeToastTimer = setTimeout(() => {
+      dismissToast(el);
+      if (activeToast === el) activeToast = null;
+      activeToastTimer = null;
+    }, 3000);
   }
 
   /* ---------------- Quota & Plan (SidebarQuota equivalent) ---------------- */
@@ -129,16 +156,15 @@
     const gate = canOpenStep(n);
     if (!gate.ok) {
       if (gate.warn) {
-        showDanger(gate.msg);
         const item = $(`.step-item[data-step="${n}"]`);
         item.classList.remove("shake");
         void item.offsetWidth;
         item.classList.add("shake");
       }
-      toast(gate.msg, gate.warn ? "" : "info");
+      // Single unified toast — no separate banner alert.
+      toast(gate.msg, gate.warn ? "err" : "info");
       return;
     }
-    hideDanger();
     state.step = n;
     state.maxStep = Math.max(state.maxStep, n);
     $$(".step-panel").forEach((p, i) => p.classList.toggle("active", i + 1 === n));
@@ -152,17 +178,6 @@
 
   $$("[data-back]").forEach((b) => b.addEventListener("click", () => goToStep(Number(b.dataset.back))));
   $$("[data-next]").forEach((b) => b.addEventListener("click", () => goToStep(Number(b.dataset.next))));
-
-  /* ---------------- Danger alert ---------------- */
-  function showDanger(msg) {
-    const a = $("#alertDanger");
-    $(".alert-text", a).textContent = msg;
-    a.hidden = false;
-  }
-  function hideDanger() {
-    $("#alertDanger").hidden = true;
-  }
-  $("#alertClose").addEventListener("click", hideDanger);
 
   /* ---------------- Help modal ---------------- */
   const helpModal = $("#helpModal");
@@ -256,7 +271,6 @@
     videoPreviewCard.hidden = false;
     step1Player.src = state.videoUrl;
     extractBtn.disabled = false;
-    hideDanger();
     toast("ဗီဒီယိုဖိုင် တင်ပြီးပါပြီ ✓", "ok");
   }
 
@@ -1107,7 +1121,6 @@
     try {
       state.voiceGenerated = true;
       state.transcriptReady = true;
-      hideDanger();
       useQuota();
       renderResult();
       // Bypass step-gate so the result page always opens from this button.
