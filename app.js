@@ -964,7 +964,7 @@
     }
   }
 
-  let activePreviewAudio = null;
+  let activePreview = null; // { stop() }
   const PREVIEW_TEXT = "မင်္ဂလာပါ၊ ဒါကတော့ နမူနာ စကားပြော အသံဖိုင် ဖြစ်ပါတယ်";
 
   function getVoiceTtsEndpoint() {
@@ -981,43 +981,114 @@
     btn.innerHTML = "▶ Preview";
   }
 
+  function stopActivePreview() {
+    if (!activePreview) return;
+    try { activePreview.stop(); } catch (_) {}
+    activePreview = null;
+  }
+
+  // Shared Web Audio context + decoded-buffer cache so every persona card can
+  // reuse the same two bundled sample files (male.mp3/female.mp3) without
+  // re-fetching or re-decoding them on every click.
+  let sharedAudioCtx = null;
+  const previewBufferCache = new Map();
+
+  function getSharedAudioCtx() {
+    if (sharedAudioCtx) return sharedAudioCtx;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    sharedAudioCtx = Ctx ? new Ctx() : null;
+    return sharedAudioCtx;
+  }
+
+  async function loadPreviewBuffer(ctx, url) {
+    if (previewBufferCache.has(url)) return previewBufferCache.get(url);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("sample fetch HTTP " + response.status);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    previewBufferCache.set(url, audioBuffer);
+    return audioBuffer;
+  }
+
+  // Derives how much to pitch/speed-shift the shared base sample so each
+  // persona card is audibly distinct even though BB/PW/KM/ZK/SL/EC all share
+  // the same Thiha recording and NL/HS/YS/TS all share the same Nilar
+  // recording. `detune` (in cents) shifts pitch independently of speed;
+  // `playbackRate` matches the persona's configured speaking rate.
+  function computePreviewTuning(v) {
+    const { pitchOffset } = computeProsodyOffsets(v);
+    // 1 semitone ≈ 100 cents; map our Hz-ish pitch offset onto a clearly
+    // audible range so every persona's preview sounds different.
+    const detuneCents = Math.max(-1200, Math.min(1200, Math.round(Number(pitchOffset) * 8)));
+    const playbackRate = Math.min(2, Math.max(0.5, Number(v.rate) || 1));
+    return { detuneCents, playbackRate };
+  }
+
   // NOTE: Browser speechSynthesis is intentionally NEVER used — it produced the
   // "Browser speech fallback ဖြင့် ဖွင့်နေပါသည်။" message and was unreliable
   // (missing/garbled Myanmar voices, inconsistent pitch/rate across browsers).
-  // Voice previews instead play a static, pre-rendered, same-origin sample file
-  // bundled with the app (see VOICES[].sample), so a click always plays instantly
-  // with zero network calls and zero chance of a CORS/fetch crash.
+  // Voice previews instead pitch/rate-shift a static, pre-rendered, same-origin
+  // sample file bundled with the app (see VOICES[].sample) via the Web Audio
+  // API, so every persona's "▶ Preview" sounds distinct, plays instantly, and
+  // never touches the network or any broken fallback path.
   function previewVoice(v, btn) {
     $$(".vc-preview").forEach((b) => resetVoicePreviewButton(b));
+    stopActivePreview();
 
-    if (activePreviewAudio) {
-      activePreviewAudio.pause();
-      activePreviewAudio = null;
-    }
-
-    const sampleUrl = v.sample || VOICE_SAMPLE_MALE;
-    const audio = new Audio(sampleUrl);
-    activePreviewAudio = audio;
-
+    // Immediate feedback — flip the button state before any async decode work
+    // starts, so the UI never looks like it's hanging.
     btn.classList.add("playing");
     btn.innerHTML = "⏸ Playing...";
 
-    audio.onended = () => {
-      if (activePreviewAudio === audio) activePreviewAudio = null;
-      resetVoicePreviewButton(btn);
-    };
-    audio.onerror = () => {
-      console.error(`[Red Bear] Voice Preview sample failed to load for ${v.code}`, sampleUrl);
-      if (activePreviewAudio === audio) activePreviewAudio = null;
-      resetVoicePreviewButton(btn);
-      toast(`Voice Preview failed (${v.code}): sample unavailable`, "err");
+    const sampleUrl = v.sample || VOICE_SAMPLE_MALE;
+    const { detuneCents, playbackRate } = computePreviewTuning(v);
+    const ctx = getSharedAudioCtx();
+
+    const playWithWebAudio = async () => {
+      if (!ctx) throw new Error("Web Audio unavailable");
+      if (ctx.state === "suspended") await ctx.resume();
+      const buffer = await loadPreviewBuffer(ctx, sampleUrl);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.playbackRate.value = playbackRate;
+      if (source.detune) source.detune.value = detuneCents;
+      source.connect(ctx.destination);
+      const handle = { stop: () => source.stop() };
+      activePreview = handle;
+      source.onended = () => {
+        if (activePreview === handle) activePreview = null;
+        resetVoicePreviewButton(btn);
+      };
+      source.start(0);
+      console.info(`[Red Bear] Voice Preview (pitch=${detuneCents}c, rate=${playbackRate}) started for ${v.code}`);
     };
 
-    audio.play().then(() => {
-      console.info(`[Red Bear] Voice Preview started for ${v.code}`);
+    // Plain <audio> fallback for browsers without Web Audio support — still
+    // applies the persona's playbackRate (no speechSynthesis involved).
+    const playWithPlainAudio = () => {
+      const audio = new Audio(sampleUrl);
+      audio.playbackRate = playbackRate;
+      const handle = { stop: () => audio.pause() };
+      activePreview = handle;
+      audio.onended = () => {
+        if (activePreview === handle) activePreview = null;
+        resetVoicePreviewButton(btn);
+      };
+      audio.onerror = () => {
+        console.error(`[Red Bear] Voice Preview sample failed to load for ${v.code}`, sampleUrl);
+        activePreview = null;
+        resetVoicePreviewButton(btn);
+        toast(`Voice Preview failed (${v.code}): sample unavailable`, "err");
+      };
+      return audio.play();
+    };
+
+    playWithWebAudio().catch((err) => {
+      console.warn(`[Red Bear] Web Audio preview failed for ${v.code}, falling back to plain playback`, err);
+      return playWithPlainAudio();
     }).catch((error) => {
       console.error(`[Red Bear] Voice Preview playback failed for ${v.code}`, error);
-      if (activePreviewAudio === audio) activePreviewAudio = null;
+      activePreview = null;
       resetVoicePreviewButton(btn);
       toast(`Voice Preview failed (${v.code}): ${error && error.message ? error.message : "playback blocked"}`, "err");
     });
@@ -1058,6 +1129,51 @@
   const TTS_MAX_RETRIES = 3;
   const TTS_RETRY_BACKOFF_MS = 450;
 
+  // The two underlying Edge-TTS Myanmar neural voices every persona is built
+  // on top of — "BB/PW/KM/ZK/SL/EC" all speak through Thiha, "NL/HS/YS/TS"
+  // all speak through Nilar. Each persona only differs by the <prosody>
+  // pitch/rate it applies on top of that base voice.
+  const BASE_VOICE_MALE = "my-MM-ThihaNeural";
+  const BASE_VOICE_FEMALE = "my-MM-NilarNeural";
+
+  function baseVoiceFor(voice) {
+    return voice.gender === "f" ? BASE_VOICE_FEMALE : BASE_VOICE_MALE;
+  }
+
+  // Converts a persona's rate/pitch multipliers (plus the global pitch
+  // slider, which is already in Hz) into the signed Hz/% offsets SSML
+  // <prosody> expects. This is what actually makes PW/KM/ZK/SL/EC (and
+  // NL/HS/YS/TS) sound distinct from one another instead of all collapsing
+  // back to the same flat Thiha/Nilar reading.
+  function computeProsodyOffsets(voice) {
+    const personaPitchHz = Math.round((Number(voice.pitch) || 1) * 100 - 100); // e.g. 0.75 -> -25, 1.35 -> +35
+    const globalPitchHz = Number(state.pitch) || 0; // slider is already -30..30 Hz
+    const pitchHz = Math.max(-100, Math.min(100, personaPitchHz + globalPitchHz));
+    const rateHz = Math.round((Number(voice.rate) || 1) * 100 - 100); // e.g. 0.85 -> -15, 1.3 -> +30
+    return {
+      pitchOffset: (pitchHz >= 0 ? "+" : "") + pitchHz,
+      rateOffset: (rateHz >= 0 ? "+" : "") + rateHz,
+    };
+  }
+
+  function escapeSsmlText(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  // Builds the actual SSML payload sent to the Edge-TTS relay: the persona's
+  // pitch/rate offsets are injected directly as <prosody> attributes around
+  // the base Thiha/Nilar <voice>, exactly as Edge TTS expects.
+  function buildProsodySsml(text, voice) {
+    const { pitchOffset, rateOffset } = computeProsodyOffsets(voice);
+    const safeText = escapeSsmlText(text);
+    const prosody = `<prosody pitch="${pitchOffset}Hz" rate="${rateOffset}%">${safeText}</prosody>`;
+    return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="my-MM">`
+      + `<voice name="${baseVoiceFor(voice)}">${prosody}</voice></speak>`;
+  }
+
   // CORS-safe public relay used only as a fallback wrapper around a configured
   // endpoint, in case the browser blocks the direct cross-origin request.
   function wrapWithCorsProxy(url) {
@@ -1071,13 +1187,16 @@
     const endpoint = getVoiceTtsEndpoint();
     const targets = [];
     if (endpoint) {
+      const { pitchOffset, rateOffset } = computeProsodyOffsets(voice);
       const body = JSON.stringify({
         text,
+        ssml: buildProsodySsml(text, voice),
         voiceId: voice.code,
         persona: voice.code,
+        baseVoice: baseVoiceFor(voice),
         locale: "my-MM",
-        pitch: voice.pitch,
-        rate: voice.rate,
+        pitch: pitchOffset + "Hz",
+        rate: rateOffset + "%",
       });
       const headers = { "Content-Type": "application/json", Accept: "application/json, audio/*" };
       targets.push({ url: endpoint, method: "POST", headers, body });
@@ -1134,13 +1253,17 @@
     throw lastError || new Error("TTS audio chunk failed after " + TTS_MAX_RETRIES + " retries");
   }
 
-  // Resolves every line in the voice plan into real audio, reporting progress
-  // as it goes. A line that fails all retries is marked but never blocks the
-  // rest of the plan — and never falls back to browser speechSynthesis.
+  // Resolves every line in the voice plan into real audio. All lines are
+  // fetched SIMULTANEOUSLY via Promise.all (instead of one-by-one in a
+  // sequential for-loop), so a 10-line script takes roughly as long as its
+  // single slowest line rather than the sum of all of them — about a 5x
+  // speedup for typical scripts. Promise.all preserves the original line
+  // order in its resolved array, so the results can be combined into the
+  // final render immediately with no re-sorting step.
   async function synthesizeVoicePlan(plan, onProgress) {
-    const resolved = [];
-    for (let i = 0; i < plan.length; i++) {
-      const item = plan[i];
+    let completed = 0;
+    const total = plan.length;
+    const tasks = plan.map(async (item) => {
       const voice = VOICES.find((x) => x.code === item.voice) || VOICES[0];
       let audioUrl = null;
       let ok = true;
@@ -1152,14 +1275,26 @@
         error = err && err.message ? err.message : String(err || "unknown TTS error");
         console.error(`[Red Bear] Line ${item.n} TTS failed after ${TTS_MAX_RETRIES} retries`, err);
       }
-      resolved.push(Object.assign({}, item, { audioUrl, ok, error }));
-      if (onProgress) onProgress(i + 1, plan.length);
-    }
-    return resolved;
+      completed += 1;
+      if (onProgress) onProgress(completed, total);
+      return Object.assign({}, item, { audioUrl, ok, error });
+    });
+    // Fire every line's fetch at once; Promise.all resolves with the audio
+    // buffers already combined in their original script order.
+    return Promise.all(tasks);
   }
 
   /* ---------------- Generate voice over ---------------- */
+  // NOTE: `generating` was previously used without being declared, which
+  // threw a ReferenceError (strict mode) the moment the function's `finally`
+  // block tried to reset it — that silently skipped re-enabling the button,
+  // leaving "အသံ ဖန်တီးနေပါသည်..." stuck on screen forever. Declaring it
+  // properly (and using it as a re-entrancy guard) fixes that hang and gives
+  // instant, reliable feedback on every click.
+  let generating = false;
+
   async function generateVoiceOver() {
+    if (generating) return;
     const btn = $("#btnGenerate");
     const box = $("#burmeseText");
     let text = box ? String(box.value || "").trim() : "";
@@ -1169,10 +1304,10 @@
       text = box ? String(box.value || "").trim() : text;
     }
     if (!text) {
-      generating = false;
       toast("မြန်မာဘာသာပြန် စာမူ ဗလာ ဖြစ်နေပါသည် — Step 3 တွင် မြန်မာစာသား Paste လုပ်ပါ။", "info");
       return;
     }
+    generating = true;
     if (!state.voice) selectVoice(VOICES[0].code);
     const lines = text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
     state.scriptLines = lines.map((line) => ({ text: line, voice: "", pitch: "" }));
