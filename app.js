@@ -40,16 +40,16 @@
   const VOICE_SAMPLE_FEMALE = "assets/voice-samples/female.mp3";
 
   const VOICES = [
-    { code: "BB", label: "BB (အမျိုးသား - သဘာဝကျသော အသံ)", rate: 0.95, pitch: 1.0, gender: "m", sample: VOICE_SAMPLE_MALE },
-    { code: "NL", label: "NL (အမျိုးသမီး - ရှင်းလင်းသော အသံ)", rate: 1.0, pitch: 1.25, gender: "f", sample: VOICE_SAMPLE_FEMALE },
-    { code: "PW", label: "PW (အမျိုးသား - စိတ်လှုပ်ရှားဖွယ် အသံ)", rate: 1.15, pitch: 1.1, gender: "m", sample: VOICE_SAMPLE_MALE },
-    { code: "KM", label: "KM (အမျိုးသား - လေးနက်သော အသံ)", rate: 0.85, pitch: 0.75, gender: "m", sample: VOICE_SAMPLE_MALE },
-    { code: "ZK", label: "ZK (အမျိုးသား - ဇာတ်ကြောင်းပြော အသံ)", rate: 0.9, pitch: 0.9, gender: "m", sample: VOICE_SAMPLE_MALE },
-    { code: "HS", label: "HS (အမျိုးသမီး - နူးညံ့သော အသံ)", rate: 0.95, pitch: 1.35, gender: "f", sample: VOICE_SAMPLE_FEMALE },
-    { code: "SL", label: "SL (အမျိုးသား - မြန်ဆန်သော အသံ)", rate: 1.3, pitch: 1.0, gender: "m", sample: VOICE_SAMPLE_MALE },
-    { code: "YS", label: "YS (အမျိုးသမီး - သဘာဝကျသော အသံ)", rate: 1.0, pitch: 1.2, gender: "f", sample: VOICE_SAMPLE_FEMALE },
-    { code: "EC", label: "EC (အမျိုးသား - သတင်းကြေညာ အသံ)", rate: 1.05, pitch: 0.95, gender: "m", sample: VOICE_SAMPLE_MALE },
-    { code: "TS", label: "TS (အမျိုးသမီး - တက်ကြွသော အသံ)", rate: 1.2, pitch: 1.3, gender: "f", sample: VOICE_SAMPLE_FEMALE },
+    { code: "BB", name: "သီဟ", label: "BB (အမျိုးသား - သဘာဝကျသော အသံ)", rate: 0.95, pitch: 1.0, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "NL", name: "နီလာ", label: "NL (အမျိုးသမီး - ရှင်းလင်းသော အသံ)", rate: 1.0, pitch: 1.25, gender: "f", sample: VOICE_SAMPLE_FEMALE },
+    { code: "PW", name: "ဖြိုးဝေ", label: "PW (အမျိုးသား - စိတ်လှုပ်ရှားဖွယ် အသံ)", rate: 1.15, pitch: 1.1, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "KM", name: "ကျော်မင်း", label: "KM (အမျိုးသား - လေးနက်သော အသံ)", rate: 0.85, pitch: 0.75, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "ZK", name: "ဇော်ကို", label: "ZK (အမျိုးသား - ဇာတ်ကြောင်းပြော အသံ)", rate: 0.9, pitch: 0.9, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "HS", name: "နှင်းဆီ", label: "HS (အမျိုးသမီး - နူးညံ့သော အသံ)", rate: 0.95, pitch: 1.35, gender: "f", sample: VOICE_SAMPLE_FEMALE },
+    { code: "SL", name: "စိုးလင်း", label: "SL (အမျိုးသား - မြန်ဆန်သော အသံ)", rate: 1.3, pitch: 1.0, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "YS", name: "ရတနာ", label: "YS (အမျိုးသမီး - သဘာဝကျသော အသံ)", rate: 1.0, pitch: 1.2, gender: "f", sample: VOICE_SAMPLE_FEMALE },
+    { code: "EC", name: "အောင်ချမ်း", label: "EC (အမျိုးသား - သတင်းကြေညာ အသံ)", rate: 1.05, pitch: 0.95, gender: "m", sample: VOICE_SAMPLE_MALE },
+    { code: "TS", name: "သဇင်", label: "TS (အမျိုးသမီး - တက်ကြွသော အသံ)", rate: 1.2, pitch: 1.3, gender: "f", sample: VOICE_SAMPLE_FEMALE },
   ];
 
   /* ---------------- Toasts ---------------- */
@@ -904,35 +904,49 @@
   burmeseInput.addEventListener("blur", () => autoCleanBurmeseInput({ notify: false }));
 
   /* ---------------- Step 3: Voice cards ---------------- */
-  const voiceGrid = $("#voiceGrid");
-  VOICES.forEach((v) => {
+  // Clean, minimalist persona card: circular initials badge (solid blue for
+  // male / solid pink for female) + Myanmar name + gender subtitle + a
+  // compact pill "▶ Preview" button. Shared by both voice grids (Manual
+  // Editor Step 3 and Auto Recap) so they always stay in sync.
+  function genderLabel(v) {
+    return v.gender === "f" ? "Female" : "Male";
+  }
+
+  function buildVoiceCard(v, { onSelect, previewExtraClass }) {
     const card = document.createElement("div");
     const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
     card.className = "voice-card voice-card-" + personaClass;
     card.dataset.code = v.code;
+    card.dataset.gender = v.gender === "f" ? "f" : "m";
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.innerHTML = `
-      <div class="vc-code voice-avatar voice-avatar-${personaClass}">${v.code}</div>
-      <div class="vc-label">${v.label}</div>
-      <button class="vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
+      <div class="vc-badge" data-gender="${card.dataset.gender}">${v.code}</div>
+      <div class="vc-name">${v.name || v.code}</div>
+      <div class="vc-gender">${genderLabel(v)}</div>
+      <button class="vc-preview${previewExtraClass ? " " + previewExtraClass : ""}" type="button">▶ Preview</button>
     `;
     card.addEventListener("click", (e) => {
       if (e.target.closest(".vc-preview")) return;
-      selectVoice(v.code);
+      onSelect(v.code);
     });
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        selectVoice(v.code);
+        onSelect(v.code);
       }
     });
     $(".vc-preview", card).addEventListener("click", (e) => {
       e.stopPropagation();
-      selectVoice(v.code);
+      onSelect(v.code);
       previewVoice(v, e.currentTarget);
     });
-    voiceGrid.appendChild(card);
+    return card;
+  }
+
+  const voiceGrid = $("#voiceGrid");
+  VOICES.forEach((v) => {
+    voiceGrid.appendChild(buildVoiceCard(v, { onSelect: selectVoice }));
   });
 
   function selectVoice(code) {
@@ -964,7 +978,7 @@
   function resetVoicePreviewButton(btn) {
     btn.classList.remove("playing");
     btn.disabled = false;
-    btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
+    btn.innerHTML = "▶ Preview";
   }
 
   // NOTE: Browser speechSynthesis is intentionally NEVER used — it produced the
@@ -986,7 +1000,7 @@
     activePreviewAudio = audio;
 
     btn.classList.add("playing");
-    btn.innerHTML = "⏸ နားထောင်နေသည်...";
+    btn.innerHTML = "⏸ Playing...";
 
     audio.onended = () => {
       if (activePreviewAudio === audio) activePreviewAudio = null;
@@ -1235,7 +1249,7 @@
     const vp = $("#step1Player");
     if (state.videoUrl && vp && !vp.src) vp.src = state.videoUrl;
     const v = VOICES.find((x) => x.code === state.voice);
-    $("#resVoice").textContent = v ? v.code + " · " + v.label.replace(/^[A-Z]{2} /, "").replace(/^\(|\)$/g, "") : "—";
+    $("#resVoice").textContent = v ? v.code + " · " + (v.name || v.code) + " (" + genderLabel(v) + ")" : "—";
     $("#resPitch").textContent = fmtPitch(state.pitch);
     const plan = state.voicePlan || [];
     if (plan.length) {
@@ -1418,27 +1432,9 @@
 
   const recapVoiceGrid = $("#recapVoiceGrid");
   VOICES.forEach((v) => {
-    const card = document.createElement("div");
-    const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    card.className = "voice-card voice-card-" + personaClass;
-    card.dataset.code = v.code;
-    card.setAttribute("role", "button");
-    card.setAttribute("tabindex", "0");
-    card.innerHTML = `
-      <div class="vc-code voice-avatar voice-avatar-${personaClass}">${v.code}</div>
-      <div class="vc-label">${v.label}</div>
-      <button class="vc-preview recap-vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
-    `;
-    card.addEventListener("click", (e) => {
-      if (e.target.closest(".vc-preview")) return;
-      selectRecapVoice(v.code);
-    });
-    $(".vc-preview", card).addEventListener("click", (e) => {
-      e.stopPropagation();
-      selectRecapVoice(v.code);
-      previewVoice(v, e.currentTarget);
-    });
-    recapVoiceGrid.appendChild(card);
+    recapVoiceGrid.appendChild(
+      buildVoiceCard(v, { onSelect: selectRecapVoice, previewExtraClass: "recap-vc-preview" })
+    );
   });
 
   function selectRecapVoice(code) {

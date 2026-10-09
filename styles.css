@@ -1199,46 +1199,53 @@ button { cursor: pointer; }
 
 .form-group { margin-bottom: 12px; }
 
-/* ---- Voice grid ---- */
+/* ---- Voice grid: clean, minimalist persona cards ---- */
 .voice-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 10px;
+  gap: 12px;
 }
 
 .voice-card {
-  border: 1.5px solid var(--border);
-  background: var(--surface-2);
-  border-radius: var(--r-md);
-  padding: 12px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid #e5e7eb; /* subtle light-grey border */
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
   text-align: center;
   cursor: pointer;
-  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
   position: relative;
 }
 
 .voice-card:hover {
-  border-color: #3b82f6; /* hover:border-blue-500 */
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1); /* shadow-lg */
-  transform: translateY(-4px) scale(1.02);
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  transform: translateY(-2px);
 }
 
-.voice-card.selected {
+/* Selected state: outline matches the card's gender theme color */
+.voice-card.selected[data-gender="m"] {
   border-color: #2563eb;
-  border-width: 2px;
-  background: var(--red-tint);
-  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.2), 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.22);
+}
+
+.voice-card.selected[data-gender="f"] {
+  border-color: #ec4899;
+  box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.22);
 }
 
 .voice-card.selected::after {
   content: "✓";
   position: absolute;
-  top: 7px;
+  top: 8px;
   right: 8px;
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #2563eb;
+  background: currentColor;
   color: #fff;
   font-size: 10px;
   font-weight: var(--w-bold);
@@ -1247,71 +1254,67 @@ button { cursor: pointer; }
   line-height: 1;
 }
 
-.vc-code {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 6px;
+.voice-card.selected[data-gender="m"]::after { background: #2563eb; }
+.voice-card.selected[data-gender="f"]::after { background: #ec4899; }
+
+/* Top circular badge — solid color by gender, 2-letter initials */
+.vc-badge {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 10px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   font-weight: var(--w-bold);
   font-size: var(--fs-sm);
-  letter-spacing: 0.03em;
-  border: 2px solid rgba(255, 255, 255, 0.55);
-  color: #fff;
-  transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.vc-badge[data-gender="m"] { background-color: #2563eb; }
+.vc-badge[data-gender="f"] { background-color: #ec4899; }
+
+/* Myanmar name — clean, no extra descriptive text */
+.vc-name {
+  font-size: var(--fs-sm);
+  font-weight: var(--w-semi);
+  color: var(--text);
   line-height: 1.4;
+  margin-bottom: 2px;
 }
 
-.voice-card:hover .vc-code {
-  transform: translateY(-2px) rotate(-4deg) scale(1.08);
-  filter: saturate(1.12) brightness(1.05);
-}
-
-.voice-card.selected .vc-code {
-  border-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4), 0 8px 16px var(--avatar-shadow);
-}
-
-.voice-avatar-bb { background: linear-gradient(135deg, #3b82f6, #1d4ed8); --avatar-shadow: rgba(37, 99, 235, 0.42); box-shadow: 0 5px 12px rgba(37, 99, 235, 0.32); }
-.voice-avatar-nl { background: linear-gradient(135deg, #ec4899, #be185d); --avatar-shadow: rgba(190, 24, 93, 0.42); box-shadow: 0 5px 12px rgba(190, 24, 93, 0.32); }
-.voice-avatar-pw { background: linear-gradient(135deg, #f59e0b, #b45309); --avatar-shadow: rgba(180, 83, 9, 0.42); box-shadow: 0 5px 12px rgba(180, 83, 9, 0.32); }
-.voice-avatar-km { background: linear-gradient(135deg, #10b981, #047857); --avatar-shadow: rgba(4, 120, 87, 0.42); box-shadow: 0 5px 12px rgba(4, 120, 87, 0.32); }
-.voice-avatar-zk { background: linear-gradient(135deg, #8b5cf6, #6d28d9); --avatar-shadow: rgba(109, 40, 217, 0.42); box-shadow: 0 5px 12px rgba(109, 40, 217, 0.32); }
-.voice-avatar-hs { background: linear-gradient(135deg, #f43f5e, #be123c); --avatar-shadow: rgba(190, 18, 60, 0.42); box-shadow: 0 5px 12px rgba(190, 18, 60, 0.32); }
-.voice-avatar-sl { background: linear-gradient(135deg, #06b6d4, #0e7490); --avatar-shadow: rgba(14, 116, 144, 0.42); box-shadow: 0 5px 12px rgba(14, 116, 144, 0.32); }
-.voice-avatar-ys { background: linear-gradient(135deg, #84cc16, #4d7c0f); --avatar-shadow: rgba(77, 124, 15, 0.42); box-shadow: 0 5px 12px rgba(77, 124, 15, 0.32); }
-.voice-avatar-ec { background: linear-gradient(135deg, #6366f1, #4338ca); --avatar-shadow: rgba(67, 56, 202, 0.42); box-shadow: 0 5px 12px rgba(67, 56, 202, 0.32); }
-.voice-avatar-ts { background: linear-gradient(135deg, #14b8a6, #0f766e); --avatar-shadow: rgba(15, 118, 110, 0.42); box-shadow: 0 5px 12px rgba(15, 118, 110, 0.32); }
-
-.vc-label {
+/* Subtle gender subtitle under the name */
+.vc-gender {
   font-size: var(--fs-2xs);
   font-weight: var(--w-med);
-  line-height: 1.55;
   color: var(--text-2);
-  min-height: 40px;
-  margin-bottom: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
 }
 
+/* Compact pill preview button */
 .vc-preview {
-  width: 100%;
+  width: auto;
+  min-width: 96px;
   border: 1px solid var(--border-strong);
   background: #fff;
   color: var(--text-2);
   font-size: var(--fs-2xs);
-  font-weight: var(--w-med);
-  line-height: 1.5;
-  padding: 5px 5px;
-  border-radius: 7px;
+  font-weight: var(--w-semi);
+  line-height: 1.4;
+  padding: 6px 14px;
+  border-radius: 999px; /* pill shape */
   transition: all 0.2s ease;
 }
 
 .vc-preview:hover {
-  opacity: 0.85; /* hover:opacity-85 */
+  border-color: #cbd5e1;
+  background: #f8fafc;
 }
 .vc-preview.playing { background: var(--red); border-color: var(--red); color: #fff; box-shadow: 0 4px 12px rgba(217, 45, 45, 0.2); }
 .vc-preview:disabled { cursor: wait; opacity: 0.92; }
-.vc-preview .spinner { width: 12px; height: 12px; border-width: 2px; margin-right: 4px; vertical-align: -2px; }
 
 .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; margin-right: 4px; vertical-align: -1px; }
 .eq i { width: 3px; background: currentColor; border-radius: 2px; animation: eq 0.7s ease-in-out infinite; }
