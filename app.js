@@ -1023,15 +1023,56 @@
     return "https://corsproxy.io/?" + encodeURIComponent(targetUrl);
   }
 
-  function isNetworkFetchError(error) {
-    if (!error) return false;
-    return error.name === "TypeError"
-      || /failed to fetch|network error|networkerror|cors/i.test(String(error.message || ""));
+  function getTtsProxyUrls(targetUrl) {
+    const encodedUrl = encodeURIComponent(targetUrl);
+    return [
+      "https://corsproxy.io/?" + encodedUrl,
+      "https://api.allorigins.win/raw?url=" + encodedUrl,
+    ];
   }
 
-  function shouldRetryThroughCorsProxy(error) {
-    const status = Number(error && error.status);
-    return isNetworkFetchError(error) || status === 429 || status >= 500;
+  function buildGoogleTtsUrl(text, client) {
+    return "https://translate.google.com/translate_tts?ie=UTF-8&client="
+      + encodeURIComponent(client) + "&tl=my&q=" + encodeURIComponent(text);
+  }
+
+  function loadTtsAudioElement(sourceUrl) {
+    return new Promise((resolve, reject) => {
+      const audio = new Audio();
+      audio.crossOrigin = "anonymous";
+      audio.preload = "auto";
+      let settled = false;
+      let timer;
+
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        audio.removeEventListener("canplay", onCanPlay);
+        audio.removeEventListener("error", onError);
+        if (error) {
+          audio.pause();
+          audio.removeAttribute("src");
+          audio.load();
+          reject(error);
+        } else {
+          resolve(audio);
+        }
+      };
+      const onCanPlay = () => finish(null);
+      const onError = () => finish(new Error("TTS audio stream could not be loaded"));
+
+      timer = setTimeout(() => finish(new Error("TTS audio stream load timeout")), FETCH_TIMEOUT_MS);
+      audio.addEventListener("canplay", onCanPlay);
+      audio.addEventListener("error", onError);
+      try {
+        audio.src = sourceUrl;
+        audio.load();
+        if (audio.readyState >= 3) onCanPlay();
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error("TTS audio stream could not be loaded"));
+      }
+    });
   }
 
   function decodeAudioBase64(encoded, mimeType) {
@@ -1112,44 +1153,43 @@
   }
 
   async function requestGoogleTtsAudio(text, client) {
-    const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client="
-      + encodeURIComponent(client) + "&tl=my&q=" + encodeURIComponent(text);
+    const googleUrl = buildGoogleTtsUrl(text, client);
+    const errors = [];
 
-    async function requestAt(url) {
-      return fetchWithTimeout(url, { headers: { Accept: "audio/mpeg" } }, async (response) => {
-        if (!response.ok || response.status !== 200) {
-          const err = new Error(`Myanmar Google TTS (${client}) ${response.status}`);
-          err.status = response.status;
-          throw err;
-        }
-        const blob = await response.blob();
-        if (!blob || !blob.size) throw new Error(`Myanmar Google TTS (${client}) returned empty audio data`);
-        const contentType = String(response.headers.get("content-type") || blob.type || "").toLowerCase();
-        if (contentType && !contentType.startsWith("audio/") && contentType !== "application/octet-stream") {
-          throw new Error(`Myanmar Google TTS (${client}) returned a non-audio response`);
-        }
-        return blob;
-      });
+    // Only request Google audio through CORS-enabled proxies; never fetch the
+    // Google stream URL directly from JavaScript.
+    for (const proxyUrl of getTtsProxyUrls(googleUrl)) {
+      try {
+        return await fetchWithTimeout(proxyUrl, { headers: { Accept: "audio/mpeg" } }, async (response) => {
+          if (!response.ok || response.status !== 200) {
+            const err = new Error(`Myanmar Google TTS (${client}) ${response.status}`);
+            err.status = response.status;
+            throw err;
+          }
+          const blob = await response.blob();
+          if (!blob || !blob.size) throw new Error(`Myanmar Google TTS (${client}) returned empty audio data`);
+          const contentType = String(response.headers.get("content-type") || blob.type || "").toLowerCase();
+          if (contentType && !contentType.startsWith("audio/") && contentType !== "application/octet-stream") {
+            throw new Error(`Myanmar Google TTS (${client}) returned a non-audio response`);
+          }
+          return blob;
+        });
+      } catch (error) {
+        errors.push(error.message || String(error));
+        console.warn(`[Red Bear] Google TTS ${client} proxy failed`, error);
+      }
     }
 
-    try {
-      return await requestAt(googleUrl);
-    } catch (error) {
-      if (!shouldRetryThroughCorsProxy(error)) throw error;
-      console.warn(`[Red Bear] Google TTS ${client} request failed; retrying through CORS proxy`, error);
-      return requestAt(getCorsProxyUrl(googleUrl));
-    }
+    throw new Error(`Google TTS ${client} proxies failed: ${errors.join("; ")}`);
   }
 
   async function requestVoiceAudio(text, v) {
     const endpoint = getVoiceTtsEndpoint();
-    const errors = [];
     if (endpoint) {
       try {
         // Attempt 1: the Edge TTS endpoint through the CORS proxy.
         return await requestConfiguredTtsAudio(endpoint, text, v);
       } catch (error) {
-        errors.push("Edge TTS proxy: " + (error.message || String(error)));
         console.warn("[Red Bear] Edge TTS proxy failed; trying Google TTS tw-ob", error);
       }
     }
@@ -1158,7 +1198,6 @@
     try {
       return await requestGoogleTtsAudio(text, "tw-ob");
     } catch (error) {
-      errors.push("Google TTS tw-ob: " + (error.message || String(error)));
       console.warn("[Red Bear] Google TTS tw-ob failed; trying gtx", error);
     }
 
@@ -1166,16 +1205,43 @@
     try {
       return await requestGoogleTtsAudio(text, "gtx");
     } catch (error) {
-      errors.push("Google TTS gtx: " + (error.message || String(error)));
-      const finalError = new Error("All TTS engines failed: " + errors.join("; "));
-      finalError.cause = error;
-      throw finalError;
+      console.warn("[Red Bear] TTS sources exhausted; this text chunk can be skipped", error);
     }
+
+    return null;
   }
 
   async function requestVoicePreview(v) {
-    const blob = await requestVoiceAudio(PREVIEW_TEXT, v);
-    return URL.createObjectURL(blob);
+    const endpoint = getVoiceTtsEndpoint();
+    if (endpoint) {
+      let objectUrl = "";
+      try {
+        const blob = await requestConfiguredTtsAudio(endpoint, PREVIEW_TEXT, v);
+        objectUrl = URL.createObjectURL(blob);
+        return { audio: await loadTtsAudioElement(objectUrl), objectUrl };
+      } catch (error) {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        console.warn("[Red Bear] Edge TTS preview failed; trying Google audio streams", error);
+      }
+    }
+
+    const errors = [];
+    for (const client of ["tw-ob", "gtx"]) {
+      const googleUrl = buildGoogleTtsUrl(PREVIEW_TEXT, client);
+      // Prefer CORS proxy streams, but allow native Audio() to try Google's URL
+      // directly as a final preview-only path (no fetch() is made to that URL).
+      const streamUrls = [...getTtsProxyUrls(googleUrl), googleUrl];
+      for (const streamUrl of streamUrls) {
+        try {
+          return { audio: await loadTtsAudioElement(streamUrl), objectUrl: "" };
+        } catch (error) {
+          errors.push(`${client}: ${error.message || String(error)}`);
+          console.warn(`[Red Bear] Google ${client} Audio stream failed`, error);
+        }
+      }
+    }
+
+    throw new Error("No TTS preview stream could be loaded: " + errors.join("; "));
   }
 
   function clearGeneratedAudio() {
@@ -1251,8 +1317,9 @@
     };
 
     try {
-      audioUrl = await requestVoicePreview(v);
-      audio = new Audio(audioUrl);
+      const previewStream = await requestVoicePreview(v);
+      audio = previewStream.audio;
+      audioUrl = previewStream.objectUrl || "";
       activePreviewAudio = audio;
       audio.onended = () => {
         if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
@@ -1371,6 +1438,7 @@
 
     try {
       const audioChunks = [];
+      let skippedChunks = 0;
       const selectedVoice = VOICES.find((voice) => voice.code === state.voice) || VOICES[0];
       for (let i = 0; i < speechChunks.length; i++) {
         if (btn) {
@@ -1378,12 +1446,23 @@
             + (i + 1) + '/' + speechChunks.length;
         }
         // Await each sentence before starting the next request to avoid API bursts/timeouts.
-        const chunkAudio = await requestVoiceAudio(speechChunks[i], selectedVoice);
-        if (!chunkAudio || !chunkAudio.size) throw new Error("TTS returned empty audio data");
-        audioChunks.push(chunkAudio);
+        try {
+          const chunkAudio = await requestVoiceAudio(speechChunks[i], selectedVoice);
+          if (chunkAudio && chunkAudio.size) audioChunks.push(chunkAudio);
+          else {
+            skippedChunks++;
+            console.warn(`[Red Bear] Skipping unavailable TTS chunk ${i + 1}/${speechChunks.length}`);
+          }
+        } catch (chunkError) {
+          skippedChunks++;
+          console.warn(`[Red Bear] Skipping failed TTS chunk ${i + 1}/${speechChunks.length}`, chunkError);
+        }
         if (i < speechChunks.length - 1) await wait(140);
       }
 
+      if (!audioChunks.length) {
+        throw new Error("No playable audio chunks were returned. Check the network and try again.");
+      }
       const combinedBlob = new Blob(audioChunks, { type: 'audio/mp3' });
       if (!combinedBlob.size) throw new Error("Merged audio is empty");
       if (state.generatedAudioUrl) URL.revokeObjectURL(state.generatedAudioUrl);
@@ -1406,7 +1485,11 @@
       updateStepsUI();
       window.scrollTo({ top: 0, behavior: "smooth" });
       await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်...");
-      toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
+      if (skippedChunks) {
+        toast(`အသံအပိုင်း ${skippedChunks} ခုကို ရယူမရသဖြင့် ကျော်ပြီး ဖန်တီးပြီးပါပြီ ✓`, "info");
+      } else {
+        toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
+      }
     } catch (err) {
       state.voiceGenerated = false;
       console.error("[Red Bear] Voice generation failed", err);
