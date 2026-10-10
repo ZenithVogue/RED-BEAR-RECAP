@@ -6,6 +6,7 @@
 
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
+  const FETCH_TIMEOUT_MS = 10_000;
 
   /* ---------------- State ---------------- */
   const state = {
@@ -15,6 +16,8 @@
     file: null,
     videoUrl: null,
     audioBlob: null,
+    generatedAudioBlob: null,
+    generatedAudioUrl: null,
     durationSec: 0,
     transcriptReady: false,
     voice: null,        // persona code
@@ -56,6 +59,40 @@
       el.classList.add("out");
       setTimeout(() => el.remove(), 320);
     }, 3200);
+  }
+
+  // Keep every network operation bounded, including response-body parsing. The
+  // callback must consume the response so a stalled body is covered by timeout.
+  async function fetchWithTimeout(url, options = {}, handleResponse = (response) => response, timeoutMs = FETCH_TIMEOUT_MS) {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    let timedOut = false;
+    let timeoutId;
+    const timeoutError = () => {
+      const error = new Error(`Request timed out after ${timeoutMs / 1000} seconds`);
+      error.name = "TimeoutError";
+      return error;
+    };
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        if (controller) controller.abort();
+        reject(timeoutError());
+      }, timeoutMs);
+    });
+    const requestPromise = (async () => {
+      const requestOptions = controller ? { ...options, signal: controller.signal } : options;
+      const response = await fetch(url, requestOptions);
+      return handleResponse(response);
+    })();
+
+    try {
+      return await Promise.race([requestPromise, timeoutPromise]);
+    } catch (error) {
+      if (timedOut) throw timeoutError();
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   /* ---------------- Quota & Plan (SidebarQuota equivalent) ---------------- */
@@ -245,6 +282,7 @@
       toast("MP4, MOV, WEBM, MKV ဖိုင်များကိုသာ လက်ခံပါသည်။", "info");
       return;
     }
+    clearGeneratedAudio();
     state.file = f;
     state.audioBlob = null;
     state.transcriptReady = false;
@@ -261,6 +299,7 @@
   }
 
   function clearStep1Media() {
+    clearGeneratedAudio();
     if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
     state.videoUrl = null;
     state.file = null;
@@ -407,15 +446,11 @@
   }
 
   async function fetchGeminiJson(url, body) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 45000);
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
+    return fetchWithTimeout(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }, async (res) => {
       const raw = await res.text();
       let payload = null;
       try { payload = raw ? JSON.parse(raw) : null; } catch (_) {}
@@ -428,9 +463,7 @@
       }
       if (!payload) throw new Error("Gemini returned an invalid JSON response");
       return payload;
-    } finally {
-      clearTimeout(timer);
-    }
+    });
   }
 
   async function transcribeWithGemini(blob, apiKey) {
@@ -478,34 +511,45 @@
   }
 
   async function transcribeWithAssemblyAI(blob, apiKey) {
-    const up = await fetch("https://api.assemblyai.com/v2/upload", {
+    const uploadUrl = await fetchWithTimeout("https://api.assemblyai.com/v2/upload", {
       method: "POST",
       headers: { authorization: apiKey },
       body: blob,
+    }, async (up) => {
+      if (!up.ok) {
+        const err = new Error("AssemblyAI upload " + up.status);
+        err.status = up.status;
+        throw err;
+      }
+      const payload = await up.json();
+      if (!payload || !payload.upload_url) throw new Error("AssemblyAI upload did not return an audio URL");
+      return payload.upload_url;
     });
-    if (!up.ok) {
-      const err = new Error("AssemblyAI upload " + up.status);
-      err.status = up.status;
-      throw err;
-    }
-    const { upload_url } = await up.json();
-    const tr = await fetch("https://api.assemblyai.com/v2/transcript", {
+    const job = await fetchWithTimeout("https://api.assemblyai.com/v2/transcript", {
       method: "POST",
       headers: { authorization: apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ audio_url: upload_url, language_detection: true }),
+      body: JSON.stringify({ audio_url: uploadUrl, language_detection: true }),
+    }, async (tr) => {
+      if (!tr.ok) {
+        const err = new Error("AssemblyAI " + tr.status);
+        err.status = tr.status;
+        throw err;
+      }
+      return tr.json();
     });
-    if (!tr.ok) {
-      const err = new Error("AssemblyAI " + tr.status);
-      err.status = tr.status;
-      throw err;
-    }
-    const job = await tr.json();
+    if (!job || !job.id) throw new Error("AssemblyAI did not return a transcript job ID");
     for (let i = 0; i < 60; i++) {
       await wait(2500);
-      const st = await fetch("https://api.assemblyai.com/v2/transcript/" + job.id, {
+      const j = await fetchWithTimeout("https://api.assemblyai.com/v2/transcript/" + job.id, {
         headers: { authorization: apiKey },
+      }, async (st) => {
+        if (!st.ok) {
+          const err = new Error("AssemblyAI status " + st.status);
+          err.status = st.status;
+          throw err;
+        }
+        return st.json();
       });
-      const j = await st.json();
       if (j.status === "completed") return String(j.text || "").trim();
       if (j.status === "error") throw new Error(j.error || "AssemblyAI error");
     }
@@ -932,6 +976,8 @@
   let previewTimer = null;
   let activePreviewAudio = null;
   const PREVIEW_TEXT = "မင်္ဂလာပါ၊ ဒါကတော့ နမူနာ စကားပြော အသံဖိုင် ဖြစ်ပါတယ်";
+  const audioPlayer = new Audio();
+  audioPlayer.preload = "auto";
 
   function getVoiceTtsEndpoint() {
     try {
@@ -941,34 +987,140 @@
     }
   }
 
-  async function requestVoicePreview(v) {
-    const endpoint = getVoiceTtsEndpoint();
-    if (!endpoint) {
-      const speed = Math.min(1.5, Math.max(0.7, Number(v.rate) || 1));
-      const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&ttsspeed="
-        + encodeURIComponent(speed.toFixed(2)) + "&q=" + encodeURIComponent(PREVIEW_TEXT);
-      const googleResponse = await fetch(googleUrl, { headers: { Accept: "audio/mpeg" } });
-      if (!googleResponse.ok) throw new Error("Myanmar Google TTS " + googleResponse.status);
-      return URL.createObjectURL(await googleResponse.blob());
+  function decodeAudioBase64(encoded, mimeType) {
+    let base64 = String(encoded || "").trim();
+    let type = mimeType || "audio/mp3";
+    const dataUri = base64.match(/^data:([^;,]+)?;base64,([\s\S]*)$/i);
+    if (dataUri) {
+      type = dataUri[1] || type;
+      base64 = dataUri[2];
     }
-    const response = await fetch(endpoint, {
+    const binary = atob(base64.replace(/\s/g, ""));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    if (!bytes.length) throw new Error("TTS endpoint returned empty audio data");
+    return new Blob([bytes], { type });
+  }
+
+  async function fetchAudioBlob(url, label) {
+    return fetchWithTimeout(url, { headers: { Accept: "audio/*" } }, async (response) => {
+      if (!response.ok) throw new Error(`${label} ${response.status}`);
+      const blob = await response.blob();
+      if (!blob || !blob.size) throw new Error(`${label} returned empty audio data`);
+      const contentType = String(response.headers.get("content-type") || blob.type || "").toLowerCase();
+      if (contentType && !contentType.startsWith("audio/") && contentType !== "application/octet-stream") {
+        throw new Error(`${label} returned a non-audio response`);
+      }
+      return blob;
+    });
+  }
+
+  async function requestConfiguredTtsAudio(endpoint, text, v) {
+    return fetchWithTimeout(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json, audio/*" },
       body: JSON.stringify({
-        text: PREVIEW_TEXT,
+        text,
         voiceId: v.code,
         persona: v.code,
         locale: "my-MM",
       }),
-    });
-    if (!response.ok) throw new Error("TTS preview endpoint " + response.status);
+    }, async (response) => {
+      if (!response.ok) {
+        const err = new Error("TTS endpoint " + response.status);
+        err.status = response.status;
+        throw err;
+      }
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      if (contentType.startsWith("audio/") || contentType === "application/octet-stream") {
+        const blob = await response.blob();
+        if (!blob.size) throw new Error("TTS endpoint returned empty audio data");
+        return blob;
+      }
 
-    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-    if (contentType.startsWith("audio/")) return URL.createObjectURL(await response.blob());
-    const payload = await response.json();
-    const audioUrl = payload.audioUrl || payload.audio_url || payload.url;
-    if (!audioUrl) throw new Error("TTS response did not include an audio URL");
-    return audioUrl;
+      let payload;
+      try { payload = await response.json(); }
+      catch (_) { throw new Error("TTS endpoint returned invalid JSON audio data"); }
+      if (!payload || typeof payload !== "object") throw new Error("TTS endpoint returned an invalid response");
+
+      const audioData = payload.audioBase64 || payload.audio_base64 || payload.base64
+        || (typeof payload.audio === "string" && !/^(https?:|blob:)/i.test(payload.audio) ? payload.audio : "");
+      if (audioData) return decodeAudioBase64(audioData, payload.mimeType || payload.mime_type || "audio/mp3");
+
+      const audioUrl = payload.audioUrl || payload.audio_url || payload.url
+        || (typeof payload.audio === "string" ? payload.audio : "");
+      if (!audioUrl) throw new Error("TTS response did not include audio data or an audio URL");
+      let resolvedUrl = String(audioUrl);
+      try { resolvedUrl = new URL(resolvedUrl, endpoint).toString(); } catch (_) {}
+      return fetchAudioBlob(resolvedUrl, "TTS audio URL");
+    });
+  }
+
+  async function requestGoogleTtsAudio(text, v) {
+    const speed = Math.min(1.5, Math.max(0.7, Number(v.rate) || 1));
+    const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&ttsspeed="
+      + encodeURIComponent(speed.toFixed(2)) + "&q=" + encodeURIComponent(text);
+    return fetchWithTimeout(googleUrl, { headers: { Accept: "audio/mpeg" } }, async (response) => {
+      if (!response.ok) throw new Error("Myanmar Google TTS " + response.status);
+      const blob = await response.blob();
+      if (!blob || !blob.size) throw new Error("Myanmar Google TTS returned empty audio data");
+      const contentType = String(response.headers.get("content-type") || blob.type || "").toLowerCase();
+      if (contentType && !contentType.startsWith("audio/")) {
+        throw new Error("Myanmar Google TTS returned a non-audio response");
+      }
+      return blob;
+    });
+  }
+
+  async function requestVoiceAudio(text, v) {
+    const endpoint = getVoiceTtsEndpoint();
+    let endpointError = null;
+    if (endpoint) {
+      try {
+        return await requestConfiguredTtsAudio(endpoint, text, v);
+      } catch (error) {
+        endpointError = error;
+        console.warn("[Red Bear] Configured TTS endpoint failed; falling back to Google TTS", error);
+      }
+    }
+    try {
+      return await requestGoogleTtsAudio(text, v);
+    } catch (error) {
+      if (endpointError) {
+        const fallbackError = new Error(
+          "Configured TTS and Google TTS fallback failed: "
+          + (endpointError.message || "TTS endpoint error") + "; "
+          + (error.message || "Google TTS error")
+        );
+        fallbackError.cause = error;
+        throw fallbackError;
+      }
+      throw error;
+    }
+  }
+
+  async function requestVoicePreview(v) {
+    const blob = await requestVoiceAudio(PREVIEW_TEXT, v);
+    return URL.createObjectURL(blob);
+  }
+
+  function clearGeneratedAudio() {
+    audioPlayer.pause();
+    if (state.generatedAudioUrl) URL.revokeObjectURL(state.generatedAudioUrl);
+    state.generatedAudioUrl = null;
+    state.generatedAudioBlob = null;
+    audioPlayer.removeAttribute("src");
+    audioPlayer.load();
+    const button = $("#amPlay");
+    if (button) {
+      button.disabled = true;
+      button.classList.remove("playing");
+      button.textContent = "▶";
+    }
+    const wave = $("#amWave");
+    if (wave) wave.classList.remove("playing");
+    const time = $(".am-time");
+    if (time) time.textContent = "00:00";
   }
 
   function speakVoicePreviewFallback(v) {
@@ -1075,6 +1227,34 @@
     if (bar) bar.hidden = true;
   }
 
+  function splitSpeechChunks(text, maxCharacters = 180) {
+    const sentencePattern = /[^.!?။]+(?:[.!?။]+|$)|[.!?။]+/gu;
+    const sentences = String(text || "").split(/\n+/)
+      .flatMap((line) => line.match(sentencePattern) || [line]);
+    const chunks = [];
+
+    sentences.map((sentence) => sentence.trim()).filter(Boolean).forEach((sentence) => {
+      const characters = Array.from(sentence);
+      let start = 0;
+      while (start < characters.length) {
+        let end = Math.min(start + maxCharacters, characters.length);
+        if (end < characters.length) {
+          const earliestBreak = start + Math.floor(maxCharacters * 0.6);
+          for (let i = end; i > earliestBreak; i--) {
+            if (/\s/.test(characters[i - 1])) {
+              end = i;
+              break;
+            }
+          }
+        }
+        const chunk = characters.slice(start, end).join("").trim();
+        if (chunk) chunks.push(chunk);
+        start = end;
+      }
+    });
+    return chunks;
+  }
+
   /* ---------------- Generate voice over ---------------- */
   async function generateVoiceOver() {
     const btn = $("#btnGenerate");
@@ -1086,12 +1266,16 @@
       text = box ? String(box.value || "").trim() : text;
     }
     if (!text) {
-      generating = false;
       toast("မြန်မာဘာသာပြန် စာမူ ဗလာ ဖြစ်နေပါသည် — Step 3 တွင် မြန်မာစာသား Paste လုပ်ပါ။", "info");
       return;
     }
     if (!state.voice) selectVoice(VOICES[0].code);
     const lines = text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    const speechChunks = splitSpeechChunks(text);
+    if (!speechChunks.length) {
+      toast("အသံဖန်တီးရန် စာသားမရှိပါ။", "info");
+      return;
+    }
     state.scriptLines = lines.map((line) => ({ text: line, voice: "", pitch: "" }));
     state.voicePlan = state.scriptLines.map((ln, i) => ({
       n: i + 1,
@@ -1100,11 +1284,39 @@
       pitch: state.pitch,
     }));
     const prevLabel = btn ? btn.innerHTML : "";
+    clearGeneratedAudio();
+    state.voiceGenerated = false;
+    updateStepsUI();
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> အသံ ဖန်တီးနေပါသည်...';
+      btn.setAttribute("aria-busy", "true");
     }
+
     try {
+      const audioChunks = [];
+      const selectedVoice = VOICES.find((voice) => voice.code === state.voice) || VOICES[0];
+      for (let i = 0; i < speechChunks.length; i++) {
+        if (btn) {
+          btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> အသံဖန်တီးနေသည်... '
+            + (i + 1) + '/' + speechChunks.length;
+        }
+        // Await each sentence before starting the next request to avoid API bursts/timeouts.
+        const chunkAudio = await requestVoiceAudio(speechChunks[i], selectedVoice);
+        if (!chunkAudio || !chunkAudio.size) throw new Error("TTS returned empty audio data");
+        audioChunks.push(chunkAudio);
+        if (i < speechChunks.length - 1) await wait(140);
+      }
+
+      const combinedBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+      if (!combinedBlob.size) throw new Error("Merged audio is empty");
+      if (state.generatedAudioUrl) URL.revokeObjectURL(state.generatedAudioUrl);
+      audioPlayer.src = URL.createObjectURL(combinedBlob);
+      state.generatedAudioUrl = audioPlayer.src;
+      state.generatedAudioBlob = combinedBlob;
+      audioPlayer.load();
+      const playButton = $("#amPlay");
+      if (playButton) playButton.disabled = false;
+
       state.voiceGenerated = true;
       state.transcriptReady = true;
       hideDanger();
@@ -1119,11 +1331,14 @@
       await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်...");
       toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
     } catch (err) {
-      toast("Generate မအောင်မြင်ပါ — ပြန်ကြိုးစားပါ။", "err");
+      state.voiceGenerated = false;
+      console.error("[Red Bear] Voice generation failed", err);
+      const details = err && err.message ? err.message : String(err || "Unknown TTS error");
+      toast("အသံဖန်တီးမအောင်မြင်ပါ — " + details + "။ ပြန်ကြိုးစားပါ။", "err");
     } finally {
-      generating = false;
       if (btn) {
         btn.disabled = false;
+        btn.removeAttribute("aria-busy");
         btn.innerHTML = prevLabel || "🔊 အသံဖန်တီးပေးမည် (Generate Voice Over)";
       }
     }
@@ -1173,27 +1388,58 @@
     }, 120);
   });
 
-  let amTimer = null;
-  $("#amPlay").addEventListener("click", () => {
-    const wave = $("#amWave");
-    const btn = $("#amPlay");
-    if (amTimer) {
-      clearInterval(amTimer);
-      amTimer = null;
-      wave.classList.remove("playing");
-      btn.classList.remove("playing");
-      btn.textContent = "▶";
+  const amPlayButton = $("#amPlay");
+  const amWave = $("#amWave");
+  const amTime = $(".am-time");
+  amPlayButton.disabled = true;
+
+  function formatAudioTime(seconds) {
+    const totalSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+    return String(Math.floor(totalSeconds / 60)).padStart(2, "0") + ":"
+      + String(totalSeconds % 60).padStart(2, "0");
+  }
+
+  function syncAudioPlaybackUi(playing) {
+    amWave.classList.toggle("playing", !!playing);
+    amPlayButton.classList.toggle("playing", !!playing);
+    amPlayButton.textContent = playing ? "❚❚" : "▶";
+  }
+
+  audioPlayer.addEventListener("play", () => syncAudioPlaybackUi(true));
+  audioPlayer.addEventListener("pause", () => syncAudioPlaybackUi(false));
+  audioPlayer.addEventListener("ended", () => {
+    syncAudioPlaybackUi(false);
+    if (amTime) amTime.textContent = formatAudioTime(audioPlayer.duration);
+  });
+  audioPlayer.addEventListener("loadedmetadata", () => {
+    if (amTime) amTime.textContent = formatAudioTime(audioPlayer.duration);
+  });
+  audioPlayer.addEventListener("timeupdate", () => {
+    if (!amTime) return;
+    amTime.textContent = formatAudioTime(audioPlayer.currentTime) + " / "
+      + formatAudioTime(audioPlayer.duration);
+  });
+  audioPlayer.addEventListener("error", () => {
+    if (!state.generatedAudioBlob) return;
+    syncAudioPlaybackUi(false);
+    console.error("[Red Bear] Generated audio playback failed", audioPlayer.error);
+    toast("အသံဖိုင် ဖွင့်မရပါ — အသံကို ပြန်လည် ဖန်တီးပြီး စမ်းကြည့်ပါ။", "err");
+  });
+
+  amPlayButton.addEventListener("click", () => {
+    if (!audioPlayer.src || !state.generatedAudioBlob) {
+      toast("အရင် အသံဖန်တီးပါ။", "info");
       return;
     }
-    wave.classList.add("playing");
-    btn.classList.add("playing");
-    btn.textContent = "❚❚";
-    amTimer = setTimeout(() => {
-      wave.classList.remove("playing");
-      btn.classList.remove("playing");
-      btn.textContent = "▶";
-      amTimer = null;
-    }, 3000);
+    if (audioPlayer.paused) {
+      audioPlayer.play().catch((error) => {
+        console.error("[Red Bear] Generated audio play request failed", error);
+        syncAudioPlaybackUi(false);
+        toast("အသံဖိုင် ဖွင့်မရပါ — " + (error.message || "ပြန်ကြိုးစားပါ။"), "err");
+      });
+    } else {
+      audioPlayer.pause();
+    }
   });
 
   /* ---------------- Re-render ---------------- */
