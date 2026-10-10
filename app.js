@@ -36,16 +36,16 @@
   };
 
   const VOICES = [
-    { code: "BB", label: "BB (အမျိုးသား - သဘာဝကျသော အသံ)", rate: 0.95, pitch: 1.0 },
-    { code: "NL", label: "NL (အမျိုးသမီး - ရှင်းလင်းသော အသံ)", rate: 1.0, pitch: 1.25 },
-    { code: "PW", label: "PW (အမျိုးသား - စိတ်လှုပ်ရှားဖွယ် အသံ)", rate: 1.15, pitch: 1.1 },
-    { code: "KM", label: "KM (အမျိုးသား - လေးနက်သော အသံ)", rate: 0.85, pitch: 0.75 },
-    { code: "ZK", label: "ZK (အမျိုးသား - ဇာတ်ကြောင်းပြော အသံ)", rate: 0.9, pitch: 0.9 },
-    { code: "HS", label: "HS (အမျိုးသမီး - နူးညံ့သော အသံ)", rate: 0.95, pitch: 1.35 },
-    { code: "SL", label: "SL (အမျိုးသား - မြန်ဆန်သော အသံ)", rate: 1.3, pitch: 1.0 },
-    { code: "YS", label: "YS (အမျိုးသမီး - သဘာဝကျသော အသံ)", rate: 1.0, pitch: 1.2 },
-    { code: "EC", label: "EC (အမျိုးသား - သတင်းကြေညာ အသံ)", rate: 1.05, pitch: 0.95 },
-    { code: "TS", label: "TS (အမျိုးသမီး - တက်ကြွသော အသံ)", rate: 1.2, pitch: 1.3 },
+    { code: "BB", name: "ဘိုဘို", gender: "male", rate: 0.95, pitch: 1.0 },
+    { code: "PW", name: "ပြည့်ဖြိုး", gender: "male", rate: 1.15, pitch: 1.1 },
+    { code: "KM", name: "ကျော်မင်း", gender: "male", rate: 0.85, pitch: 0.75 },
+    { code: "ZK", name: "ဇော်ကို", gender: "male", rate: 0.9, pitch: 0.9 },
+    { code: "SL", name: "စိုးလင်း", gender: "male", rate: 1.3, pitch: 1.0 },
+    { code: "EC", name: "အောင်ကို", gender: "male", rate: 1.05, pitch: 0.95 },
+    { code: "NL", name: "နွယ်လေး", gender: "female", rate: 1.0, pitch: 1.25 },
+    { code: "HS", name: "နှင်းဆီ", gender: "female", rate: 0.95, pitch: 1.35 },
+    { code: "YS", name: "ယဉ်သီ", gender: "female", rate: 1.0, pitch: 1.2 },
+    { code: "TS", name: "သီတာ", gender: "female", rate: 1.2, pitch: 1.3 },
   ];
 
   /* ---------------- Toasts ---------------- */
@@ -931,36 +931,64 @@
   burmeseInput.addEventListener("blur", () => autoCleanBurmeseInput({ notify: false }));
 
   /* ---------------- Step 3: Voice cards ---------------- */
+  function renderVoiceGroups(grid, isRecap = false) {
+    if (!grid) return;
+    grid.replaceChildren();
+    const groups = [
+      { gender: "male", title: "Male Voices" },
+      { gender: "female", title: "Female Voices" },
+    ];
+
+    groups.forEach((group) => {
+      const section = document.createElement("section");
+      section.className = "voice-group voice-group-" + group.gender;
+      const heading = document.createElement("h3");
+      heading.className = "voice-group-title";
+      heading.textContent = group.title;
+      const cards = document.createElement("div");
+      cards.className = "voice-group-cards";
+
+      VOICES.filter((voice) => voice.gender === group.gender).forEach((v) => {
+        const card = document.createElement("div");
+        card.className = "voice-card voice-card-" + v.gender;
+        card.dataset.code = v.code;
+        card.dataset.gender = v.gender;
+        card.setAttribute("role", "button");
+        card.setAttribute("tabindex", "0");
+        card.innerHTML = `
+          <div class="vc-code voice-avatar voice-avatar-${v.gender}">${v.code}</div>
+          <div class="vc-label">${v.name}</div>
+          <button class="vc-preview${isRecap ? " recap-vc-preview" : ""}" type="button">▶ Preview</button>
+        `;
+        card.addEventListener("click", (e) => {
+          if (e.target.closest(".vc-preview")) return;
+          if (isRecap) selectRecapVoice(v.code);
+          else selectVoice(v.code);
+        });
+        card.addEventListener("keydown", (e) => {
+          if (e.target.closest(".vc-preview")) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (isRecap) selectRecapVoice(v.code);
+            else selectVoice(v.code);
+          }
+        });
+        $(".vc-preview", card).addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (isRecap) selectRecapVoice(v.code);
+          else selectVoice(v.code);
+          previewVoice(v, e.currentTarget);
+        });
+        cards.appendChild(card);
+      });
+
+      section.append(heading, cards);
+      grid.appendChild(section);
+    });
+  }
+
   const voiceGrid = $("#voiceGrid");
-  VOICES.forEach((v) => {
-    const card = document.createElement("div");
-    const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    card.className = "voice-card voice-card-" + personaClass;
-    card.dataset.code = v.code;
-    card.setAttribute("role", "button");
-    card.setAttribute("tabindex", "0");
-    card.innerHTML = `
-      <div class="vc-code voice-avatar voice-avatar-${personaClass}">${v.code}</div>
-      <div class="vc-label">${v.label}</div>
-      <button class="vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
-    `;
-    card.addEventListener("click", (e) => {
-      if (e.target.closest(".vc-preview")) return;
-      selectVoice(v.code);
-    });
-    card.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        selectVoice(v.code);
-      }
-    });
-    $(".vc-preview", card).addEventListener("click", (e) => {
-      e.stopPropagation();
-      selectVoice(v.code);
-      previewVoice(v, e.currentTarget);
-    });
-    voiceGrid.appendChild(card);
-  });
+  renderVoiceGroups(voiceGrid);
 
   function selectVoice(code) {
     state.voice = code;
@@ -1183,7 +1211,7 @@
   function resetVoicePreviewButton(btn) {
     btn.classList.remove("playing");
     btn.disabled = false;
-    btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
+    btn.innerHTML = "▶ Preview";
   }
 
   async function previewVoice(v, btn) {
@@ -1198,7 +1226,7 @@
 
     btn.classList.add("playing");
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> ⏳ တင်ယူနေသည်...';
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Loading…';
 
     let audioUrl = "";
     let audio = null;
@@ -1242,7 +1270,7 @@
       await audio.play();
       console.info(`[Red Bear] Voice Preview started for ${v.code}`);
       btn.disabled = false;
-      btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
+      btn.innerHTML = "▶ Preview";
     } catch (error) {
       console.error(`[Red Bear] Voice Preview failed for ${v.code}`, error);
       useBrowserFallback(error && error.message ? error.message : String(error || "Unknown TTS error"));
@@ -1406,7 +1434,7 @@
     const vp = $("#step1Player");
     if (state.videoUrl && vp && !vp.src) vp.src = state.videoUrl;
     const v = VOICES.find((x) => x.code === state.voice);
-    $("#resVoice").textContent = v ? v.code + " · " + v.label.replace(/^[A-Z]{2} /, "").replace(/^\(|\)$/g, "") : "—";
+    $("#resVoice").textContent = v ? v.code + " · " + v.name : "—";
     $("#resPitch").textContent = fmtPitch(state.pitch);
     const plan = state.voicePlan || [];
     if (plan.length) {
@@ -1619,29 +1647,7 @@
   });
 
   const recapVoiceGrid = $("#recapVoiceGrid");
-  VOICES.forEach((v) => {
-    const card = document.createElement("div");
-    const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    card.className = "voice-card voice-card-" + personaClass;
-    card.dataset.code = v.code;
-    card.setAttribute("role", "button");
-    card.setAttribute("tabindex", "0");
-    card.innerHTML = `
-      <div class="vc-code voice-avatar voice-avatar-${personaClass}">${v.code}</div>
-      <div class="vc-label">${v.label}</div>
-      <button class="vc-preview recap-vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
-    `;
-    card.addEventListener("click", (e) => {
-      if (e.target.closest(".vc-preview")) return;
-      selectRecapVoice(v.code);
-    });
-    $(".vc-preview", card).addEventListener("click", (e) => {
-      e.stopPropagation();
-      selectRecapVoice(v.code);
-      previewVoice(v, e.currentTarget);
-    });
-    recapVoiceGrid.appendChild(card);
-  });
+  renderVoiceGroups(recapVoiceGrid, true);
 
   function selectRecapVoice(code) {
     state.voice = code;
