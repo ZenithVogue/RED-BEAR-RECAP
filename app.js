@@ -1023,7 +1023,7 @@
 
   async function fetchAudioBlob(url, label) {
     return fetchWithTimeout(url, { headers: { Accept: "audio/*" } }, async (response) => {
-      if (!response.ok) {
+      if (!response.ok || response.status !== 200) {
         const err = new Error(`${label} ${response.status}`);
         err.status = response.status;
         throw err;
@@ -1039,6 +1039,7 @@
   }
 
   async function requestConfiguredTtsAudio(endpoint, text, v) {
+    const proxyUrl = getCorsProxyUrl(endpoint);
     const options = {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json, audio/*" },
@@ -1050,64 +1051,54 @@
       }),
     };
 
-    async function requestAt(url) {
-      return fetchWithTimeout(url, options, async (response) => {
-        if (!response.ok) {
-          const err = new Error("TTS endpoint " + response.status);
-          err.status = response.status;
-          throw err;
-        }
-        const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-        if (contentType.startsWith("audio/") || contentType === "application/octet-stream") {
-          const blob = await response.blob();
-          if (!blob.size) throw new Error("TTS endpoint returned empty audio data");
-          return blob;
-        }
+    return fetchWithTimeout(proxyUrl, options, async (response) => {
+      if (!response.ok || response.status !== 200) {
+        const err = new Error("Edge TTS proxy " + response.status);
+        err.status = response.status;
+        throw err;
+      }
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      if (contentType.startsWith("audio/") || contentType === "application/octet-stream") {
+        const blob = await response.blob();
+        if (!blob.size) throw new Error("Edge TTS proxy returned empty audio data");
+        return blob;
+      }
 
-        let payload;
-        try { payload = await response.json(); }
-        catch (_) { throw new Error("TTS endpoint returned invalid JSON audio data"); }
-        if (!payload || typeof payload !== "object") throw new Error("TTS endpoint returned an invalid response");
+      let payload;
+      try { payload = await response.json(); }
+      catch (_) { throw new Error("Edge TTS proxy returned invalid JSON audio data"); }
+      if (!payload || typeof payload !== "object") throw new Error("Edge TTS proxy returned an invalid response");
 
-        const audioData = payload.audioBase64 || payload.audio_base64 || payload.base64
-          || (typeof payload.audio === "string" && !/^(https?:|blob:)/i.test(payload.audio) ? payload.audio : "");
-        if (audioData) return decodeAudioBase64(audioData, payload.mimeType || payload.mime_type || "audio/mp3");
+      const audioData = payload.audioBase64 || payload.audio_base64 || payload.base64
+        || (typeof payload.audio === "string" && !/^(https?:|blob:)/i.test(payload.audio) ? payload.audio : "");
+      if (audioData) return decodeAudioBase64(audioData, payload.mimeType || payload.mime_type || "audio/mp3");
 
-        const audioUrl = payload.audioUrl || payload.audio_url || payload.url
-          || (typeof payload.audio === "string" ? payload.audio : "");
-        if (!audioUrl) throw new Error("TTS response did not include audio data or an audio URL");
-        let resolvedUrl = String(audioUrl);
-        try { resolvedUrl = new URL(resolvedUrl, endpoint).toString(); } catch (_) {}
-        return fetchAudioBlob(resolvedUrl, "TTS audio URL");
-      });
-    }
-
-    try {
-      return await requestAt(endpoint);
-    } catch (error) {
-      if (!shouldRetryThroughCorsProxy(error)) throw error;
-      console.warn("[Red Bear] Edge TTS request failed; retrying through CORS proxy", error);
-      return requestAt(getCorsProxyUrl(endpoint));
-    }
+      const audioUrl = payload.audioUrl || payload.audio_url || payload.url
+        || (typeof payload.audio === "string" ? payload.audio : "");
+      if (!audioUrl) throw new Error("Edge TTS response did not include audio data or an audio URL");
+      let resolvedUrl = String(audioUrl);
+      try { resolvedUrl = new URL(resolvedUrl, endpoint).toString(); } catch (_) {}
+      if (/^https?:\/\//i.test(resolvedUrl)) resolvedUrl = getCorsProxyUrl(resolvedUrl);
+      return fetchAudioBlob(resolvedUrl, "Edge TTS audio URL");
+    });
   }
 
-  async function requestGoogleTtsAudio(text, v) {
-    const speed = Math.min(1.5, Math.max(0.7, Number(v.rate) || 1));
-    const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&q="
-      + encodeURIComponent(text) + "&ttsspeed=" + encodeURIComponent(speed.toFixed(2));
+  async function requestGoogleTtsAudio(text, client) {
+    const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client="
+      + encodeURIComponent(client) + "&tl=my&q=" + encodeURIComponent(text);
 
     async function requestAt(url) {
       return fetchWithTimeout(url, { headers: { Accept: "audio/mpeg" } }, async (response) => {
-        if (!response.ok) {
-          const err = new Error("Myanmar Google TTS " + response.status);
+        if (!response.ok || response.status !== 200) {
+          const err = new Error(`Myanmar Google TTS (${client}) ${response.status}`);
           err.status = response.status;
           throw err;
         }
         const blob = await response.blob();
-        if (!blob || !blob.size) throw new Error("Myanmar Google TTS returned empty audio data");
+        if (!blob || !blob.size) throw new Error(`Myanmar Google TTS (${client}) returned empty audio data`);
         const contentType = String(response.headers.get("content-type") || blob.type || "").toLowerCase();
-        if (contentType && !contentType.startsWith("audio/")) {
-          throw new Error("Myanmar Google TTS returned a non-audio response");
+        if (contentType && !contentType.startsWith("audio/") && contentType !== "application/octet-stream") {
+          throw new Error(`Myanmar Google TTS (${client}) returned a non-audio response`);
         }
         return blob;
       });
@@ -1117,35 +1108,40 @@
       return await requestAt(googleUrl);
     } catch (error) {
       if (!shouldRetryThroughCorsProxy(error)) throw error;
-      console.warn("[Red Bear] Google TTS request failed; retrying audio stream through CORS proxy", error);
+      console.warn(`[Red Bear] Google TTS ${client} request failed; retrying through CORS proxy`, error);
       return requestAt(getCorsProxyUrl(googleUrl));
     }
   }
 
   async function requestVoiceAudio(text, v) {
     const endpoint = getVoiceTtsEndpoint();
-    let endpointError = null;
+    const errors = [];
     if (endpoint) {
       try {
+        // Attempt 1: the Edge TTS endpoint through the CORS proxy.
         return await requestConfiguredTtsAudio(endpoint, text, v);
       } catch (error) {
-        endpointError = error;
-        console.warn("[Red Bear] Configured TTS endpoint failed; falling back to Google TTS", error);
+        errors.push("Edge TTS proxy: " + (error.message || String(error)));
+        console.warn("[Red Bear] Edge TTS proxy failed; trying Google TTS tw-ob", error);
       }
     }
+
+    // Attempt 2: Google Translate TTS using its tw-ob client.
     try {
-      return await requestGoogleTtsAudio(text, v);
+      return await requestGoogleTtsAudio(text, "tw-ob");
     } catch (error) {
-      if (endpointError) {
-        const fallbackError = new Error(
-          "Configured TTS and Google TTS fallback failed: "
-          + (endpointError.message || "TTS endpoint error") + "; "
-          + (error.message || "Google TTS error")
-        );
-        fallbackError.cause = error;
-        throw fallbackError;
-      }
-      throw error;
+      errors.push("Google TTS tw-ob: " + (error.message || String(error)));
+      console.warn("[Red Bear] Google TTS tw-ob failed; trying gtx", error);
+    }
+
+    // Attempt 3: Google Translate TTS using the alternate gtx client.
+    try {
+      return await requestGoogleTtsAudio(text, "gtx");
+    } catch (error) {
+      errors.push("Google TTS gtx: " + (error.message || String(error)));
+      const finalError = new Error("All TTS engines failed: " + errors.join("; "));
+      finalError.cause = error;
+      throw finalError;
     }
   }
 
