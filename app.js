@@ -51,6 +51,10 @@
   /* ---------------- Toasts ---------------- */
   const toastWrap = $("#toastWrap");
   function toast(msg, type = "") {
+    if (type === "err") {
+      // Avoid stacking stale network errors when a fallback endpoint is attempted.
+      $$(".toast", toastWrap).forEach((existing) => existing.remove());
+    }
     const el = document.createElement("div");
     el.className = "toast" + (type ? " " + type : "");
     el.textContent = msg;
@@ -987,6 +991,21 @@
     }
   }
 
+  function getCorsProxyUrl(targetUrl) {
+    return "https://corsproxy.io/?" + encodeURIComponent(targetUrl);
+  }
+
+  function isNetworkFetchError(error) {
+    if (!error) return false;
+    return error.name === "TypeError"
+      || /failed to fetch|network error|networkerror|cors/i.test(String(error.message || ""));
+  }
+
+  function shouldRetryThroughCorsProxy(error) {
+    const status = Number(error && error.status);
+    return isNetworkFetchError(error) || status === 429 || status >= 500;
+  }
+
   function decodeAudioBase64(encoded, mimeType) {
     let base64 = String(encoded || "").trim();
     let type = mimeType || "audio/mp3";
@@ -1004,7 +1023,11 @@
 
   async function fetchAudioBlob(url, label) {
     return fetchWithTimeout(url, { headers: { Accept: "audio/*" } }, async (response) => {
-      if (!response.ok) throw new Error(`${label} ${response.status}`);
+      if (!response.ok) {
+        const err = new Error(`${label} ${response.status}`);
+        err.status = response.status;
+        throw err;
+      }
       const blob = await response.blob();
       if (!blob || !blob.size) throw new Error(`${label} returned empty audio data`);
       const contentType = String(response.headers.get("content-type") || blob.type || "").toLowerCase();
@@ -1016,7 +1039,7 @@
   }
 
   async function requestConfiguredTtsAudio(endpoint, text, v) {
-    return fetchWithTimeout(endpoint, {
+    const options = {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json, audio/*" },
       body: JSON.stringify({
@@ -1025,51 +1048,78 @@
         persona: v.code,
         locale: "my-MM",
       }),
-    }, async (response) => {
-      if (!response.ok) {
-        const err = new Error("TTS endpoint " + response.status);
-        err.status = response.status;
-        throw err;
-      }
-      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-      if (contentType.startsWith("audio/") || contentType === "application/octet-stream") {
-        const blob = await response.blob();
-        if (!blob.size) throw new Error("TTS endpoint returned empty audio data");
-        return blob;
-      }
+    };
 
-      let payload;
-      try { payload = await response.json(); }
-      catch (_) { throw new Error("TTS endpoint returned invalid JSON audio data"); }
-      if (!payload || typeof payload !== "object") throw new Error("TTS endpoint returned an invalid response");
+    async function requestAt(url) {
+      return fetchWithTimeout(url, options, async (response) => {
+        if (!response.ok) {
+          const err = new Error("TTS endpoint " + response.status);
+          err.status = response.status;
+          throw err;
+        }
+        const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+        if (contentType.startsWith("audio/") || contentType === "application/octet-stream") {
+          const blob = await response.blob();
+          if (!blob.size) throw new Error("TTS endpoint returned empty audio data");
+          return blob;
+        }
 
-      const audioData = payload.audioBase64 || payload.audio_base64 || payload.base64
-        || (typeof payload.audio === "string" && !/^(https?:|blob:)/i.test(payload.audio) ? payload.audio : "");
-      if (audioData) return decodeAudioBase64(audioData, payload.mimeType || payload.mime_type || "audio/mp3");
+        let payload;
+        try { payload = await response.json(); }
+        catch (_) { throw new Error("TTS endpoint returned invalid JSON audio data"); }
+        if (!payload || typeof payload !== "object") throw new Error("TTS endpoint returned an invalid response");
 
-      const audioUrl = payload.audioUrl || payload.audio_url || payload.url
-        || (typeof payload.audio === "string" ? payload.audio : "");
-      if (!audioUrl) throw new Error("TTS response did not include audio data or an audio URL");
-      let resolvedUrl = String(audioUrl);
-      try { resolvedUrl = new URL(resolvedUrl, endpoint).toString(); } catch (_) {}
-      return fetchAudioBlob(resolvedUrl, "TTS audio URL");
-    });
+        const audioData = payload.audioBase64 || payload.audio_base64 || payload.base64
+          || (typeof payload.audio === "string" && !/^(https?:|blob:)/i.test(payload.audio) ? payload.audio : "");
+        if (audioData) return decodeAudioBase64(audioData, payload.mimeType || payload.mime_type || "audio/mp3");
+
+        const audioUrl = payload.audioUrl || payload.audio_url || payload.url
+          || (typeof payload.audio === "string" ? payload.audio : "");
+        if (!audioUrl) throw new Error("TTS response did not include audio data or an audio URL");
+        let resolvedUrl = String(audioUrl);
+        try { resolvedUrl = new URL(resolvedUrl, endpoint).toString(); } catch (_) {}
+        return fetchAudioBlob(resolvedUrl, "TTS audio URL");
+      });
+    }
+
+    try {
+      return await requestAt(endpoint);
+    } catch (error) {
+      if (!shouldRetryThroughCorsProxy(error)) throw error;
+      console.warn("[Red Bear] Edge TTS request failed; retrying through CORS proxy", error);
+      return requestAt(getCorsProxyUrl(endpoint));
+    }
   }
 
   async function requestGoogleTtsAudio(text, v) {
     const speed = Math.min(1.5, Math.max(0.7, Number(v.rate) || 1));
-    const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&ttsspeed="
-      + encodeURIComponent(speed.toFixed(2)) + "&q=" + encodeURIComponent(text);
-    return fetchWithTimeout(googleUrl, { headers: { Accept: "audio/mpeg" } }, async (response) => {
-      if (!response.ok) throw new Error("Myanmar Google TTS " + response.status);
-      const blob = await response.blob();
-      if (!blob || !blob.size) throw new Error("Myanmar Google TTS returned empty audio data");
-      const contentType = String(response.headers.get("content-type") || blob.type || "").toLowerCase();
-      if (contentType && !contentType.startsWith("audio/")) {
-        throw new Error("Myanmar Google TTS returned a non-audio response");
-      }
-      return blob;
-    });
+    const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&q="
+      + encodeURIComponent(text) + "&ttsspeed=" + encodeURIComponent(speed.toFixed(2));
+
+    async function requestAt(url) {
+      return fetchWithTimeout(url, { headers: { Accept: "audio/mpeg" } }, async (response) => {
+        if (!response.ok) {
+          const err = new Error("Myanmar Google TTS " + response.status);
+          err.status = response.status;
+          throw err;
+        }
+        const blob = await response.blob();
+        if (!blob || !blob.size) throw new Error("Myanmar Google TTS returned empty audio data");
+        const contentType = String(response.headers.get("content-type") || blob.type || "").toLowerCase();
+        if (contentType && !contentType.startsWith("audio/")) {
+          throw new Error("Myanmar Google TTS returned a non-audio response");
+        }
+        return blob;
+      });
+    }
+
+    try {
+      return await requestAt(googleUrl);
+    } catch (error) {
+      if (!shouldRetryThroughCorsProxy(error)) throw error;
+      console.warn("[Red Bear] Google TTS request failed; retrying audio stream through CORS proxy", error);
+      return requestAt(getCorsProxyUrl(googleUrl));
+    }
   }
 
   async function requestVoiceAudio(text, v) {
@@ -1155,9 +1205,30 @@
     btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> ⏳ တင်ယူနေသည်...';
 
     let audioUrl = "";
+    let audio = null;
+    let fallbackStarted = false;
+    const useBrowserFallback = (detail) => {
+      if (fallbackStarted) return;
+      fallbackStarted = true;
+      if (audio) audio.pause();
+      if (audioUrl && audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
+      if (activePreviewAudio === audio) activePreviewAudio = null;
+      resetVoicePreviewButton(btn);
+      try {
+        speakVoicePreviewFallback(v);
+        toast("Browser speech fallback ဖြင့် ဖွင့်နေပါသည်။", "info");
+        previewTimer = setTimeout(() => resetVoicePreviewButton(btn), 2600);
+      } catch (fallbackError) {
+        console.error(`[Red Bear] Browser speech fallback failed for ${v.code}`, fallbackError);
+        const reason = detail ? ` (${detail})` : "";
+        toast(`Voice Preview failed${reason}; browser fallback failed: ${fallbackError.message}`, "err");
+        resetVoicePreviewButton(btn);
+      }
+    };
+
     try {
       audioUrl = await requestVoicePreview(v);
-      const audio = new Audio(audioUrl);
+      audio = new Audio(audioUrl);
       activePreviewAudio = audio;
       audio.onended = () => {
         if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
@@ -1167,36 +1238,18 @@
       audio.onerror = () => {
         const playbackError = new Error("audio stream could not be played");
         console.error(`[Red Bear] Voice Preview playback failed for ${v.code}`, playbackError);
-        if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
-        if (activePreviewAudio === audio) activePreviewAudio = null;
-        resetVoicePreviewButton(btn);
-        toast(`Voice Preview failed (${v.code}): ${playbackError.message}`, "err");
+        useBrowserFallback(playbackError.message);
       };
 
       // Keep playback inside the async try/catch so autoplay and decode errors
-      // are visible and never leave the card stuck in its loading state.
+      // fall back without leaving duplicate error banners or a stuck loading state.
       await audio.play();
       console.info(`[Red Bear] Voice Preview started for ${v.code}`);
       btn.disabled = false;
       btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
     } catch (error) {
       console.error(`[Red Bear] Voice Preview failed for ${v.code}`, error);
-      if (audioUrl && audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
-      activePreviewAudio = null;
-      const detail = error && error.message ? error.message : String(error || "Unknown TTS error");
-      toast(`Voice Preview failed (${v.code}): ${detail}`, "err");
-      resetVoicePreviewButton(btn);
-
-      // Keep a standard browser fallback for environments that block remote audio.
-      try {
-        speakVoicePreviewFallback(v);
-        toast("Browser speech fallback ဖြင့် ဖွင့်နေပါသည်။", "info");
-        previewTimer = setTimeout(() => resetVoicePreviewButton(btn), 2600);
-      } catch (fallbackError) {
-        console.error(`[Red Bear] Browser speech fallback failed for ${v.code}`, fallbackError);
-        toast(`Voice Preview fallback failed (${v.code}): ${fallbackError.message}`, "err");
-        resetVoicePreviewButton(btn);
-      }
+      useBrowserFallback(error && error.message ? error.message : String(error || "Unknown TTS error"));
     }
   }
 
