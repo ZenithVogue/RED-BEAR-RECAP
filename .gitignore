@@ -1,0 +1,11 @@
+# dependencies (the runtime itself is dependency-free — see README)
+node_modules/
+
+# local/runtime artifacts
+*.log
+.DS_Store
+.env
+.env.*
+.cache/
+coverage/
+tmp/

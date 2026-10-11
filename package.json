@@ -1,0 +1,23 @@
+{
+  "name": "red-bear-recap",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Red Bear Studio \u2014 Burmese recap studio. Static front-end + server-side TTS API route (/api/tts) for Edge & Google neural speech.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test test/ws.test.js test/edge.test.js test/api.test.js test/frontend.test.js"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "keywords": [
+    "tts",
+    "edge-tts",
+    "myanmar",
+    "burmese",
+    "text-to-speech"
+  ],
+  "license": "MIT"
+}
