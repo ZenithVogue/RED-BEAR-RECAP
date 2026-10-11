@@ -32,30 +32,79 @@
     keys: { crumb: "API Keys" },
   };
 
+  /* Voice personas — mirrored by lib/tts/personas.js on the server, which
+     owns the real neural voice + prosody mapping. Gender drives the card
+     accent colour (male #2563eb / female #ec4899). */
+  const VOICE_ACCENTS = { male: "#2563eb", female: "#ec4899" };
   const VOICES = [
-    { code: "BB", label: "BB (အမျိုးသား - သဘာဝကျသော အသံ)", rate: 0.95, pitch: 1.0 },
-    { code: "NL", label: "NL (အမျိုးသမီး - ရှင်းလင်းသော အသံ)", rate: 1.0, pitch: 1.25 },
-    { code: "PW", label: "PW (အမျိုးသား - စိတ်လှုပ်ရှားဖွယ် အသံ)", rate: 1.15, pitch: 1.1 },
-    { code: "KM", label: "KM (အမျိုးသား - လေးနက်သော အသံ)", rate: 0.85, pitch: 0.75 },
-    { code: "ZK", label: "ZK (အမျိုးသား - ဇာတ်ကြောင်းပြော အသံ)", rate: 0.9, pitch: 0.9 },
-    { code: "HS", label: "HS (အမျိုးသမီး - နူးညံ့သော အသံ)", rate: 0.95, pitch: 1.35 },
-    { code: "SL", label: "SL (အမျိုးသား - မြန်ဆန်သော အသံ)", rate: 1.3, pitch: 1.0 },
-    { code: "YS", label: "YS (အမျိုးသမီး - သဘာဝကျသော အသံ)", rate: 1.0, pitch: 1.2 },
-    { code: "EC", label: "EC (အမျိုးသား - သတင်းကြေညာ အသံ)", rate: 1.05, pitch: 0.95 },
-    { code: "TS", label: "TS (အမျိုးသမီး - တက်ကြွသော အသံ)", rate: 1.2, pitch: 1.3 },
+    { code: "BB", name: "Bobo", gender: "male", tone: "Natural", desc: "သဘာဝကျသော အသံ", rate: 0.95, pitch: 1.0 },
+    { code: "NL", name: "Nilar", gender: "female", tone: "Clear", desc: "ရှင်းလင်းသော အသံ", rate: 1.0, pitch: 1.25 },
+    { code: "PW", name: "Pyae Wai", gender: "male", tone: "Energetic", desc: "စိတ်လှုပ်ရှားဖွယ် အသံ", rate: 1.15, pitch: 1.1 },
+    { code: "KM", name: "Kaung Myat", gender: "male", tone: "Deep", desc: "လေးနက်သော အသံ", rate: 0.85, pitch: 0.75 },
+    { code: "ZK", name: "Zaw Ko", gender: "male", tone: "Narrator", desc: "ဇာတ်ကြောင်းပြော အသံ", rate: 0.9, pitch: 0.9 },
+    { code: "HS", name: "Hnin Si", gender: "female", tone: "Gentle", desc: "နူးညံ့သော အသံ", rate: 0.95, pitch: 1.35 },
+    { code: "SL", name: "Soe Lwin", gender: "male", tone: "Fast", desc: "မြန်ဆန်သော အသံ", rate: 1.3, pitch: 1.0 },
+    { code: "YS", name: "Yee Mon", gender: "female", tone: "Natural", desc: "သဘာဝကျသော အသံ", rate: 1.0, pitch: 1.2 },
+    { code: "EC", name: "Ei Chan", gender: "male", tone: "News", desc: "သတင်းကြေညာ အသံ", rate: 1.05, pitch: 0.95 },
+    { code: "TS", name: "Thuzar", gender: "female", tone: "Lively", desc: "တက်ကြွသော အသံ", rate: 1.2, pitch: 1.3 },
   ];
 
-  /* ---------------- Toasts ---------------- */
+  function voiceGender(v) {
+    return v && v.gender === "female" ? "female" : "male";
+  }
+  function voiceGenderLabel(v) {
+    return voiceGender(v) === "female" ? "Female" : "Male";
+  }
+  function voiceAccent(v) {
+    return VOICE_ACCENTS[voiceGender(v)];
+  }
+
+  /* ---------------- Toasts (exactly one at a time) ---------------- */
   const toastWrap = $("#toastWrap");
-  function toast(msg, type = "") {
-    const el = document.createElement("div");
-    el.className = "toast" + (type ? " " + type : "");
-    el.textContent = msg;
-    toastWrap.appendChild(el);
+  const TOAST_DURATION = 3000;
+  let toastEl = null;
+  let toastTimer = null;
+  let toastSignature = "";
+  let toastAt = 0;
+
+  function dismissToast(el) {
+    el.classList.add("out");
     setTimeout(() => {
-      el.classList.add("out");
-      setTimeout(() => el.remove(), 320);
-    }, 3200);
+      if (el.isConnected) el.remove();
+      if (toastEl === el) toastEl = null;
+    }, 320);
+  }
+
+  function toast(msg, type = "") {
+    const message = String(msg == null ? "" : msg).trim();
+    if (!message) return;
+
+    /* Collapse bursts of identical messages (double clicks, retries). */
+    const signature = type + "|" + message;
+    const now = Date.now();
+    if (signature === toastSignature && now - toastAt < 600) return;
+    toastSignature = signature;
+    toastAt = now;
+
+    /* Reuse a single node so a new message replaces the previous toast
+       instead of stacking duplicates on top of each other. */
+    if (!toastEl || !toastEl.isConnected) {
+      toastEl = document.createElement("div");
+    }
+    toastWrap.replaceChildren(toastEl);
+
+    toastEl.className = "toast" + (type ? " " + type : "");
+    toastEl.textContent = message;
+
+    /* restart the entrance animation for the replaced message */
+    toastEl.style.animation = "none";
+    void toastEl.offsetWidth;
+    toastEl.style.animation = "";
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      if (toastEl) dismissToast(toastEl);
+    }, TOAST_DURATION);
   }
 
   /* ---------------- Quota & Plan (SidebarQuota equivalent) ---------------- */
@@ -882,37 +931,60 @@
   });
   burmeseInput.addEventListener("blur", () => autoCleanBurmeseInput({ notify: false }));
 
-  /* ---------------- Step 3: Voice cards ---------------- */
-  const voiceGrid = $("#voiceGrid");
-  VOICES.forEach((v) => {
+  /* ---------------- Step 3: Voice cards (minimalist) ---------------- */
+
+  /**
+   * One card = Initial badge · Voice name · Gender label · ▶ Preview.
+   * Accent colour comes from the gender (male blue / female pink).
+   */
+  function buildVoiceCard(v) {
     const card = document.createElement("div");
     const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    card.className = "voice-card voice-card-" + personaClass;
+    const gender = voiceGender(v);
+    const genderLabel = voiceGenderLabel(v);
+
+    card.className = `voice-card voice-card-${personaClass} gender-${gender}`;
     card.dataset.code = v.code;
+    card.dataset.gender = gender;
+    card.style.setProperty("--voice-accent", voiceAccent(v));
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", `${v.name} — ${genderLabel} voice`);
+    card.title = v.desc ? `${v.name} · ${genderLabel} · ${v.desc}` : `${v.name} · ${genderLabel}`;
     card.innerHTML = `
-      <div class="vc-code voice-avatar voice-avatar-${personaClass}">${v.code}</div>
-      <div class="vc-label">${v.label}</div>
-      <button class="vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
+      <div class="vc-code voice-avatar">${v.code}</div>
+      <div class="vc-name">${v.name}</div>
+      <div class="vc-gender">${gender === "female" ? "♀" : "♂"} ${genderLabel}</div>
+      <button class="vc-preview" type="button" aria-label="Preview ${v.name}">▶ Preview</button>
     `;
-    card.addEventListener("click", (e) => {
-      if (e.target.closest(".vc-preview")) return;
-      selectVoice(v.code);
-    });
-    card.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        selectVoice(v.code);
-      }
-    });
-    $(".vc-preview", card).addEventListener("click", (e) => {
-      e.stopPropagation();
-      selectVoice(v.code);
-      previewVoice(v, e.currentTarget);
-    });
-    voiceGrid.appendChild(card);
-  });
+    return card;
+  }
+
+  /** Paint a persona grid and wire selection + preview for every card. */
+  function renderVoiceGrid(grid, onSelect) {
+    if (!grid) return;
+    grid.replaceChildren(...VOICES.map((v) => {
+      const card = buildVoiceCard(v);
+      card.addEventListener("click", (e) => {
+        if (e.target.closest(".vc-preview")) return;
+        onSelect(v.code);
+      });
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(v.code);
+        }
+      });
+      $(".vc-preview", card).addEventListener("click", (e) => {
+        e.stopPropagation();
+        onSelect(v.code);
+        previewVoice(v, e.currentTarget);
+      });
+      return card;
+    }));
+  }
+
+  renderVoiceGrid($("#voiceGrid"), (code) => selectVoice(code));
 
   function selectVoice(code) {
     state.voice = code;
@@ -933,42 +1005,53 @@
   let activePreviewAudio = null;
   const PREVIEW_TEXT = "မင်္ဂလာပါ၊ ဒါကတော့ နမူနာ စကားပြော အသံဖိုင် ဖြစ်ပါတယ်";
 
-  function getVoiceTtsEndpoint() {
-    try {
-      return String(localStorage.getItem("voice_tts_endpoint") || "").trim();
-    } catch (_) {
-      return "";
-    }
-  }
+  /* ---------------------------------------------------------------
+     Server-side TTS
 
-  async function requestVoicePreview(v) {
-    const endpoint = getVoiceTtsEndpoint();
-    if (!endpoint) {
-      const speed = Math.min(1.5, Math.max(0.7, Number(v.rate) || 1));
-      const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=my&ttsspeed="
-        + encodeURIComponent(speed.toFixed(2)) + "&q=" + encodeURIComponent(PREVIEW_TEXT);
-      const googleResponse = await fetch(googleUrl, { headers: { Accept: "audio/mpeg" } });
-      if (!googleResponse.ok) throw new Error("Myanmar Google TTS " + googleResponse.status);
-      return URL.createObjectURL(await googleResponse.blob());
-    }
-    const response = await fetch(endpoint, {
+     The browser never contacts the public Google or Edge speech
+     endpoints: both answer browsers with CORS errors / HTTP 403.
+     Every synthesis request goes through our own `/api/tts` route,
+     which carries a real server-side fingerprint.
+     --------------------------------------------------------------- */
+  const TTS_ROUTE = "/api/tts";
+
+  /** POST { text, voice, pitch } → audio Blob straight from our server. */
+  async function requestTtsBlob(voiceCode, text, pitchHz) {
+    const response = await fetch(TTS_ROUTE, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json, audio/*" },
+      headers: { "Content-Type": "application/json", Accept: "audio/mpeg" },
       body: JSON.stringify({
-        text: PREVIEW_TEXT,
-        voiceId: v.code,
-        persona: v.code,
-        locale: "my-MM",
+        text: text || PREVIEW_TEXT,
+        voice: voiceCode || "BB",
+        pitch: Number(pitchHz) || 0,
       }),
     });
-    if (!response.ok) throw new Error("TTS preview endpoint " + response.status);
 
-    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-    if (contentType.startsWith("audio/")) return URL.createObjectURL(await response.blob());
-    const payload = await response.json();
-    const audioUrl = payload.audioUrl || payload.audio_url || payload.url;
-    if (!audioUrl) throw new Error("TTS response did not include an audio URL");
-    return audioUrl;
+    if (!response.ok) {
+      let detail = `TTS server ${response.status}`;
+      try {
+        const info = await response.json();
+        if (info && (info.message || info.error)) detail = info.message;
+      } catch (_) {}
+      if (response.status === 404 || response.status === 405 || response.status === 501) {
+        detail = "TTS route မတွေ့ပါ — Server ကို `npm start` ဖြင့် ဖွင့်ပါ";
+      }
+      throw new Error(detail);
+    }
+
+    const blob = await response.blob();
+    if (!blob.size) throw new Error("TTS server returned an empty audio stream");
+    return blob;
+  }
+
+  /** Blob → ObjectURL → ready for `new Audio(url)`. */
+  async function requestTtsAudioUrl(v, text, pitchHz) {
+    const blob = await requestTtsBlob(v && v.code ? v.code : "BB", text, pitchHz);
+    return URL.createObjectURL(blob);
+  }
+
+  function requestVoicePreview(v) {
+    return requestTtsAudioUrl(v, PREVIEW_TEXT, state.pitch);
   }
 
   function speakVoicePreviewFallback(v) {
@@ -982,10 +1065,13 @@
     window.speechSynthesis.speak(u);
   }
 
+  const PREVIEW_LABEL = "▶ Preview";
+
   function resetVoicePreviewButton(btn) {
+    if (!btn) return;
     btn.classList.remove("playing");
     btn.disabled = false;
-    btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
+    btn.innerHTML = PREVIEW_LABEL;
   }
 
   async function previewVoice(v, btn) {
@@ -1000,10 +1086,11 @@
 
     btn.classList.add("playing");
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> ⏳ တင်ယူနေသည်...';
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Loading…';
 
     let audioUrl = "";
     try {
+      /* One POST to our own server — no CORS, no 403, no third-party proxy. */
       audioUrl = await requestVoicePreview(v);
       const audio = new Audio(audioUrl);
       activePreviewAudio = audio;
@@ -1021,12 +1108,13 @@
         toast(`Voice Preview failed (${v.code}): ${playbackError.message}`, "err");
       };
 
-      // Keep playback inside the async try/catch so autoplay and decode errors
-      // are visible and never leave the card stuck in its loading state.
+      /* Keep playback inside the async try/catch so autoplay and decode
+         errors are visible and never leave the card stuck on "Loading…". */
       await audio.play();
       console.info(`[Red Bear] Voice Preview started for ${v.code}`);
+      btn.classList.remove("playing");
       btn.disabled = false;
-      btn.innerHTML = "▶ အသံနမူနာ နားထောင်ရန်";
+      btn.innerHTML = PREVIEW_LABEL;
     } catch (error) {
       console.error(`[Red Bear] Voice Preview failed for ${v.code}`, error);
       if (audioUrl && audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
@@ -1035,14 +1123,13 @@
       toast(`Voice Preview failed (${v.code}): ${detail}`, "err");
       resetVoicePreviewButton(btn);
 
-      // Keep a standard browser fallback for environments that block remote audio.
+      /* Last resort for static hosting without the Node route. */
       try {
         speakVoicePreviewFallback(v);
         toast("Browser speech fallback ဖြင့် ဖွင့်နေပါသည်။", "info");
         previewTimer = setTimeout(() => resetVoicePreviewButton(btn), 2600);
       } catch (fallbackError) {
         console.error(`[Red Bear] Browser speech fallback failed for ${v.code}`, fallbackError);
-        toast(`Voice Preview fallback failed (${v.code}): ${fallbackError.message}`, "err");
         resetVoicePreviewButton(btn);
       }
     }
@@ -1075,8 +1162,73 @@
     if (bar) bar.hidden = true;
   }
 
+  /* ---------------- Voice-over player (Step 4) ---------------- */
+  let voiceOverUrl = "";
+  let voiceOverAudio = null;
+  let voiceOverToken = 0;
+
+  function stopVoiceOver() {
+    voiceOverToken += 1;
+    if (voiceOverAudio) {
+      try { voiceOverAudio.pause(); } catch (_) {}
+      voiceOverAudio = null;
+    }
+    if (voiceOverUrl) {
+      URL.revokeObjectURL(voiceOverUrl);
+      voiceOverUrl = "";
+    }
+  }
+
+  function fmtClock(seconds) {
+    const total = Math.max(0, Math.round(Number(seconds) || 0));
+    const mm = String(Math.floor(total / 60)).padStart(2, "0");
+    const ss = String(total % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
+  }
+
+  /** Attach synthesized audio to the Step 4 audio card. */
+  function setVoiceOverSource(url, estimatedSeconds) {
+    voiceOverUrl = url;
+    voiceOverAudio = new Audio(url);
+    voiceOverAudio.preload = "metadata";
+    voiceOverAudio.addEventListener("loadedmetadata", () => {
+      if (Number.isFinite(voiceOverAudio.duration) && voiceOverAudio.duration > 0) {
+        $("#amTime").textContent = fmtClock(voiceOverAudio.duration);
+      }
+    });
+    voiceOverAudio.addEventListener("ended", () => {
+      $("#amWave").classList.remove("playing");
+      $("#amPlay").classList.remove("playing");
+      $("#amPlay").textContent = "▶";
+    });
+    if (estimatedSeconds) $("#amTime").textContent = fmtClock(estimatedSeconds);
+  }
+
+  /**
+   * Synthesize every planned line through /api/tts and join the clips
+   * into one MP3 blob (constant-bitrate mono streams concatenate cleanly).
+   */
+  async function synthesizeVoicePlan(plan) {
+    const token = ++voiceOverToken;
+    const parts = [];
+    for (const line of plan) {
+      const code = line.voice || state.voice || "BB";
+      const pitch = line.pitch === "" || line.pitch == null ? state.pitch : Number(line.pitch);
+      const blob = await requestTtsBlob(code, line.text, pitch);
+      if (token !== voiceOverToken) throw new Error("generation cancelled");
+      parts.push(blob);
+    }
+    if (!parts.length) throw new Error("no lines to synthesize");
+    return new Blob(parts, { type: "audio/mpeg" });
+  }
+
   /* ---------------- Generate voice over ---------------- */
+  /* Re-entrancy guard — `generating` used to be assigned without ever
+     being declared, which threw in strict mode and left the button stuck. */
+  let generating = false;
+
   async function generateVoiceOver() {
+    if (generating) return;
     const btn = $("#btnGenerate");
     const box = $("#burmeseText");
     let text = box ? String(box.value || "").trim() : "";
@@ -1086,10 +1238,10 @@
       text = box ? String(box.value || "").trim() : text;
     }
     if (!text) {
-      generating = false;
       toast("မြန်မာဘာသာပြန် စာမူ ဗလာ ဖြစ်နေပါသည် — Step 3 တွင် မြန်မာစာသား Paste လုပ်ပါ။", "info");
       return;
     }
+    generating = true;
     if (!state.voice) selectVoice(VOICES[0].code);
     const lines = text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
     state.scriptLines = lines.map((line) => ({ text: line, voice: "", pitch: "" }));
@@ -1117,7 +1269,17 @@
       updateStepsUI();
       window.scrollTo({ top: 0, behavior: "smooth" });
       await runRenderProgress("ဗီဒီယို ဖန်တီးနေပါသည်...");
-      toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
+      /* Real synthesis: every line goes through the server-side /api/tts route. */
+      try {
+        stopVoiceOver();
+        const audioBlob = await synthesizeVoicePlan(state.voicePlan);
+        const chars = state.voicePlan.reduce((sum, line) => sum + String(line.text || "").length, 0);
+        setVoiceOverSource(URL.createObjectURL(audioBlob), chars / 4.2);
+        toast("အသံနှင့် ဗီဒီယို ဖန်တီးပြီးပါပြီ ✓", "ok");
+      } catch (audioError) {
+        console.warn("[Red Bear] Voice-over synthesis failed", audioError);
+        toast("အသံ ဖန်တီးမရပါ — Preview ခလုတ်ဖြင့် စမ်းကြည့်ပါ။", "err");
+      }
     } catch (err) {
       toast("Generate မအောင်မြင်ပါ — ပြန်ကြိုးစားပါ။", "err");
     } finally {
@@ -1142,8 +1304,13 @@
     const vp = $("#step1Player");
     if (state.videoUrl && vp && !vp.src) vp.src = state.videoUrl;
     const v = VOICES.find((x) => x.code === state.voice);
-    $("#resVoice").textContent = v ? v.code + " · " + v.label.replace(/^[A-Z]{2} /, "").replace(/^\(|\)$/g, "") : "—";
+    $("#resVoice").textContent = v ? `${v.code} · ${v.name} (${voiceGenderLabel(v)})` : "—";
     $("#resPitch").textContent = fmtPitch(state.pitch);
+    const durationEl = $("#resDuration");
+    if (durationEl) {
+      const chars = (state.voicePlan || []).reduce((sum, line) => sum + String(line.text || "").length, 0);
+      durationEl.textContent = chars ? "~ " + fmtClock(chars / 4.2) : "—";
+    }
     const plan = state.voicePlan || [];
     if (plan.length) {
       const overrides = plan.filter((p) => p.voice !== state.voice || p.pitch !== state.pitch).length;
@@ -1174,26 +1341,50 @@
   });
 
   let amTimer = null;
-  $("#amPlay").addEventListener("click", () => {
-    const wave = $("#amWave");
-    const btn = $("#amPlay");
+
+  function stopAmAnimation() {
     if (amTimer) {
       clearInterval(amTimer);
       amTimer = null;
-      wave.classList.remove("playing");
-      btn.classList.remove("playing");
-      btn.textContent = "▶";
+    }
+    $("#amWave").classList.remove("playing");
+    $("#amPlay").classList.remove("playing");
+    $("#amPlay").textContent = "▶";
+  }
+
+  /* Plays the real synthesized voice-over when available; otherwise keeps
+     the decorative animation so the card still feels alive. */
+  $("#amPlay").addEventListener("click", async () => {
+    const wave = $("#amWave");
+    const btn = $("#amPlay");
+
+    if (voiceOverAudio) {
+      if (voiceOverAudio.paused) {
+        try {
+          await voiceOverAudio.play();
+          wave.classList.add("playing");
+          btn.classList.add("playing");
+          btn.textContent = "❚❚";
+        } catch (error) {
+          console.warn("[Red Bear] Voice-over playback failed", error);
+          stopAmAnimation();
+          toast("အသံ ဖွင့်မရပါ — ပြန်လည် ဖန်တီးကြည့်ပါ။", "err");
+        }
+      } else {
+        voiceOverAudio.pause();
+        stopAmAnimation();
+      }
+      return;
+    }
+
+    if (amTimer) {
+      stopAmAnimation();
       return;
     }
     wave.classList.add("playing");
     btn.classList.add("playing");
     btn.textContent = "❚❚";
-    amTimer = setTimeout(() => {
-      wave.classList.remove("playing");
-      btn.classList.remove("playing");
-      btn.textContent = "▶";
-      amTimer = null;
-    }, 3000);
+    amTimer = setTimeout(stopAmAnimation, 3000);
   });
 
   /* ---------------- Re-render ---------------- */
@@ -1255,6 +1446,9 @@
   /* ---------------- New job ---------------- */
   $("#btnNewJob").addEventListener("click", () => {
     clearStep1Media();
+    stopVoiceOver();
+    stopAmAnimation();
+    $("#amTime").textContent = "00:00";
     state.transcriptReady = false;
     state.voice = null;
     state.voiceGenerated = false;
@@ -1323,30 +1517,8 @@
     showRecapWorkspace(false);
   });
 
-  const recapVoiceGrid = $("#recapVoiceGrid");
-  VOICES.forEach((v) => {
-    const card = document.createElement("div");
-    const personaClass = String(v.code || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    card.className = "voice-card voice-card-" + personaClass;
-    card.dataset.code = v.code;
-    card.setAttribute("role", "button");
-    card.setAttribute("tabindex", "0");
-    card.innerHTML = `
-      <div class="vc-code voice-avatar voice-avatar-${personaClass}">${v.code}</div>
-      <div class="vc-label">${v.label}</div>
-      <button class="vc-preview recap-vc-preview" type="button">▶ အသံနမူနာ နားထောင်ရန် (Preview)</button>
-    `;
-    card.addEventListener("click", (e) => {
-      if (e.target.closest(".vc-preview")) return;
-      selectRecapVoice(v.code);
-    });
-    $(".vc-preview", card).addEventListener("click", (e) => {
-      e.stopPropagation();
-      selectRecapVoice(v.code);
-      previewVoice(v, e.currentTarget);
-    });
-    recapVoiceGrid.appendChild(card);
-  });
+  /* Same minimalist persona cards on the Auto Recap page. */
+  renderVoiceGrid($("#recapVoiceGrid"), (code) => selectRecapVoice(code));
 
   function selectRecapVoice(code) {
     state.voice = code;
