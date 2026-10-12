@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node --test test/ws.test.js test/edge.test.js test/api.test.js test/frontend.test.js"
+    "test": "node --test test/api.test.js test/editor.test.js test/edge.test.js test/frontend.test.js test/ws.test.js"
   },
   "engines": {
     "node": ">=18.17"

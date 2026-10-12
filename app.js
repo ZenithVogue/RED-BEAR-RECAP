@@ -64,8 +64,6 @@
   const TOAST_DURATION = 3000;
   let toastEl = null;
   let toastTimer = null;
-  let toastSignature = "";
-  let toastAt = 0;
 
   function dismissToast(el) {
     el.classList.add("out");
@@ -79,12 +77,16 @@
     const message = String(msg == null ? "" : msg).trim();
     if (!message) return;
 
-    /* Collapse bursts of identical messages (double clicks, retries). */
     const signature = type + "|" + message;
-    const now = Date.now();
-    if (signature === toastSignature && now - toastAt < 600) return;
-    toastSignature = signature;
-    toastAt = now;
+    const onScreen = !!toastEl && toastEl.isConnected && !toastEl.classList.contains("out");
+
+    /* The same message is already showing (double click, retry): keep the
+       single toast and just restart its 3 s auto-dismiss clock. */
+    if (onScreen && toastEl.dataset.signature === signature) {
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl && dismissToast(toastEl), TOAST_DURATION);
+      return;
+    }
 
     /* Reuse a single node so a new message replaces the previous toast
        instead of stacking duplicates on top of each other. */
@@ -95,6 +97,7 @@
 
     toastEl.className = "toast" + (type ? " " + type : "");
     toastEl.textContent = message;
+    toastEl.dataset.signature = signature;
 
     /* restart the entrance animation for the replaced message */
     toastEl.style.animation = "none";
@@ -306,6 +309,7 @@
     step1Player.src = state.videoUrl;
     extractBtn.disabled = false;
     hideDanger();
+    editorSyncMedia(); /* the Step-4 editor stage previews the upload immediately */
     toast("ဗီဒီယိုဖိုင် တင်ပြီးပါပြီ ✓", "ok");
   }
 
@@ -322,6 +326,16 @@
     processingBanner.hidden = true;
     step1Player.removeAttribute("src");
     step1Player.load();
+    const editorStageVideo = editorVideo();
+    if (editorStageVideo) {
+      editorStageVideo.removeAttribute("src");
+      if (typeof editorStageVideo.load === "function") editorStageVideo.load();
+      editorSetPlayLabel(false);
+    }
+    const emptyStage = $("#editorEmpty");
+    if (emptyStage) emptyStage.hidden = false;
+    const stageTime = $("#editorTime");
+    if (stageTime) stageTime.textContent = "00:00 / 00:00";
     extractBtn.disabled = true;
   }
 
@@ -992,6 +1006,9 @@
     $$(".voice-card").forEach((c) => c.classList.toggle("selected", c.dataset.code === code));
     $("#voiceChip").hidden = false;
     $("#voiceChip").textContent = code + " ရွေးပြီး";
+    /* mirror the choice into the video editor's Voice tab */
+    const editorVoice = $("#edVoiceSelect");
+    if (editorVoice) editorVoice.value = code;
     // keep per-line "Global" labels current
     refreshGlobalPicks();
     // re-generation is required after a change
@@ -1138,12 +1155,7 @@
   /* ---------------- Pitch slider ---------------- */
   const pitchSlider = $("#pitchSlider");
   const pitchValue = $("#pitchValue");
-  pitchSlider.addEventListener("input", () => {
-    state.pitch = Number(pitchSlider.value);
-    const v = state.pitch;
-    pitchValue.textContent = fmtPitch(v);
-    refreshGlobalPicks();
-  });
+  pitchSlider.addEventListener("input", () => setPitchOffset(pitchSlider.value));
 
   async function runRenderProgress(label) {
     const bar = $("#renderBar");
@@ -1318,27 +1330,9 @@
     } else {
       $("#resLines").textContent = "—";
     }
+    /* keep the video-editor stage + caption preview in sync */
+    if (typeof editorSyncMedia === "function") editorSyncMedia();
   }
-
-  // fake video progress playback
-  let vpTimer = null;
-  $("#vpPlay").addEventListener("click", () => {
-    const fill = $("#vpProgressFill");
-    if (vpTimer) {
-      clearInterval(vpTimer);
-      vpTimer = null;
-      return;
-    }
-    if (parseFloat(fill.style.width || "0") >= 100) fill.style.width = "0%";
-    vpTimer = setInterval(() => {
-      const w = Math.min(100, parseFloat(fill.style.width || "0") + 1.2);
-      fill.style.width = w + "%";
-      if (w >= 100) {
-        clearInterval(vpTimer);
-        vpTimer = null;
-      }
-    }, 120);
-  });
 
   let amTimer = null;
 
@@ -1424,11 +1418,14 @@
       toast("SRT ထုတ်ရန် Step 3 တွင် မြန်မာ စာသား အရင်ရှိရပါမည်။", "info");
       return;
     }
+    const perLine = Number(editorState && editorState.captions ? editorState.captions.words : 0) || 0;
     const body = lines
       .map((text, i) => {
         const start = i * 7 + 1;
         const end = i * 7 + 7;
-        return `${i + 1}\n${srtTimestamp(start)} --> ${srtTimestamp(end)}\n${text}\n`;
+        /* same wrapping rule as the on-screen captions */
+        const cue = wrapCaptionLines(text, perLine).join("\n");
+        return `${i + 1}\n${srtTimestamp(start)} --> ${srtTimestamp(end)}\n${cue}\n`;
       })
       .join("\n");
     const blob = new Blob(["\uFEFF" + body], { type: "text/plain;charset=utf-8" });
@@ -2153,6 +2150,855 @@
     toast("အကောင့် ထွက်ပြီးပါပြီ", "info");
   });
 
+  /* ============================================================
+     VIDEO EDITOR — subtitle blur overlay · styled captions ·
+     watermark & logo · tabbed right sidebar [Video|Voice|Captions|Extras]
+     ============================================================ */
+
+  const EDITOR_KEY = "rb_editor_v1";
+  const EDITOR_POSITIONS = [
+    "top-left", "top-center", "top-right",
+    "middle-left", "middle-center", "middle-right",
+    "bottom-left", "bottom-center", "bottom-right",
+  ];
+  const MYANMAR_FONTS = [
+    { id: "noto-sans-myanmar", label: "Noto Sans Myanmar", stack: "'Noto Sans Myanmar', 'Padauk', 'Myanmar Text', sans-serif" },
+    { id: "myanmar-black", label: "Myanmar Black", stack: "'Myanmar Black', 'MyanmarBlack', 'Myanmar Sans Pro', 'Noto Sans Myanmar', sans-serif" },
+    { id: "myanmar-pyidaungsu", label: "Myanmar Pyidaungsu", stack: "'Myanmar Pyidaungsu', 'MyanmarPyidaungsu', 'Pyidaungsu', 'Myanmar Text', 'Noto Sans Myanmar', sans-serif" },
+    { id: "padauk", label: "Padauk", stack: "'Padauk', 'Padauk Book', 'Noto Sans Myanmar', sans-serif" },
+    { id: "myanmar-text", label: "Myanmar Text (Windows)", stack: "'Myanmar Text', 'Noto Sans Myanmar', sans-serif" },
+    { id: "system", label: "System UI", stack: "system-ui, -apple-system, 'Segoe UI', sans-serif" },
+  ];
+  const CAPTION_SAMPLE = "မင်္ဂလာပါ၊ ဤသည်မှာ စာတန်း နမူနာ ဖြစ်ပါသည်";
+
+  const EDITOR_DEFAULTS = {
+    activeTab: "video",
+    blur: { enabled: true, strength: 18, fullWidth: false, x: 6, y: 62, w: 88, h: 18 },
+    layers: { blur: true, captions: true, watermark: true, logo: true },
+    stage: { fit: "contain", volume: 100, muted: false },
+    captions: {
+      font: "noto-sans-myanmar", size: 30, color: "#ffffff", outlineColor: "#000000",
+      outlineWidth: 3, box: true, boxColor: "#000000", boxOpacity: 55, y: 88, words: 6,
+    },
+    watermark: { text: "@redbearrecap", size: 20, opacity: 70, position: "bottom-right", move: false },
+    logo: { size: 64, opacity: 90, position: "bottom-left", circle: true },
+  };
+
+  /* logo blobs are per-session only — a blob: URL must never be persisted */
+  const editorRuntime = { logoSrc: "", logoName: "", captionIndex: 0, dragging: false };
+
+  function editorDefaults() {
+    return JSON.parse(JSON.stringify(EDITOR_DEFAULTS));
+  }
+
+  function clampNumber(value, min, max) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return min;
+    return Math.min(max, Math.max(min, num));
+  }
+
+  /** Merge a persisted patch over the defaults, keeping the shape/types. */
+  function mergeEditorState(base, patch) {
+    if (!patch || typeof patch !== "object") return base;
+    for (const key of Object.keys(base)) {
+      const value = patch[key];
+      if (value === undefined || value === null) continue;
+      if (typeof base[key] === "object" && !Array.isArray(base[key])) {
+        if (typeof value === "object") mergeEditorState(base[key], value);
+        continue;
+      }
+      if (typeof base[key] === "boolean") {
+        if (typeof value === "boolean") base[key] = value;
+        else if (value === "true" || value === "false") base[key] = value === "true";
+        continue;
+      }
+      if (typeof base[key] === "number") {
+        const num = Number(value);
+        if (Number.isFinite(num)) base[key] = num;
+        continue;
+      }
+      base[key] = String(value);
+    }
+    return base;
+  }
+
+  function loadEditorState() {
+    const base = editorDefaults();
+    try {
+      const raw = localStorage.getItem(EDITOR_KEY);
+      if (raw) mergeEditorState(base, JSON.parse(raw));
+    } catch (_) {}
+    return base;
+  }
+
+  let editorState = loadEditorState();
+  let editorSaveTimer = null;
+
+  function editorPersist() {
+    try {
+      const snapshot = JSON.parse(JSON.stringify(editorState));
+      localStorage.setItem(EDITOR_KEY, JSON.stringify(snapshot));
+    } catch (_) {}
+  }
+
+  function saveEditorSoon() {
+    if (editorSaveTimer) clearTimeout(editorSaveTimer);
+    editorSaveTimer = setTimeout(editorPersist, 220);
+  }
+
+  function editorFontStack(id) {
+    const font = MYANMAR_FONTS.find((f) => f.id === id) || MYANMAR_FONTS[0];
+    return font.stack;
+  }
+
+  /** Wraps caption text to `limit` words per line (0 = auto / no limit). */
+  function wrapCaptionLines(text, limit) {
+    const clean = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+    if (!clean) return [""];
+    const perLine = Math.round(Number(limit) || 0);
+    if (perLine <= 0) return [clean];
+    const words = clean.split(" ");
+    const lines = [];
+    for (let i = 0; i < words.length; i += perLine) {
+      lines.push(words.slice(i, i + perLine).join(" "));
+    }
+    return lines;
+  }
+
+  function applyPositionClasses(element, position) {
+    if (!element) return;
+    const wanted = EDITOR_POSITIONS.includes(position) ? position : "bottom-right";
+    EDITOR_POSITIONS.forEach((pos) => element.classList.toggle("pos-" + pos, pos === wanted));
+  }
+
+  /** Nine-dot position picker, reused by the watermark and logo controls. */
+  function renderPositionGrid(container, current, onPick) {
+    if (!container) return;
+    container.replaceChildren(...EDITOR_POSITIONS.map((pos) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ed-pos" + (pos === current ? " active" : "");
+      button.dataset.pos = pos;
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", pos === current ? "true" : "false");
+      button.setAttribute("aria-label", pos.replace(/-/g, " "));
+      button.title = pos.replace(/-/g, " ");
+      button.addEventListener("click", () => onPick(pos));
+      return button;
+    }));
+  }
+
+  function refreshPositionGrid(container, current) {
+    if (!container) return;
+    Array.from(container.children).forEach((button) => {
+      const active = button.dataset.pos === current;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-checked", active ? "true" : "false");
+    });
+  }
+
+  /* ---------------- stage helpers ---------------- */
+
+  function editorVideo() {
+    return $("#editorVideo");
+  }
+
+  function editorStageSize() {
+    const stage = $("#editorStage");
+    if (stage && typeof stage.getBoundingClientRect === "function") {
+      const rect = stage.getBoundingClientRect();
+      if (rect && rect.width) return { width: rect.width, height: rect.height || rect.width * 0.5625 };
+    }
+    return { width: 800, height: 450 };
+  }
+
+  function editorDuration() {
+    const video = editorVideo();
+    const media = Number(video && video.duration);
+    if (Number.isFinite(media) && media > 0) return media;
+    if (Number.isFinite(state.durationSec) && state.durationSec > 0) return state.durationSec;
+    return 0;
+  }
+
+  /* ---------------- apply: blur overlay ---------------- */
+
+  function applyBlurBox() {
+    const blur = editorState.blur;
+    const box = $("#ovBlur");
+    if (!box) return;
+
+    box.hidden = !(editorState.layers.blur && blur.enabled);
+    if (blur.fullWidth) {
+      blur.x = 0;
+      blur.w = 100;
+    }
+    box.style.left = blur.x + "%";
+    box.style.top = blur.y + "%";
+    box.style.width = blur.w + "%";
+    box.style.height = blur.h + "%";
+    box.style.backdropFilter = "blur(" + blur.strength + "px)";
+    box.style.webkitBackdropFilter = "blur(" + blur.strength + "px)";
+    box.classList.toggle("full-width", !!blur.fullWidth);
+
+    const badge = $("#badgeBlur");
+    if (badge) badge.textContent = blur.enabled ? "Blur " + blur.strength + "px" : "Blur off";
+
+    const strength = $("#blurStrength");
+    if (strength) strength.value = String(blur.strength);
+    const strengthValue = $("#blurStrengthValue");
+    if (strengthValue) strengthValue.textContent = blur.strength + " px";
+    const enabled = $("#blurEnabled");
+    if (enabled) enabled.checked = !!blur.enabled;
+    const fullWidth = $("#blurFullWidth");
+    if (fullWidth) fullWidth.checked = !!blur.fullWidth;
+    const resetBadge = $("#editorResetBox");
+    if (resetBadge) resetBadge.hidden = !(editorState.layers.blur && blur.enabled);
+  }
+
+  /** Clamp + commit a blur box geometry change. */
+  function setBlurBox(x, y, width, height) {
+    const blur = editorState.blur;
+    const MIN = 6;
+    blur.w = clampNumber(width, MIN, 100);
+    blur.h = clampNumber(height, MIN, 100);
+    blur.x = clampNumber(x, 0, 100 - blur.w);
+    blur.y = clampNumber(y, 0, 100 - blur.h);
+    if (blur.fullWidth) {
+      blur.x = 0;
+      blur.w = 100;
+    }
+    applyBlurBox();
+  }
+
+  /* ---------------- apply: captions ---------------- */
+
+  function hexToRgba(hex, alpha) {
+    const value = String(hex || "").replace("#", "").trim();
+    const full = value.length === 3 ? value.split("").map((c) => c + c).join("") : value.padEnd(6, "0").slice(0, 6);
+    const r = parseInt(full.slice(0, 2), 16) || 0;
+    const g = parseInt(full.slice(2, 4), 16) || 0;
+    const b = parseInt(full.slice(4, 6), 16) || 0;
+    const a = Math.min(1, Math.max(0, Number(alpha)));
+    return `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})`;
+  }
+
+  function applyCaptions() {
+    const caps = editorState.captions;
+    const layer = $("#ovCaptionLayer");
+    const caption = $("#ovCaption");
+    const visible = !!(editorState.layers.captions && caption && caption.children.length);
+    if (layer) {
+      layer.hidden = !editorState.layers.captions;
+      layer.style.top = caps.y + "%";
+    }
+    if (caption) {
+      caption.style.fontFamily = editorFontStack(caps.font);
+      caption.style.fontSize = caps.size + "px";
+      caption.style.color = caps.color;
+      caption.classList.toggle("has-box", !!caps.box);
+      caption.style.setProperty("--cap-bg", hexToRgba(caps.boxColor, caps.boxOpacity / 100));
+      caption.style.setProperty("--cap-outline", caps.outlineColor);
+      caption.style.setProperty("--cap-outline-w", caps.outlineWidth + "px");
+      caption.style.webkitTextStroke = caps.outlineWidth > 0 ? caps.outlineWidth + "px " + caps.outlineColor : "";
+      /* a soft halo behind the strokes keeps stacked Myanmar glyphs readable
+         on busy footage (the webkit stroke alone is centred on the glyph) */
+      caption.style.textShadow = caps.outlineWidth > 0
+        ? "0 0 " + Math.max(2, caps.outlineWidth * 1.5) + "px " + caps.outlineColor
+        : "";
+    }
+    if (layer) layer.classList.toggle("is-off", !visible);
+
+    const bind = (selector, value) => {
+      const input = $(selector);
+      if (input) input.value = String(value);
+    };
+    bind("#capFont", caps.font);
+    bind("#capSize", caps.size);
+    bind("#capColor", caps.color);
+    bind("#capOutlineColor", caps.outlineColor);
+    bind("#capOutlineWidth", caps.outlineWidth);
+    bind("#capBoxColor", caps.boxColor);
+    bind("#capBoxOpacity", caps.boxOpacity);
+    bind("#capY", caps.y);
+    bind("#capWords", caps.words);
+    const box = $("#capBox");
+    if (box) box.checked = !!caps.box;
+
+    const values = {
+      "#capSizeValue": caps.size + " px",
+      "#capOutlineWidthValue": caps.outlineWidth + " px",
+      "#capBoxOpacityValue": caps.boxOpacity + " %",
+      "#capYValue": caps.y + " %",
+      "#capWordsValue": caps.words > 0 ? String(caps.words) : "Auto",
+    };
+    for (const [selector, text] of Object.entries(values)) {
+      const el = $(selector);
+      if (el) el.textContent = text;
+    }
+  }
+
+  function editorCaptionLines() {
+    const plan = (state.voicePlan && state.voicePlan.length) ? state.voicePlan : (state.scriptLines || []);
+    const lines = plan.map((line) => String(line && line.text ? line.text : "").trim()).filter(Boolean);
+    return lines.length ? lines : [CAPTION_SAMPLE];
+  }
+
+  function renderCaptionLines(lines) {
+    const caption = $("#ovCaption");
+    if (!caption) return;
+    caption.replaceChildren(...lines.map((text) => {
+      const span = document.createElement("span");
+      span.className = "cap-line";
+      span.textContent = text;
+      return span;
+    }));
+  }
+
+  /** Show the caption for `time` (seconds) with the current style + wrapping. */
+  function editorRefreshCaptions(time) {
+    const video = editorVideo();
+    const now = Number.isFinite(Number(time)) ? Number(time) : Number((video && video.currentTime) || 0);
+    const lines = editorCaptionLines();
+    const duration = editorDuration();
+    let index = 0;
+    if (duration > 0 && lines.length > 1) {
+      index = Math.min(lines.length - 1, Math.max(0, Math.floor((now / duration) * lines.length)));
+    } else {
+      index = editorRuntime.captionIndex % lines.length;
+    }
+    editorRuntime.captionIndex = index;
+    renderCaptionLines(wrapCaptionLines(lines[index], editorState.captions.words));
+    applyCaptions();
+    const badge = $("#badgeCaption");
+    if (badge) badge.textContent = "Captions · " + (index + 1) + "/" + lines.length;
+  }
+
+  /* ---------------- apply: watermark ---------------- */
+
+  function applyWatermark() {
+    const mark = editorState.watermark;
+    const el = $("#ovWatermark");
+    if (!el) return;
+    const text = String(mark.text || "").trim();
+    el.textContent = text;
+    el.hidden = !(editorState.layers.watermark && text);
+    el.style.fontSize = mark.size + "px";
+    el.style.opacity = String(clampNumber(mark.opacity, 5, 100) / 100);
+    el.classList.toggle("is-moving", !!mark.move);
+    applyPositionClasses(el, mark.position);
+
+    const bind = (selector, value) => {
+      const input = $(selector);
+      if (input) input.value = String(value);
+    };
+    bind("#wmText", mark.text);
+    bind("#wmSize", mark.size);
+    bind("#wmOpacity", mark.opacity);
+    const move = $("#wmMove");
+    if (move) move.checked = !!mark.move;
+    const sizeValue = $("#wmSizeValue");
+    if (sizeValue) sizeValue.textContent = mark.size + " px";
+    const opacityValue = $("#wmOpacityValue");
+    if (opacityValue) opacityValue.textContent = mark.opacity + " %";
+    refreshPositionGrid($("#wmPosGrid"), mark.position);
+  }
+
+  /* ---------------- apply: logo ---------------- */
+
+  function applyLogo() {
+    const logo = editorState.logo;
+    const img = $("#ovLogo");
+    const src = editorRuntime.logoSrc;
+    if (img) {
+      img.hidden = !(editorState.layers.logo && src);
+      img.style.width = logo.size + "px";
+      img.style.height = logo.size + "px";
+      img.style.opacity = String(clampNumber(logo.opacity, 5, 100) / 100);
+      img.classList.toggle("is-circle", !!logo.circle);
+      applyPositionClasses(img, logo.position);
+      if (src) img.src = src;
+      else img.removeAttribute("src");
+    }
+    const thumb = $("#logoThumb");
+    if (thumb) {
+      thumb.hidden = !src;
+      if (src) thumb.src = src;
+    }
+    const name = $("#logoName");
+    if (name) name.textContent = src ? (editorRuntime.logoName || "logo") : "Logo မရွေးရသေးပါ";
+
+    const bind = (selector, value) => {
+      const input = $(selector);
+      if (input) input.value = String(value);
+    };
+    bind("#logoSize", logo.size);
+    bind("#logoOpacity", logo.opacity);
+    const circle = $("#logoCircle");
+    if (circle) circle.checked = !!logo.circle;
+    const sizeValue = $("#logoSizeValue");
+    if (sizeValue) sizeValue.textContent = logo.size + " px";
+    const opacityValue = $("#logoOpacityValue");
+    if (opacityValue) opacityValue.textContent = logo.opacity + " %";
+    refreshPositionGrid($("#logoPosGrid"), logo.position);
+  }
+
+  /* ---------------- apply: layers + stage ---------------- */
+
+  function applyLayers() {
+    const layers = editorState.layers;
+    const map = { "#layerBlur": "blur", "#layerCaptions": "captions", "#layerWatermark": "watermark", "#layerLogo": "logo" };
+    for (const [selector, key] of Object.entries(map)) {
+      const input = $(selector);
+      if (input) input.checked = !!layers[key];
+    }
+  }
+
+  function applyStage() {
+    const stage = editorState.stage;
+    const video = editorVideo();
+    if (video) {
+      video.style.objectFit = stage.fit;
+      video.volume = clampNumber(stage.volume, 0, 100) / 100;
+      video.muted = !!stage.muted;
+    }
+    const fit = $("#stageFit");
+    if (fit) fit.value = stage.fit;
+    const volume = $("#edVolume");
+    if (volume) volume.value = String(stage.volume);
+    const volumeValue = $("#edVolumeValue");
+    if (volumeValue) volumeValue.textContent = stage.volume + " %";
+    const mute = $("#edMute");
+    if (mute) mute.checked = !!stage.muted;
+  }
+
+  function applyEditorAll() {
+    applyBlurBox();
+    applyCaptions();
+    applyWatermark();
+    applyLogo();
+    applyLayers();
+    applyStage();
+  }
+
+  /* ---------------- media + playback ---------------- */
+
+  function editorSyncMedia() {
+    const video = editorVideo();
+    if (video && state.videoUrl && video.src !== state.videoUrl) video.src = state.videoUrl;
+    const empty = $("#editorEmpty");
+    if (empty) empty.hidden = !!state.videoUrl;
+    applyStage();
+    editorRefreshCaptions();
+    editorUpdateTime();
+  }
+
+  function editorUpdateTime() {
+    const video = editorVideo();
+    const time = Number((video && video.currentTime) || 0);
+    const duration = editorDuration();
+    const label = $("#editorTime");
+    if (label) label.textContent = fmtClock(time) + " / " + fmtClock(duration);
+    const scrub = $("#editorScrub");
+    if (scrub && duration > 0) scrub.value = String(Math.round((time / duration) * 1000));
+  }
+
+  function editorSetPlayLabel(playing) {
+    const button = $("#editorPlay");
+    if (button) button.textContent = playing ? "❚❚" : "▶";
+  }
+
+  /* ---------------- drag & resize (pointer events) ---------------- */
+
+  function beginBlurGesture(event, mode, handle) {
+    if (!event) return;
+    const blur = editorState.blur;
+    if (!editorState.layers.blur || !blur.enabled) return;
+    if (typeof event.preventDefault === "function") event.preventDefault();
+    if (typeof event.stopPropagation === "function") event.stopPropagation();
+
+    const size = editorStageSize();
+    const startX = Number(event.clientX) || 0;
+    const startY = Number(event.clientY) || 0;
+    const start = { x: blur.x, y: blur.y, w: blur.w, h: blur.h };
+    const pointerId = event.pointerId;
+    const box = $("#ovBlur");
+
+    editorRuntime.dragging = true;
+    if (box) {
+      box.classList.add("dragging");
+      if (pointerId !== undefined && typeof box.setPointerCapture === "function") {
+        try { box.setPointerCapture(pointerId); } catch (_) {}
+      }
+    }
+
+    const onMove = (moveEvent) => {
+      const dx = ((Number(moveEvent.clientX) || 0) - startX) / size.width * 100;
+      const dy = ((Number(moveEvent.clientY) || 0) - startY) / size.height * 100;
+      if (mode === "move") {
+        setBlurBox(start.x + dx, start.y + dy, start.w, start.h);
+        return;
+      }
+      let x = start.x;
+      let y = start.y;
+      let w = start.w;
+      let h = start.h;
+      if (handle.includes("e")) w = start.w + dx;
+      if (handle.includes("s")) h = start.h + dy;
+      if (handle.includes("w")) { w = start.w - dx; x = start.x + dx; }
+      if (handle.includes("n")) { h = start.h - dy; y = start.y + dy; }
+      if (w < 6) { if (handle.includes("w")) x = start.x + start.w - 6; w = 6; }
+      if (h < 6) { if (handle.includes("n")) y = start.y + start.h - 6; h = 6; }
+      setBlurBox(x, y, w, h);
+    };
+
+    const finish = () => {
+      editorRuntime.dragging = false;
+      if (box) {
+        box.classList.remove("dragging");
+        if (pointerId !== undefined && typeof box.releasePointerCapture === "function") {
+          try { box.releasePointerCapture(pointerId); } catch (_) {}
+        }
+      }
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      saveEditorSoon();
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  }
+
+  /* ---------------- tabs ---------------- */
+
+  function editorSetTab(name) {
+    const known = ["video", "voice", "captions", "extras"];
+    const tab = known.includes(name) ? name : "video";
+    $$(".editor-tab").forEach((button) => {
+      const active = button.dataset.tab === tab;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    $$(".editor-panel").forEach((panel) => panel.classList.toggle("active", panel.dataset.panel === tab));
+    editorState.activeTab = tab;
+    saveEditorSoon();
+  }
+
+  /* ---------------- wiring ---------------- */
+
+  function editorBindControls() {
+    /* --- tabs --- */
+    $$(".editor-tab").forEach((button) => {
+      button.addEventListener("click", () => editorSetTab(button.dataset.tab));
+    });
+
+    /* --- blur overlay --- */
+    const box = $("#ovBlur");
+    if (box) {
+      box.addEventListener("pointerdown", (event) => {
+        if (event.target && event.target.classList && event.target.classList.contains("ov-handle")) return;
+        beginBlurGesture(event, "move", "");
+      });
+      box.addEventListener("keydown", (event) => {
+        const step = event.shiftKey ? 5 : 1;
+        const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+        const delta = moves[event.key];
+        if (!delta) return;
+        event.preventDefault();
+        setBlurBox(editorState.blur.x + delta[0], editorState.blur.y + delta[1], editorState.blur.w, editorState.blur.h);
+        saveEditorSoon();
+      });
+      Array.from(box.querySelectorAll(".ov-handle")).forEach((handleEl) => {
+        handleEl.addEventListener("pointerdown", (event) => beginBlurGesture(event, "resize", handleEl.dataset.handle || ""));
+      });
+    }
+
+    const bindCheck = (selector, onChange) => {
+      const input = $(selector);
+      if (input) input.addEventListener("change", () => onChange(!!input.checked));
+    };
+    const bindValue = (selector, onChange) => {
+      const input = $(selector);
+      if (input) input.addEventListener("input", () => onChange(input.value));
+    };
+
+    bindCheck("#blurEnabled", (value) => { editorState.blur.enabled = value; applyBlurBox(); saveEditorSoon(); });
+    bindValue("#blurStrength", (value) => {
+      editorState.blur.strength = clampNumber(value, 10, 30);
+      applyBlurBox();
+      saveEditorSoon();
+    });
+    bindCheck("#blurFullWidth", (value) => {
+      editorState.blur.fullWidth = value;
+      if (value) { editorState.blur.x = 0; editorState.blur.w = 100; }
+      applyBlurBox();
+      saveEditorSoon();
+    });
+
+    const preset = (selector, patch) => {
+      const button = $(selector);
+      if (button) {
+        button.addEventListener("click", () => {
+          Object.assign(editorState.blur, patch);
+          applyBlurBox();
+          saveEditorSoon();
+        });
+      }
+    };
+    preset("#blurPresetBottom", { x: 0, y: 70, w: 100, h: 24, fullWidth: true, enabled: true });
+    preset("#blurPresetLower", { x: 6, y: 58, w: 88, h: 26, fullWidth: false, enabled: true });
+    const resetBox = $("#blurReset");
+    if (resetBox) {
+      resetBox.addEventListener("click", () => {
+        editorState.blur = editorDefaults().blur;
+        applyBlurBox();
+        saveEditorSoon();
+      });
+    }
+    const resetBoxInline = $("#editorResetBox");
+    if (resetBoxInline) {
+      resetBoxInline.addEventListener("click", () => {
+        editorState.blur = editorDefaults().blur;
+        applyBlurBox();
+        saveEditorSoon();
+      });
+    }
+
+    /* --- overlay layers --- */
+    bindCheck("#layerBlur", (value) => { editorState.layers.blur = value; applyBlurBox(); saveEditorSoon(); });
+    bindCheck("#layerCaptions", (value) => { editorState.layers.captions = value; applyCaptions(); saveEditorSoon(); });
+    bindCheck("#layerWatermark", (value) => { editorState.layers.watermark = value; applyWatermark(); saveEditorSoon(); });
+    bindCheck("#layerLogo", (value) => { editorState.layers.logo = value; applyLogo(); saveEditorSoon(); });
+
+    const fit = $("#stageFit");
+    if (fit) {
+      fit.addEventListener("change", () => { editorState.stage.fit = fit.value; applyStage(); saveEditorSoon(); });
+    }
+    const resetAll = $("#editorResetAll");
+    if (resetAll) {
+      resetAll.addEventListener("click", () => {
+        const tab = editorState.activeTab;
+        editorState = editorDefaults();
+        editorState.activeTab = tab;
+        if (editorRuntime.logoSrc) {
+          URL.revokeObjectURL(editorRuntime.logoSrc);
+          editorRuntime.logoSrc = "";
+          editorRuntime.logoName = "";
+        }
+        editorRuntime.captionIndex = 0;
+        applyEditorAll();
+        editorSyncMedia();
+        editorPersist();
+        toast("Editor settings အားလုံး ပြန်လည် သတ်မှတ်ပြီးပါပြီ ✓", "ok");
+      });
+    }
+
+    /* --- voice tab --- */
+    const voiceSelect = $("#edVoiceSelect");
+    if (voiceSelect) {
+      voiceSelect.replaceChildren(...VOICES.map((v) => {
+        const option = document.createElement("option");
+        option.value = v.code;
+        option.textContent = `${v.code} — ${v.name} (${voiceGenderLabel(v)})`;
+        return option;
+      }));
+      voiceSelect.addEventListener("change", () => selectVoice(voiceSelect.value));
+    }
+    const voicePreview = $("#edVoicePreview");
+    if (voicePreview) {
+      voicePreview.addEventListener("click", () => {
+        const persona = VOICES.find((v) => v.code === state.voice) || VOICES[0];
+        previewVoice(persona, voicePreview);
+      });
+    }
+    bindValue("#edPitch", (value) => setPitchOffset(value));
+    bindValue("#edVolume", (value) => {
+      editorState.stage.volume = clampNumber(value, 0, 100);
+      applyStage();
+      saveEditorSoon();
+    });
+    bindCheck("#edMute", (value) => { editorState.stage.muted = value; applyStage(); saveEditorSoon(); });
+
+    /* --- captions tab --- */
+    const fontSelect = $("#capFont");
+    if (fontSelect) {
+      fontSelect.replaceChildren(...MYANMAR_FONTS.map((font) => {
+        const option = document.createElement("option");
+        option.value = font.id;
+        option.textContent = font.label;
+        return option;
+      }));
+      fontSelect.addEventListener("change", () => {
+        editorState.captions.font = fontSelect.value;
+        applyCaptions();
+        saveEditorSoon();
+      });
+    }
+    bindValue("#capSize", (value) => { editorState.captions.size = clampNumber(value, 14, 72); applyCaptions(); saveEditorSoon(); });
+    bindValue("#capColor", (value) => { editorState.captions.color = value; applyCaptions(); saveEditorSoon(); });
+    bindValue("#capOutlineColor", (value) => { editorState.captions.outlineColor = value; applyCaptions(); saveEditorSoon(); });
+    bindValue("#capOutlineWidth", (value) => { editorState.captions.outlineWidth = clampNumber(value, 0, 8); applyCaptions(); saveEditorSoon(); });
+    bindCheck("#capBox", (value) => { editorState.captions.box = value; applyCaptions(); saveEditorSoon(); });
+    bindValue("#capBoxColor", (value) => { editorState.captions.boxColor = value; applyCaptions(); saveEditorSoon(); });
+    bindValue("#capBoxOpacity", (value) => { editorState.captions.boxOpacity = clampNumber(value, 0, 100); applyCaptions(); saveEditorSoon(); });
+    bindValue("#capY", (value) => { editorState.captions.y = clampNumber(value, 0, 100); applyCaptions(); saveEditorSoon(); });
+    bindValue("#capWords", (value) => {
+      editorState.captions.words = clampNumber(value, 0, 12);
+      applyCaptions();
+      editorRefreshCaptions();
+      saveEditorSoon();
+    });
+    $$("[data-cap-pos]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const presetY = { top: 12, middle: 50, bottom: 88 };
+        editorState.captions.y = presetY[button.dataset.capPos] || 88;
+        applyCaptions();
+        saveEditorSoon();
+      });
+    });
+
+    /* --- extras: watermark --- */
+    const wmText = $("#wmText");
+    if (wmText) {
+      wmText.addEventListener("input", () => {
+        editorState.watermark.text = wmText.value;
+        applyWatermark();
+        saveEditorSoon();
+      });
+    }
+    bindValue("#wmSize", (value) => { editorState.watermark.size = clampNumber(value, 10, 48); applyWatermark(); saveEditorSoon(); });
+    bindValue("#wmOpacity", (value) => { editorState.watermark.opacity = clampNumber(value, 5, 100); applyWatermark(); saveEditorSoon(); });
+    bindCheck("#wmMove", (value) => { editorState.watermark.move = value; applyWatermark(); saveEditorSoon(); });
+    renderPositionGrid($("#wmPosGrid"), editorState.watermark.position, (position) => {
+      editorState.watermark.position = position;
+      applyWatermark();
+      saveEditorSoon();
+    });
+
+    /* --- extras: logo --- */
+    const logoInput = $("#logoInput");
+    const logoPick = $("#logoPick");
+    if (logoPick && logoInput) logoPick.addEventListener("click", () => logoInput.click());
+    if (logoInput) {
+      logoInput.addEventListener("change", () => {
+        const file = logoInput.files && logoInput.files[0];
+        if (!file) return;
+        if (!/^image\//i.test(String(file.type || ""))) {
+          toast("ပုံဖိုင် (PNG/JPG/WEBP/SVG) များသာ ရွေးနိုင်ပါသည်။", "err");
+          logoInput.value = "";
+          return;
+        }
+        if (editorRuntime.logoSrc) URL.revokeObjectURL(editorRuntime.logoSrc);
+        editorRuntime.logoSrc = URL.createObjectURL(file);
+        editorRuntime.logoName = file.name || "logo";
+        editorState.layers.logo = true;
+        applyLayers();
+        applyLogo();
+        toast("Logo ထည့်ပြီးပါပြီ ✓", "ok");
+      });
+    }
+    const logoRemove = $("#logoRemove");
+    if (logoRemove) {
+      logoRemove.addEventListener("click", () => {
+        if (editorRuntime.logoSrc) URL.revokeObjectURL(editorRuntime.logoSrc);
+        editorRuntime.logoSrc = "";
+        editorRuntime.logoName = "";
+        const input = $("#logoInput");
+        if (input) input.value = "";
+        applyLogo();
+        toast("Logo ဖယ်ရှားပြီးပါပြီ", "info");
+      });
+    }
+    bindValue("#logoSize", (value) => { editorState.logo.size = clampNumber(value, 24, 180); applyLogo(); saveEditorSoon(); });
+    bindValue("#logoOpacity", (value) => { editorState.logo.opacity = clampNumber(value, 5, 100); applyLogo(); saveEditorSoon(); });
+    bindCheck("#logoCircle", (value) => { editorState.logo.circle = value; applyLogo(); saveEditorSoon(); });
+    renderPositionGrid($("#logoPosGrid"), editorState.logo.position, (position) => {
+      editorState.logo.position = position;
+      applyLogo();
+      saveEditorSoon();
+    });
+
+    /* --- stage bar --- */
+    const play = $("#editorPlay");
+    if (play) {
+      play.addEventListener("click", () => {
+        const video = editorVideo();
+        if (!video) return;
+        if (video.paused) {
+          const started = video.play();
+          if (started && typeof started.catch === "function") {
+            started.catch((error) => console.warn("[Red Bear] Editor playback failed", error));
+          }
+        } else {
+          video.pause();
+        }
+        editorSetPlayLabel(!video.paused);
+      });
+    }
+    const scrub = $("#editorScrub");
+    if (scrub) {
+      scrub.addEventListener("input", () => {
+        const video = editorVideo();
+        const duration = editorDuration();
+        if (!video || duration <= 0) return;
+        video.currentTime = (Number(scrub.value) / 1000) * duration;
+        editorRefreshCaptions(video.currentTime);
+        editorUpdateTime();
+      });
+    }
+    const fullscreen = $("#editorFullscreen");
+    if (fullscreen) {
+      fullscreen.addEventListener("click", () => {
+        const stage = $("#editorStage");
+        if (!stage) return;
+        if (document.fullscreenElement && typeof document.exitFullscreen === "function") {
+          document.exitFullscreen();
+          return;
+        }
+        if (typeof stage.requestFullscreen === "function") {
+          const requested = stage.requestFullscreen();
+          if (requested && typeof requested.catch === "function") requested.catch(() => {});
+        }
+      });
+    }
+
+    const video = editorVideo();
+    if (video) {
+      video.addEventListener("play", () => editorSetPlayLabel(true));
+      video.addEventListener("pause", () => editorSetPlayLabel(false));
+      video.addEventListener("timeupdate", () => {
+        editorRefreshCaptions(video.currentTime);
+        editorUpdateTime();
+      });
+      video.addEventListener("loadedmetadata", () => {
+        editorUpdateTime();
+        editorRefreshCaptions(video.currentTime);
+      });
+    }
+  }
+
+  /** Single entry point used by the step-3 pitch slider and the editor. */
+  function setPitchOffset(value) {
+    state.pitch = clampNumber(Math.round(Number(value) || 0), -30, 30);
+    const label = fmtPitch(state.pitch);
+    if (pitchSlider) pitchSlider.value = String(state.pitch);
+    if (pitchValue) pitchValue.textContent = label;
+    const edPitch = $("#edPitch");
+    if (edPitch) edPitch.value = String(state.pitch);
+    const edPitchValue = $("#edPitchValue");
+    if (edPitchValue) edPitchValue.textContent = label;
+    refreshGlobalPicks();
+  }
+
+  function editorInit() {
+    editorBindControls();
+    editorSetTab(editorState.activeTab || "video");
+    applyEditorAll();
+    editorSyncMedia();
+    editorSetPlayLabel(false);
+  }
+
   /* ---------------- Init ---------------- */
   loadUser();
   renderAuth();
@@ -2161,4 +3007,5 @@
   renderQuota();
   updateStepsUI();
   renderHistory();
+  editorInit();
 })();

@@ -27,7 +27,7 @@ upstreams answer normally — no CORS, no client-IP 403.
 
 ```bash
 npm start            # → http://localhost:4173
-npm test             # 40 dependency-free tests (Node ≥ 18 built-in runner)
+npm test             # 66 dependency-free tests (Node ≥ 18 built-in runner)
 ```
 
 No `npm install` is required — there are **zero dependencies** (the WebSocket
@@ -105,8 +105,36 @@ lib/tts/personas.js     voice registry  ·  lib/tts/text.js  normalisation
 lib/tts/cache.js        in-memory LRU (96 entries / 16 MB / 30 min)
 lib/ws/{frames,client}.js  minimal RFC 6455 codec + client (custom headers)
 app.js                  front-end: one POST to /api/tts, Blob → ObjectURL → Audio
-test/                   40 tests: codec, provider, HTTP route, DOM behaviour
+test/                   66 tests: codec, provider, HTTP route, DOM behaviour, editor
 ```
+
+## Video editor (Step 4)
+
+The result step is a real editor: a 16:9 stage with draggable overlay layers and
+a tabbed inspector — **[🎬 Video] [🎙️ Voice] [💬 Captions] [⭐ Extras]**.
+
+| Tab | Controls |
+| --- | --- |
+| 🎬 Video | **Smart subtitle blur box** (drag to move, 8 resize handles, keyboard nudge), blur strength `10–30px`, full-width band toggle, bottom/lower-third presets, per-layer visibility, video fit (`contain`/`cover`) |
+| 🎙️ Voice | persona picker (mirrors the Step 3 cards), pitch offset, original-audio volume + mute |
+| 💬 Captions | Myanmar font family (Noto Sans Myanmar · Myanmar Black · Myanmar Pyidaungsu · Padauk · Myanmar Text), size, text colour, outline colour + width, background box with colour & opacity, vertical position (slider + top/middle/bottom presets), words-per-line wrapping |
+| ⭐ Extras | text watermark (text, size, opacity, 3×3 position grid, "moves around screen"), circle image logo (upload, size, opacity, position, circle mask) |
+
+Everything is applied live over the video and persisted to `localStorage`
+under `rb_editor_v1` (logo blobs stay in memory — a `blob:` URL is never
+persisted). The **words-per-line** limit is reused by the `.srt` export so the
+burned-in captions and the subtitle file wrap identically.
+
+**Blur box** — the box is positioned in stage-relative percentages, so it tracks
+the video at any size. It uses `backdrop-filter: blur(Npx)` over the `moz`/`webkit`
+prefixes, can be dragged with the pointer (or arrow keys, `Shift` for 5% steps),
+resized from any of the eight handles (6% minimum) and clamped so it can never
+leave the stage. Alt-drag is not required, and the box is quick-resettable from
+the badge on the stage.
+
+**Watermark** — nine static positions (`pos-top-left` … `pos-bottom-right`); the
+"moves around screen" toggle swaps the static anchor for the `wmOrbit`
+keyframes animation (TikTok-style corner hopping).
 
 ## Front-end behaviour
 
@@ -119,6 +147,8 @@ test/                   40 tests: codec, provider, HTTP route, DOM behaviour
   bursts inside 600 ms are collapsed.
 * **Graceful degradation** — if the route is unreachable (e.g. the page is
   opened as a static file), previews fall back to `speechSynthesis`.
+* **Editor persistence** — blur geometry, caption styling, watermark and logo
+  settings survive a reload via `localStorage` (`rb_editor_v1`).
 
 ## Configuration
 

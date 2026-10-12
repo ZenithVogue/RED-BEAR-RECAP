@@ -14,18 +14,44 @@ const vm = require("vm");
 
 /* ---------------- selectors ---------------- */
 
+const SELECTOR_PART = /^([a-zA-Z][\w-]*)?(?:#([\w:-]+))?((?:\.[\w-]+)*)((?:\[[^\]]+\])*)$/;
+
+function parseAttributes(text) {
+  const attributes = [];
+  for (const token of String(text || "").matchAll(/\[([^\]=]+)(?:=("([^"]*)"|([^\]]*)))?\]/g)) {
+    attributes.push({
+      name: token[1].trim().toLowerCase(),
+      value: token[3] !== undefined ? token[3] : (token[4] !== undefined ? token[4].trim() : null),
+      present: token[2] === undefined,
+    });
+  }
+  return attributes;
+}
+
 function parseSelector(selector) {
   return String(selector).trim().split(/\s+/).map((part) => {
-    const match = part.match(/^([a-zA-Z][\w-]*)?(?:#([\w:-]+))?((?:\.[\w-]+)*)$/);
-    const classes = match && match[3] ? match[3].split(".").filter(Boolean) : [];
-    return { tag: match && match[1] ? match[1].toLowerCase() : null, id: match && match[2] ? match[2] : null, classes };
+    const match = part.match(SELECTOR_PART);
+    if (!match) return { tag: null, id: null, classes: [], attributes: [] };
+    const classes = match[3] ? match[3].split(".").filter(Boolean) : [];
+    return {
+      tag: match[1] ? match[1].toLowerCase() : null,
+      id: match[2] || null,
+      classes,
+      attributes: parseAttributes(match[4]),
+    };
   });
 }
 
 function matchesSimple(element, part) {
   if (part.tag && element.tagName !== part.tag) return false;
   if (part.id && element.id !== part.id) return false;
-  return part.classes.every((cls) => element.classList.contains(cls));
+  if (part.classes.length && !part.classes.every((cls) => element.classList.contains(cls))) return false;
+  for (const attribute of part.attributes) {
+    const actual = element.getAttribute(attribute.name);
+    if (actual === null) return false;
+    if (!attribute.present && attribute.value !== null && actual !== attribute.value) return false;
+  }
+  return true;
 }
 
 function matchesSelector(element, selector) {
@@ -126,6 +152,35 @@ class MiniClassList {
   get value() { return Array.from(this.set).join(" "); }
 }
 
+/** `dataset` is a live view over `data-*` attributes, like the real DOM. */
+function createDataset(element) {
+  const toAttribute = (prop) => "data-" + String(prop).replace(/[A-Z]/g, (char) => "-" + char.toLowerCase());
+  const toProperty = (attr) => attr.slice(5).replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+  const dataKeys = () => Array.from(element.attributes.keys())
+    .filter((key) => key.startsWith("data-"))
+    .map(toProperty);
+
+  return new Proxy({}, {
+    get(_target, prop) {
+      if (prop === "toString") return () => "[object DOMStringMap]";
+      if (typeof prop !== "string") return undefined;
+      const value = element.attributes.get(toAttribute(prop));
+      return value === undefined ? undefined : value;
+    },
+    set(_target, prop, value) {
+      element.attributes.set(toAttribute(prop), String(value));
+      return true;
+    },
+    has(_target, prop) { return element.attributes.has(toAttribute(prop)); },
+    deleteProperty(_target, prop) { return element.attributes.delete(toAttribute(prop)); },
+    ownKeys() { return dataKeys(); },
+    getOwnPropertyDescriptor(_target, prop) {
+      if (typeof prop !== "string" || !element.attributes.has(toAttribute(prop))) return undefined;
+      return { enumerable: true, configurable: true, value: element.attributes.get(toAttribute(prop)) };
+    },
+  });
+}
+
 function createStyle() {
   const style = {
     setProperty(name, value) { style[name] = String(value); },
@@ -146,7 +201,7 @@ class MiniElement {
     this.listeners = new Map();
     this.classList = new MiniClassList(this);
     this.style = createStyle();
-    this.dataset = {};
+    this.dataset = createDataset(this);
     this._textContent = "";
     this._innerHTML = "";
     this._id = "";
@@ -157,6 +212,9 @@ class MiniElement {
     this.title = "";
     this.checked = false;
     this.offsetWidth = 0;
+    this.paused = true;
+    this.currentTime = 0;
+    this.duration = NaN;
     this.isFragment = !!options.fragment;
   }
 
@@ -171,6 +229,14 @@ class MiniElement {
   }
 
   get tag() { return this.tagName; }
+
+  /* `src` mirrors the attribute, like real media/img elements — so
+     `removeAttribute("src")` clears the property as the browser does. */
+  get src() { return this.getAttribute("src") || ""; }
+  set src(value) {
+    if (value === "" || value === null || value === undefined) this.removeAttribute("src");
+    else this.setAttribute("src", String(value));
+  }
 
   setAttribute(name, value) {
     const key = String(name);
@@ -307,6 +373,7 @@ class MiniElement {
       node = node.parentElement;
     }
     this.ownerDocument._dispatchToDocument(type, event);
+    this.ownerDocument._dispatchToWindow(type, event);
     return event;
   }
 
@@ -316,8 +383,19 @@ class MiniElement {
   scrollIntoView() {}
   setSelectionRange() {}
   select() {}
-  pause() {}
-  play() { return Promise.resolve(); }
+  pause() { this.paused = true; }
+  play() { this.paused = false; return Promise.resolve(); }
+  load() { this.currentTime = 0; }
+  setPointerCapture() {}
+  releasePointerCapture() {}
+  requestFullscreen() { return Promise.resolve(); }
+  /** Geometry: tests may pin a rect with `element._rect = { width, height }`. */
+  getBoundingClientRect() {
+    const rect = this._rect || {};
+    const width = Number(rect.width) || 800;
+    const height = Number(rect.height) || 450;
+    return { width, height, top: rect.top || 0, left: rect.left || 0, right: width, bottom: height, x: 0, y: 0 };
+  }
 }
 
 /* ---------------- document + window ---------------- */
@@ -340,6 +418,9 @@ function createMiniDom(html) {
     _dispatchToDocument(type, event) {
       for (const handler of document.listeners.get(type) || []) handler(event);
     },
+    _dispatchToWindow(type, event) {
+      if (document.defaultView) document.defaultView._dispatch(type, event);
+    },
     createElement(tag, options) {
       const element = new MiniElement(tag, document, options);
       if (!options || !options.fragment) return element;
@@ -351,7 +432,17 @@ function createMiniDom(html) {
       node.nodeType = 3;
       return node;
     },
-    getElementById(id) { return document.ids.get(String(id)) || null; },
+    getElementById(id) {
+      const key = String(id);
+      const cached = document.ids.get(key);
+      if (cached && cached.isConnected) return cached;
+      const live = document.querySelectorAll("#" + key)[0];
+      if (live) {
+        document.ids.set(key, live);
+        return live;
+      }
+      return cached || null;
+    },
     querySelectorAll(selector) {
       const found = [];
       walk(document.body, (element) => {
@@ -378,6 +469,8 @@ function createMiniDom(html) {
       document.listeners.get(type).push(handler);
     },
     execCommand() { return true; },
+    fullscreenElement: null,
+    exitFullscreen() { document.fullscreenElement = null; return Promise.resolve(); },
   };
 
   document.documentElement = document.createElement("html");
@@ -385,16 +478,20 @@ function createMiniDom(html) {
   document.body.tagName = "body";
   document.documentElement.appendChild(document.body);
 
-  /* Pre-register every id declared in index.html. */
-  const ids = Array.from(html.matchAll(/\sid="([^"]+)"/g)).map((m) => m[1]);
-  const trees = new Map();
-  for (const id of ids) {
-    const element = document.createElement("div");
-    element.id = id;
-    document.ids.set(id, element);
-    document.body.appendChild(element);
-    trees.set(id, element);
+  /* Parse the real <body> markup so every panel, tab and control exists. */
+  const bodyMatch = String(html).match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const bodyMarkup = bodyMatch ? bodyMatch[1] : String(html);
+  for (const node of parseHtml(bodyMarkup, document)) {
+    node.parentElement = document.body;
+    document.body.childNodes.push(node);
+    if (node.nodeType !== 3) document.body.children.push(node);
   }
+
+  /* Index every declared id from the parsed tree (and keep the on-demand
+     fallback so app.js hooks added later still resolve). */
+  walk(document.body, (element) => {
+    if (element.id) document.ids.set(element.id, element);
+  });
 
   /* Voice grids are injected by app.js through these containers. */
   document.voiceGrid = document.ids.get("voiceGrid") || document.querySelector("#voiceGrid");
@@ -403,10 +500,36 @@ function createMiniDom(html) {
   const clock = createClock();
   const blobs = [];
 
+  const windowListeners = new Map();
+
   const window = {
     document,
-    addEventListener: document.addEventListener,
-    removeEventListener() {},
+    _dispatch(type, event) {
+      for (const handler of (windowListeners.get(type) || []).slice()) handler.call(window, event);
+    },
+    addEventListener(type, handler) {
+      if (!windowListeners.has(type)) windowListeners.set(type, []);
+      windowListeners.get(type).push(handler);
+    },
+    removeEventListener(type, handler) {
+      const list = windowListeners.get(type) || [];
+      windowListeners.set(type, list.filter((fn) => fn !== handler));
+    },
+    /** Drive window-level events from a test (e.g. an in-flight pointer drag). */
+    dispatch(type, properties = {}) {
+      const event = {
+        type,
+        target: window,
+        currentTarget: window,
+        defaultPrevented: false,
+        propagationStopped: false,
+        preventDefault() { this.defaultPrevented = true; },
+        stopPropagation() { this.propagationStopped = true; },
+        ...properties,
+      };
+      window._dispatch(type, event);
+      return event;
+    },
     scrollTo() {},
     open() {},
     location: { href: "http://localhost:4173/", origin: "http://localhost:4173" },
@@ -424,6 +547,7 @@ function createMiniDom(html) {
     prompt: () => null,
   };
   window.window = window;
+  document.defaultView = window;
 
   return { document, window, clock, blobs };
 }
@@ -482,7 +606,7 @@ function loadApp(options = {}) {
 
   const { document, window, clock } = createMiniDom(html);
 
-  const storage = new Map();
+  const storage = new Map(options.storage instanceof Map ? options.storage : []);
   const localStorage = {
     getItem: (key) => (storage.has(String(key)) ? storage.get(String(key)) : null),
     setItem: (key, value) => storage.set(String(key), String(value)),
@@ -490,6 +614,8 @@ function loadApp(options = {}) {
     clear: () => storage.clear(),
     key: (i) => Array.from(storage.keys())[i] || null,
     get length() { return storage.size; },
+    /** Hand the backing map to another instance (simulates a reload). */
+    raw: () => new Map(storage),
   };
 
   const fetchCalls = [];

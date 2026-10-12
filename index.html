@@ -292,17 +292,317 @@
                 <span class="chip chip-green">✓ ပြီးစီးပါပြီ</span>
               </div>
 
-              <div class="result-grid">
-                <div class="video-preview" id="videoPreview">
-                  <div class="vp-screen">
-                    <button class="vp-play" id="vpPlay" type="button" aria-label="Play preview">
-                      <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor"><path d="M8 5.5v13l11-6.5-11-6.5z"/></svg>
-                    </button>
-                    <span class="vp-tag">Dubbed Preview</span>
+              <!-- ================= VIDEO EDITOR: STAGE + INSPECTOR ================= -->
+              <div class="editor" id="videoEditor">
+                <!-- ---------- STAGE ---------- -->
+                <div class="editor-stage-col">
+                  <div class="editor-stage" id="editorStage">
+                    <video class="editor-video" id="editorVideo" playsinline preload="metadata"></video>
+
+                    <div class="editor-empty" id="editorEmpty">
+                      <span class="editor-empty-icon" aria-hidden="true">🎬</span>
+                      <span>Step 1 တွင် ဗီဒီယိုတင်ပြီးပါက ဤနေရာတွင် တိုက်ရိုက် Preview ပေါ်လာပါမည်</span>
+                    </div>
+
+                    <div class="editor-overlay" id="editorOverlay">
+                      <!-- Smart subtitle blur box (draggable + resizable) -->
+                      <div class="ov-blur" id="ovBlur" tabindex="0" role="button"
+                           aria-label="Subtitle blur box — drag to move, handles to resize">
+                        <span class="ov-blur-tag">BLUR</span>
+                        <span class="ov-handle" data-handle="nw" aria-hidden="true"></span>
+                        <span class="ov-handle" data-handle="n"  aria-hidden="true"></span>
+                        <span class="ov-handle" data-handle="ne" aria-hidden="true"></span>
+                        <span class="ov-handle" data-handle="e"  aria-hidden="true"></span>
+                        <span class="ov-handle" data-handle="se" aria-hidden="true"></span>
+                        <span class="ov-handle" data-handle="s"  aria-hidden="true"></span>
+                        <span class="ov-handle" data-handle="sw" aria-hidden="true"></span>
+                        <span class="ov-handle" data-handle="w"  aria-hidden="true"></span>
+                      </div>
+
+                      <!-- Styled captions -->
+                      <div class="ov-caption-layer" id="ovCaptionLayer">
+                        <span class="ov-caption" id="ovCaption"></span>
+                      </div>
+
+                      <!-- Text watermark -->
+                      <div class="ov-watermark pos-bottom-right" id="ovWatermark">@redbearrecap</div>
+
+                      <!-- Image logo -->
+                      <img class="ov-logo pos-bottom-left" id="ovLogo" alt="Logo overlay" hidden />
+                    </div>
+
+                    <div class="editor-badge-bar">
+                      <span class="editor-badge" id="badgeBlur">Blur 18px</span>
+                      <span class="editor-badge" id="badgeCaption">Captions</span>
+                      <button class="editor-badge editor-badge-action" id="editorResetBox" type="button" hidden>↺ Reset box</button>
+                    </div>
                   </div>
-                  <div class="vp-progress"><span id="vpProgressFill"></span></div>
+
+                  <div class="editor-stage-bar">
+                    <button class="eb-play" id="editorPlay" type="button" aria-label="Play video">▶</button>
+                    <span class="eb-time" id="editorTime">00:00 / 00:00</span>
+                    <input type="range" class="eb-scrub" id="editorScrub" min="0" max="1000" step="1" value="0"
+                           aria-label="Seek video" />
+                    <button class="eb-ghost" id="editorFullscreen" type="button" aria-label="Toggle fullscreen">⛶</button>
+                  </div>
                 </div>
 
+                <!-- ---------- RIGHT SIDEBAR: INSPECTOR TABS ---------- -->
+                <aside class="editor-inspector" id="editorInspector">
+                  <div class="editor-tabs" role="tablist" aria-label="Editor panels">
+                    <button class="editor-tab active" type="button" role="tab" data-tab="video" aria-selected="true">🎬 Video</button>
+                    <button class="editor-tab" type="button" role="tab" data-tab="voice" aria-selected="false">🎙️ Voice</button>
+                    <button class="editor-tab" type="button" role="tab" data-tab="captions" aria-selected="false">💬 Captions</button>
+                    <button class="editor-tab" type="button" role="tab" data-tab="extras" aria-selected="false">⭐ Extras</button>
+                  </div>
+
+                  <div class="editor-body" id="editorBody">
+                    <!-- ===== TAB: VIDEO ===== -->
+                    <section class="editor-panel active" data-panel="video" role="tabpanel" aria-label="Video settings">
+                      <div class="ed-group">
+                        <div class="ed-group-head">
+                          <h4 class="ed-title">Smart Subtitle Blur</h4>
+                          <label class="ed-switch" title="Enable blur box">
+                            <input type="checkbox" id="blurEnabled" checked />
+                            <span class="ed-switch-track" aria-hidden="true"></span>
+                          </label>
+                        </div>
+
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="blurStrength">Blur Strength</label>
+                            <span class="ed-value" id="blurStrengthValue">18 px</span>
+                          </div>
+                          <input type="range" class="ed-range" id="blurStrength" min="10" max="30" step="1" value="18" />
+                          <div class="ed-scale" aria-hidden="true"><span>10px</span><span>20px</span><span>30px</span></div>
+                        </div>
+
+                        <label class="ed-check">
+                          <input type="checkbox" id="blurFullWidth" />
+                          <span>Full-width band (အလျားလိုက် အပြည့်)</span>
+                        </label>
+
+                        <div class="ed-btn-row">
+                          <button class="ed-mini" id="blurPresetBottom" type="button">Bottom band</button>
+                          <button class="ed-mini" id="blurPresetLower" type="button">Lower third</button>
+                          <button class="ed-mini" id="blurReset" type="button">↺ Reset</button>
+                        </div>
+                        <p class="ed-hint">Box ကို ဆွဲရွှေ့၍ နေရာချပါ။ အနား/ထောင့် handle များဖြင့် အရွယ်အစား ချိန်ပါ။</p>
+                      </div>
+
+                      <div class="ed-group">
+                        <h4 class="ed-title">Overlay Layers</h4>
+                        <label class="ed-check"><input type="checkbox" id="layerBlur" checked /><span>Blur box</span></label>
+                        <label class="ed-check"><input type="checkbox" id="layerCaptions" checked /><span>Captions</span></label>
+                        <label class="ed-check"><input type="checkbox" id="layerWatermark" checked /><span>Watermark</span></label>
+                        <label class="ed-check"><input type="checkbox" id="layerLogo" checked /><span>Logo</span></label>
+                      </div>
+
+                      <div class="ed-group">
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="stageFit">Video Fit</label>
+                          </div>
+                          <select class="ed-select" id="stageFit">
+                            <option value="contain">Contain (ဘောင်အတွင်း အပြည့်)</option>
+                            <option value="cover">Cover (ဖြတ်၍ ဖြည့်)</option>
+                          </select>
+                        </div>
+                        <button class="ed-mini ed-mini-wide" id="editorResetAll" type="button">↺ Reset all editor settings</button>
+                      </div>
+                    </section>
+
+                    <!-- ===== TAB: VOICE ===== -->
+                    <section class="editor-panel" data-panel="voice" role="tabpanel" aria-label="Voice settings">
+                      <div class="ed-group">
+                        <h4 class="ed-title">Voice Persona</h4>
+                        <div class="ed-row">
+                          <select class="ed-select" id="edVoiceSelect" aria-label="Voice persona"></select>
+                          <button class="ed-mini" id="edVoicePreview" type="button">▶ Preview</button>
+                        </div>
+                        <p class="ed-hint" id="edVoiceHint">Persona ပြောင်းလိုက်ပါက ဗီဒီယိုကို ပြန်လည် Generate လုပ်ရန် လိုအပ်ပါသည်။</p>
+                      </div>
+
+                      <div class="ed-group">
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="edPitch">Pitch Offset</label>
+                            <span class="ed-value" id="edPitchValue">0 Hz</span>
+                          </div>
+                          <input type="range" class="ed-range" id="edPitch" min="-30" max="30" step="1" value="0" />
+                        </div>
+                      </div>
+
+                      <div class="ed-group">
+                        <h4 class="ed-title">Original Audio</h4>
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="edVolume">Volume</label>
+                            <span class="ed-value" id="edVolumeValue">100 %</span>
+                          </div>
+                          <input type="range" class="ed-range" id="edVolume" min="0" max="100" step="1" value="100" />
+                        </div>
+                        <label class="ed-check"><input type="checkbox" id="edMute" /><span>Mute original audio (dubbing only)</span></label>
+                      </div>
+                    </section>
+
+                    <!-- ===== TAB: CAPTIONS ===== -->
+                    <section class="editor-panel" data-panel="captions" role="tabpanel" aria-label="Caption settings">
+                      <div class="ed-group">
+                        <h4 class="ed-title">Font</h4>
+                        <div class="ed-field">
+                          <label class="ed-label" for="capFont">Myanmar Font Family</label>
+                          <select class="ed-select" id="capFont"></select>
+                        </div>
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="capSize">Font Size</label>
+                            <span class="ed-value" id="capSizeValue">30 px</span>
+                          </div>
+                          <input type="range" class="ed-range" id="capSize" min="14" max="72" step="1" value="30" />
+                        </div>
+                      </div>
+
+                      <div class="ed-group">
+                        <h4 class="ed-title">Style</h4>
+                        <div class="ed-color-row">
+                          <label class="ed-color">
+                            <span class="ed-label">Text Color</span>
+                            <input type="color" id="capColor" value="#ffffff" />
+                          </label>
+                          <label class="ed-color">
+                            <span class="ed-label">Outline Color</span>
+                            <input type="color" id="capOutlineColor" value="#000000" />
+                          </label>
+                        </div>
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="capOutlineWidth">Outline Width</label>
+                            <span class="ed-value" id="capOutlineWidthValue">3 px</span>
+                          </div>
+                          <input type="range" class="ed-range" id="capOutlineWidth" min="0" max="8" step="1" value="3" />
+                        </div>
+                      </div>
+
+                      <div class="ed-group">
+                        <h4 class="ed-title">Background Box</h4>
+                        <label class="ed-check"><input type="checkbox" id="capBox" checked /><span>Show caption background box</span></label>
+                        <div class="ed-color-row">
+                          <label class="ed-color">
+                            <span class="ed-label">Box Color</span>
+                            <input type="color" id="capBoxColor" value="#000000" />
+                          </label>
+                        </div>
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="capBoxOpacity">Box Opacity</label>
+                            <span class="ed-value" id="capBoxOpacityValue">55 %</span>
+                          </div>
+                          <input type="range" class="ed-range" id="capBoxOpacity" min="0" max="100" step="1" value="55" />
+                        </div>
+                      </div>
+
+                      <div class="ed-group">
+                        <h4 class="ed-title">Position</h4>
+                        <div class="ed-btn-row">
+                          <button class="ed-mini" data-cap-pos="top" type="button">Top</button>
+                          <button class="ed-mini" data-cap-pos="middle" type="button">Middle</button>
+                          <button class="ed-mini" data-cap-pos="bottom" type="button">Bottom</button>
+                        </div>
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="capY">Vertical Position</label>
+                            <span class="ed-value" id="capYValue">88 %</span>
+                          </div>
+                          <input type="range" class="ed-range" id="capY" min="0" max="100" step="1" value="88" />
+                          <div class="ed-scale" aria-hidden="true"><span>Top</span><span>Middle</span><span>Bottom</span></div>
+                        </div>
+                      </div>
+
+                      <div class="ed-group">
+                        <h4 class="ed-title">Layout</h4>
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="capWords">Words Per Line</label>
+                            <span class="ed-value" id="capWordsValue">6</span>
+                          </div>
+                          <input type="range" class="ed-range" id="capWords" min="0" max="12" step="1" value="6" />
+                          <div class="ed-scale" aria-hidden="true"><span>Auto</span><span>6</span><span>12</span></div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <!-- ===== TAB: EXTRAS ===== -->
+                    <section class="editor-panel" data-panel="extras" role="tabpanel" aria-label="Watermark and logo">
+                      <div class="ed-group">
+                        <h4 class="ed-title">Text Watermark</h4>
+                        <div class="ed-field">
+                          <label class="ed-label" for="wmText">Handle / Text</label>
+                          <input type="text" class="ed-input" id="wmText" value="@redbearrecap" maxlength="40"
+                                 placeholder="@redbearrecap" spellcheck="false" />
+                        </div>
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="wmSize">Font Size</label>
+                            <span class="ed-value" id="wmSizeValue">20 px</span>
+                          </div>
+                          <input type="range" class="ed-range" id="wmSize" min="10" max="48" step="1" value="20" />
+                        </div>
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="wmOpacity">Opacity</label>
+                            <span class="ed-value" id="wmOpacityValue">70 %</span>
+                          </div>
+                          <input type="range" class="ed-range" id="wmOpacity" min="5" max="100" step="1" value="70" />
+                        </div>
+                        <div class="ed-field">
+                          <span class="ed-label">Position</span>
+                          <div class="ed-pos-grid" id="wmPosGrid" role="radiogroup" aria-label="Watermark position"></div>
+                        </div>
+                        <label class="ed-check">
+                          <input type="checkbox" id="wmMove" />
+                          <span>Moves around screen (TikTok-style)</span>
+                        </label>
+                      </div>
+
+                      <div class="ed-group">
+                        <h4 class="ed-title">Image Logo (Circle)</h4>
+                        <input type="file" id="logoInput" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" hidden />
+                        <div class="ed-btn-row">
+                          <button class="ed-mini" id="logoPick" type="button">🖼 Logo ရွေးပါ</button>
+                          <button class="ed-mini ed-mini-danger" id="logoRemove" type="button">✕ ဖယ်ရှားမည်</button>
+                        </div>
+                        <div class="ed-logo-preview">
+                          <img id="logoThumb" alt="Logo preview" hidden />
+                          <span class="ed-logo-name" id="logoName">Logo မရွေးရသေးပါ</span>
+                        </div>
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="logoSize">Size</label>
+                            <span class="ed-value" id="logoSizeValue">64 px</span>
+                          </div>
+                          <input type="range" class="ed-range" id="logoSize" min="24" max="180" step="2" value="64" />
+                        </div>
+                        <div class="ed-field">
+                          <div class="ed-label-row">
+                            <label class="ed-label" for="logoOpacity">Opacity</label>
+                            <span class="ed-value" id="logoOpacityValue">90 %</span>
+                          </div>
+                          <input type="range" class="ed-range" id="logoOpacity" min="5" max="100" step="1" value="90" />
+                        </div>
+                        <div class="ed-field">
+                          <span class="ed-label">Position</span>
+                          <div class="ed-pos-grid" id="logoPosGrid" role="radiogroup" aria-label="Logo position"></div>
+                        </div>
+                        <label class="ed-check"><input type="checkbox" id="logoCircle" checked /><span>Circle mask</span></label>
+                      </div>
+                    </section>
+                  </div>
+                </aside>
+              </div>
+
+              <!-- ---------- SUMMARY ---------- -->
+              <div class="result-summary">
                 <div class="result-side">
                   <h3 class="rs-title">အကျဉ်းချုပ် (Summary)</h3>
                   <ul class="rs-list">
