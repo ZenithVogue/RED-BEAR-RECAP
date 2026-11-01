@@ -3,156 +3,147 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Red Bear Studio Edition v2.0 - AI Video & Subtitle Studio</title>
+  <title>Red Bear Studio - Manual ညှိနှိုင်းခြင်း</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Pyidaungsu:wght@400;700&family=Noto+Sans+Myanmar:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-shell">
-    <!-- Sidebar / Navigation -->
-    <aside class="sidebar">
-      <div class="brand-box">
-        <div class="brand-icon">🐻</div>
-        <div class="brand-text">
-          <h1>Red Bear Studio</h1>
-          <span class="badge-v">v2.0 Pro</span>
-        </div>
+  <div class="app-container">
+    <!-- Top Header Bar -->
+    <header class="top-nav">
+      <div class="nav-left">
+        <span class="brand-title">Red Bear Studio</span>
+        <span class="breadcrumb">/ Manual ညှိနှိုင်းခြင်း</span>
       </div>
-      <nav class="nav-menu">
-        <button class="nav-item active" data-page="manual">
-          <span class="icon">⚡</span> <span>Quick Studio</span>
-        </button>
-        <button class="nav-item" data-page="batch">
-          <span class="icon">📦</span> <span>Batch Processing</span>
-        </button>
-        <button class="nav-item" data-page="history">
-          <span class="icon">📂</span> <span>History & Projects</span>
-        </button>
-      </nav>
-    </aside>
-
-    <!-- Main Content Area -->
-    <main class="main-content">
-      <header class="topbar">
-        <h2>Video Dubbing & Subtitle Generator</h2>
-        <div class="user-quota">
-          <span class="quota-chip">⚡ Quota: <strong id="quotaCount">1</strong> left</span>
+      <div class="nav-right">
+        <div class="user-info">
+          <span class="user-email">justineburn...</span>
+          <span class="credit-badge">⚡ Credits: 0 Left</span>
         </div>
-      </header>
-
-      <div class="content-body">
-        <!-- Steps Progress Bar -->
-        <div class="steps-indicator">
-          <div class="step-dot active" id="dot1">1. Video Upload</div>
-          <div class="line"></div>
-          <div class="step-dot" id="dot2">2. Transcript</div>
-          <div class="line"></div>
-          <div class="step-dot" id="dot3">3. Voice & Style</div>
-          <div class="line"></div>
-          <div class="step-dot" id="dot4">4. Export</div>
-        </div>
-
-        <!-- STEP 1: Video Upload -->
-        <div class="step-panel active" id="stepPanel1">
-          <div class="upload-dropzone" id="dropzone">
-            <div class="upload-icon">📹</div>
-            <h3>ဗီဒီယိုဖိုင်ကို ဤနေရာသို့ ဆွဲထည့်ပါ (သို့မဟုတ်) နှိပ်၍ရွေးပါ</h3>
-            <p>MP4, MKV, MOV (Max size: 500MB)</p>
-            <input type="file" id="videoFileInput" accept="video/*" hidden>
-            <button class="btn btn-primary" id="browseBtn">ဖိုင်ရွေးချယ်မည်</button>
-          </div>
-          <div class="preview-container hidden" id="videoPreviewBox">
-            <video id="sourceVideo" controls></video>
-            <button class="btn btn-secondary" id="reselectBtn">ဖိုင်အသစ်ပြောင်းမည်</button>
-          </div>
-        </div>
-
-        <!-- STEP 2: Transcript Editing -->
-        <div class="step-panel" id="stepPanel2">
-          <div class="panel-header">
-            <h3>Auto Transcript & Subtitles</h3>
-            <button class="btn btn-sm btn-outline" id="retranscribeBtn">🔄 ပြန်လည်ထုတ်ယူမည်</button>
-          </div>
-          <div class="transcript-editor" id="transcriptEditor">
-            <!-- Dynamic transcript rows will load here -->
-          </div>
-        </div>
-
-        <!-- STEP 3: Voice Persona & Font Style Settings -->
-        <div class="step-panel" id="stepPanel3">
-          <h3>အသံနှင့် စာတန်းထိုး ပုံစံ ရွေးချယ်မှု</h3>
-          
-          <div class="settings-group">
-            <label class="field-label">အသံထွက် ပုံစံ (Voice Persona)</label>
-            <div class="voice-grid">
-              <div class="voice-card selected" data-voice="hero">
-                <div class="v-icon">🎙️</div>
-                <div class="v-title">Hero Narrator</div>
-                <div class="v-desc">အားမာန်ပါသော ဇာတ်ကြောင်းပြောသံ</div>
-              </div>
-              <div class="voice-card" data-voice="calm">
-                <div class="v-icon">🎧</div>
-                <div class="v-title">Calm Explainer</div>
-                <div class="v-desc">အေးဆေးရှင်းလင်းသော အသံ</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- NEW: Font Style Section -->
-          <div class="font-style-section">
-            <div class="pitch-head">
-              <label class="field-label">စာတန်းထိုး ဖောင့်ပုံစံ (Subtitle Font Style)</label>
-              <span class="chip chip-soft" id="fontChip">Noto Sans</span>
-            </div>
-            <p class="raw-hint" style="margin-bottom: 8px;">ဗီဒီယိုပေါ်တွင် ပေါ်လာမည့် မြန်မာစာတန်းထိုး (Subtitle) ၏ ဖောင့်စတိုင်နှင့် ပုံစံကို ရွေးချယ်ပါ။</p>
-            
-            <div class="font-style-grid" id="fontStyleGrid">
-              <div class="font-option-card selected" data-font="noto-sans" tabindex="0" role="button">
-                <div class="font-option-title" style="font-family: 'Noto Sans Myanmar', sans-serif;">Noto Sans Myanmar</div>
-                <div class="font-option-desc">ခေတ်မီပြီး ရှင်းလင်းသော ပုံစံ (Modern & Clean)</div>
-              </div>
-              <div class="font-option-card" data-font="padauk" tabindex="0" role="button">
-                <div class="font-option-title" style="font-family: 'Pyidaungsu', 'Padauk', sans-serif;">Pyidaungsu / Padauk</div>
-                <div class="font-option-desc">ရိုးရာနှင့် စာဖတ်ရလွယ်ကူသော ပုံစံ (Traditional)</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-group" style="margin-top: 16px;">
-            <div class="pitch-head">
-              <label class="field-label">အသံ အနိမ့်အမြင့် (Pitch Shift)</label>
-              <span class="chip" id="pitchVal">0 Hz</span>
-            </div>
-            <input type="range" id="pitchRange" min="-30" max="30" value="0" class="slider">
-          </div>
-        </div>
-
-        <!-- STEP 4: Export & Preview -->
-        <div class="step-panel" id="stepPanel4">
-          <div class="export-box">
-            <div class="success-banner">✨ ဗီဒီယိုအဆင်သင့် ဖြစ်ပါပြီ!</div>
-            <div class="export-preview" id="exportPreviewArea">
-              <!-- Rendered video result preview -->
-            </div>
-            <div class="actions-row">
-              <button class="btn btn-primary btn-lg" id="downloadBtn">⬇️ ဗီဒီယိုကို သိမ်းဆည်းမည် (Download)</button>
-              <button class="btn btn-secondary" id="shareBtn">🔗 မျှဝေမည်</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Wizard Navigation Footer -->
-        <div class="wizard-footer">
-          <button class="btn btn-outline" id="prevBtn" disabled>ရှေ့သို့ (Back)</button>
-          <button class="btn btn-primary" id="nextBtn">ဆက်လုပ်မည် (Next)</button>
-        </div>
+        <button class="btn-upgrade">Upgrade လုပ်မည်</button>
       </div>
+    </header>
+
+    <!-- Main Content Wrapper -->
+    <main class="studio-main">
+      
+      <!-- Video Upload / Link Box Section -->
+      <section class="upload-section">
+        <div class="upload-box" id="dropzone">
+          <div class="upload-icon">📤</div>
+          <h3>ဗီဒီယိုဖိုင်ကို ဤနေရာသို့ ဆွဲထည့်ပါ (သို့မဟုတ်) နှိပ်၍ရွေးပါ</h3>
+          <p>MP4, MKV, MOV (Max size: 500MB)</p>
+          <input type="file" id="videoFileInput" accept="video/*" hidden>
+          <button class="btn-browse" id="browseBtn">ဖိုင်ရွေးချယ်မည်</button>
+        </div>
+
+        <!-- URL Input Option -->
+        <div class="link-input-box">
+          <label class="field-label">သို့မဟုတ် Link ထည့်ရန်</label>
+          <div class="link-row">
+            <input type="text" id="urlInput" placeholder="https://www.tiktok.com/@... သို့မဟုတ် YouTube Link">
+            <button class="btn-paste" id="pasteBtn">📋 Paste</button>
+            <button class="btn-fetch" id="fetchBtn">🔗 ဆွဲယူမည်</button>
+          </div>
+          <div class="platform-tags">
+            <span class="tag youtube">YouTube</span>
+            <span class="tag tiktok">TikTok</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Options Configuration Grid -->
+      <section class="options-grid">
+        
+        <!-- 1. Subtitle Mode -->
+        <div class="option-card">
+          <label class="card-title">Subtitle Mode</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="subMode" value="ai" checked>
+              <span><strong>AI Recap</strong><br><small>အကြောင်းအရာအလိုက် စာသားများကို အလိုအလျောက် စီစစ်ပေးသည်</small></span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="subMode" value="normal">
+              <span><strong>ရိုးရိုး</strong><br><small>မူရင်းပြောသံအတိုင်း တိုက်ရိုက် စာတန်းထိုးထိုးမည်</small></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 2. TikTok HD / Resolution -->
+        <div class="option-card">
+          <label class="card-title">TikTok HD (1080p)</label>
+          <div class="sub-option">
+            <label class="checkbox-label">
+              <input type="checkbox" id="tiktokHdCheck" checked>
+              <span>TikTokအတွက် အရည်အသွေးမြင့် render ပြုလုပ်မည်</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. Aspect Ratio -->
+        <div class="option-card">
+          <label class="card-title">ဗီဒီယို ratio</label>
+          <div class="ratio-buttons">
+            <button class="ratio-btn active" data-ratio="9:16">9:16</button>
+            <button class="ratio-btn" data-ratio="3:4">3:4</button>
+            <button class="ratio-btn" data-ratio="16:9">16:9s</button>
+            <button class="ratio-btn" data-ratio="1:1">1:1</button>
+          </div>
+        </div>
+
+        <!-- 4. Output ဘာသာစကား -->
+        <div class="option-card">
+          <label class="card-title">Output ဘာသာစကား</label>
+          <p class="card-desc">Video ထဲက အသံကို နိုင်ငံခြားဘာသာစကားဖြင့် ပြောင်းလဲနိုင်သည် (Free ချက်)</p>
+          <div class="lang-buttons">
+            <button class="lang-btn active" data-lang="my">မြန်မာ</button>
+            <button class="lang-btn" data-lang="en">English</button>
+            <button class="lang-btn" data-lang="th">ไทย</button>
+          </div>
+        </div>
+
+        <!-- 5. Blur & Mirror Toggles -->
+        <div class="option-card">
+          <label class="card-title">Blur & Mirror</label>
+          <div class="toggle-row">
+            <span>Blur Background</span>
+            <label class="switch">
+              <input type="checkbox" id="blurToggle">
+              <span class="slider-round"></span>
+            </label>
+          </div>
+          <div class="toggle-row" style="margin-top: 10px;">
+            <span>Mirror (ဗီဒီယိုလှန်ရန်)</span>
+            <label class="switch">
+              <input type="checkbox" id="mirrorToggle">
+              <span class="slider-round"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 6. Zoom Option -->
+        <div class="option-card">
+          <label class="card-title">ရූမ် (Zoom)</label>
+          <div class="zoom-row">
+            <input type="range" id="zoomRange" min="100" max="150" value="100" class="range-slider">
+            <span id="zoomVal">100%</span>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Bottom Action Button -->
+      <div class="action-footer">
+        <button class="btn-submit" id="submitBtn">စတင်ထုတ်ယူမည်</button>
+      </div>
+
     </main>
   </div>
 
-  <div class="toast-container" id="toastContainer"></div>
+  <div id="toastContainer"></div>
   <script src="app.js"></script>
 </body>
 </html>
