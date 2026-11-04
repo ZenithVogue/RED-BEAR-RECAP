@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="my">
+<html lang="my" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Red Bear Studio - Manual ညှိနှိုင်းခြင်း</title>
+  <title>Red Bear Studio - Pro Edition</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -14,15 +14,23 @@
     <!-- Top Header Bar -->
     <header class="top-nav">
       <div class="nav-left">
-        <span class="brand-title">Red Bear Studio</span>
+        <span class="brand-title">🐻 Red Bear Studio</span>
         <span class="breadcrumb">/ Manual ညှိနှိုင်းခြင်း</span>
       </div>
       <div class="nav-right">
-        <div class="user-info">
-          <span class="user-email">justineburn...</span>
-          <span class="credit-badge">⚡ Credits: 0 Left</span>
+        <!-- Auth Section -->
+        <div class="auth-box" id="authBox">
+          <button class="btn-auth" id="loginBtn">🔑 Login</button>
+          <button class="btn-auth primary" id="registerBtn">✨ Create Account</button>
         </div>
-        <button class="btn-upgrade">Upgrade လုပ်မည်</button>
+        <div class="user-info hidden" id="userInfo">
+          <span class="user-email" id="userEmailDisplay">user@gmail.com</span>
+          <span class="credit-badge">⚡ Credits: 5 Left</span>
+        </div>
+        
+        <!-- Theme Toggle Button -->
+        <button class="theme-toggle-btn" id="themeToggleBtn" title="Theme ပြောင်းရန်">🌙 Dark</button>
+        <button class="btn-upgrade">Upgrade</button>
       </div>
     </header>
 
@@ -31,6 +39,7 @@
       
       <!-- Video Upload / Link Box Section -->
       <section class="upload-section">
+        <!-- Default Upload Dropzone -->
         <div class="upload-box" id="dropzone">
           <div class="upload-icon">📤</div>
           <h3>ဗီဒီယိုဖိုင်ကို ဤနေရာသို့ ဆွဲထည့်ပါ (သို့မဟုတ်) နှိပ်၍ရွေးပါ</h3>
@@ -39,17 +48,27 @@
           <button class="btn-browse" id="browseBtn">ဖိုင်ရွေးချယ်မည်</button>
         </div>
 
-        <!-- URL Input Option -->
+        <!-- Video Preview Box (Hidden by default, shows when video is selected) -->
+        <div class="preview-box hidden" id="videoPreviewContainer">
+          <video id="sourceVideoPreview" controls></video>
+          <div class="preview-actions">
+            <span id="videoFileName" class="file-name-text">video.mp4</span>
+            <button class="btn-remove-video" id="removeVideoBtn">🗑️ ဖိုင်ဖျက်မည်</button>
+          </div>
+        </div>
+
+        <!-- URL Input Option with RedNote -->
         <div class="link-input-box">
-          <label class="field-label">သို့မဟုတ် Link ထည့်ရန်</label>
+          <label class="field-label">သို့မဟုတ် Link ဖြင့် ထည့်ရန် (YouTube, TikTok, RedNote)</label>
           <div class="link-row">
-            <input type="text" id="urlInput" placeholder="https://www.tiktok.com/@... သို့မဟုတ် YouTube Link">
+            <input type="text" id="urlInput" placeholder="https://www.xiaohongshu.com/... သို့မဟုတ် TikTok/YouTube Link">
             <button class="btn-paste" id="pasteBtn">📋 Paste</button>
             <button class="btn-fetch" id="fetchBtn">🔗 ဆွဲယူမည်</button>
           </div>
           <div class="platform-tags">
             <span class="tag youtube">YouTube</span>
             <span class="tag tiktok">TikTok</span>
+            <span class="tag rednote">RedNote (小红书)</span>
           </div>
         </div>
       </section>
@@ -89,7 +108,7 @@
           <div class="ratio-buttons">
             <button class="ratio-btn active" data-ratio="9:16">9:16</button>
             <button class="ratio-btn" data-ratio="3:4">3:4</button>
-            <button class="ratio-btn" data-ratio="16:9">16:9s</button>
+            <button class="ratio-btn" data-ratio="16:9">16:9</button>
             <button class="ratio-btn" data-ratio="1:1">1:1</button>
           </div>
         </div>
@@ -97,7 +116,7 @@
         <!-- 4. Output ဘာသာစကား -->
         <div class="option-card">
           <label class="card-title">Output ဘာသာစကား</label>
-          <p class="card-desc">Video ထဲက အသံကို နိုင်ငံခြားဘာသာစကားဖြင့် ပြောင်းလဲနိုင်သည် (Free ချက်)</p>
+          <p class="card-desc">Video ထဲက အသံကို နိုင်ငံခြားဘာသာစကားဖြင့် ပြောင်းလဲနိုင်သည်</p>
           <div class="lang-buttons">
             <button class="lang-btn active" data-lang="my">မြန်မာ</button>
             <button class="lang-btn" data-lang="en">English</button>
@@ -115,7 +134,7 @@
               <span class="slider-round"></span>
             </label>
           </div>
-          <div class="toggle-row" style="margin-top: 10px;">
+          <div class="toggle-row" style="margin-top: 12px;">
             <span>Mirror (ဗီဒီယိုလှန်ရန်)</span>
             <label class="switch">
               <input type="checkbox" id="mirrorToggle">
