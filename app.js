@@ -1,99 +1,173 @@
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => document.querySelectorAll(s);
+/* ============================================================
+   Red Bear Studio v2.0 Pro — Logic Engine
+   ============================================================ */
+
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => document.querySelectorAll(selector);
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Theme Toggle Functionality (Dark / Light Mode with distinct shadow & colors)
-  const themeToggleBtn = $("#themeToggleBtn");
+  initThemeToggle();
+  initAuthSimulation();
+  initMediaInputAndPlayer();
+  initOptionControls();
+});
+
+/* ---------------- 1. Theme Switcher ---------------- */
+function initThemeToggle() {
+  const themeSwitchBtn = $("#themeSwitchBtn");
   const htmlElement = document.documentElement;
 
-  themeToggleBtn.addEventListener("click", () => {
+  themeSwitchBtn.addEventListener("click", () => {
     const currentTheme = htmlElement.getAttribute("data-theme");
-    const newTheme = currentTheme === "light" ? "dark" : "light";
-    htmlElement.setAttribute("data-theme", newTheme);
-    themeToggleBtn.textContent = newTheme === "dark" ? "☀️ Light" : "🌙 Dark";
-    showToast(`Theme သို့ ပြောင်းပြီးပါပြီ: ${newTheme.toUpperCase()}`);
+    const nextTheme = currentTheme === "dark" ? "light" : "dark";
+    htmlElement.setAttribute("data-theme", nextTheme);
+    themeSwitchBtn.textContent = nextTheme === "dark" ? "☀️ Light" : "🌙 Dark";
+    notifyToast(`Theme: ${nextTheme.toUpperCase()}`);
   });
+}
 
-  // Auth Simulation (Login / Create Account)
-  $("#loginBtn").addEventListener("click", () => {
-    simulateAuth("user@gmail.com");
-  });
+/* ---------------- 2. Auth Flow Simulation ---------------- */
+function initAuthSimulation() {
+  const btnLogin = $("#btnLogin");
+  const btnSignup = $("#btnSignup");
+  const loggedOutAuth = $("#loggedOutAuth");
+  const loggedInAuth = $("#loggedInAuth");
+  const sidebarQuotaCard = $("#sidebarQuotaCard");
+  const userEmailLabel = $("#userEmailLabel");
 
-  $("#registerBtn").addEventListener("click", () => {
-    simulateAuth("newbie_creator@gmail.com");
-  });
+  btnLogin.addEventListener("click", () => handleLogin("user@gmail.com"));
+  btnSignup.addEventListener("click", () => handleLogin("newbie_creator@gmail.com"));
 
-  function simulateAuth(email) {
-    $("#authBox").classList.add("hidden");
-    $("#userInfo").classList.remove("hidden");
-    $("#userEmailDisplay").textContent = email;
-    showToast("✓ အောင်မြင်စွာ အကောင့်ဝင်ရောက်ပြီးပါပြီ");
+  function handleLogin(email) {
+    loggedOutAuth.classList.add("hidden");
+    loggedInAuth.classList.remove("hidden");
+    sidebarQuotaCard.classList.remove("hidden");
+    userEmailLabel.textContent = email;
+    notifyToast("✓ အကောင့် အောင်မြင်စွာ ဝင်ရောက်ပြီးပါပြီ");
   }
+}
 
-  // File Upload & Preview Handling
-  const browseBtn = $("#browseBtn");
-  const fileInput = $("#videoFileInput");
-  const dropzone = $("#dropzone");
-  const previewContainer = $("#videoPreviewContainer");
-  const sourceVideoPreview = $("#sourceVideoPreview");
-  const videoFileName = $("#videoFileName");
-  const removeVideoBtn = $("#removeVideoBtn");
+/* ---------------- 3. Media Input & Custom Video Player ---------------- */
+function initMediaInputAndPlayer() {
+  const fileInput = $("#fileInput");
+  const btnBrowse = $("#btnBrowse");
+  const uploadDropzone = $("#uploadDropzone");
+  const linkInput = $("#linkInput");
+  const btnPaste = $("#btnPaste");
+  const btnFetch = $("#btnFetch");
 
-  browseBtn.addEventListener("click", () => fileInput.click());
-  dropzone.addEventListener("click", () => fileInput.click());
+  const playerPreviewWrapper = $("#playerPreviewWrapper");
+  const previewVideoPlayer = $("#previewVideoPlayer");
+  const loadedFileName = $("#loadedFileName");
+  const btnRemoveFile = $("#btnRemoveFile");
+
+  const btnPlayToggle = $("#btnPlayToggle");
+  const videoProgressBar = $("#videoProgressBar");
+  const timeDisplay = $("#timeDisplay");
+
+  // Browse File Action
+  btnBrowse.addEventListener("click", () => fileInput.click());
+  uploadDropzone.addEventListener("click", () => fileInput.click());
 
   fileInput.addEventListener("change", (e) => {
     if (e.target.files.length) {
-      handleSelectedFile(e.target.files[0]);
+      loadMediaSource(e.target.files[0]);
     }
   });
 
-  function handleSelectedFile(file) {
-    const videoUrl = URL.createObjectURL(file);
-    sourceVideoPreview.src = videoUrl;
-    videoFileName.textContent = file.name;
-    dropzone.classList.add("hidden");
-    previewContainer.classList.remove("hidden");
-    showToast("✓ ဗီဒီယိုဖိုင် အောင်မြင်စွာ တင်ပြီး Preview ထွက်လာပါပြီ");
-  }
-
-  removeVideoBtn.addEventListener("click", () => {
-    sourceVideoPreview.src = "";
-    fileInput.value = "";
-    previewContainer.classList.add("hidden");
-    dropzone.classList.remove("hidden");
-    showToast("🗑️ ဗီဒီယိုဖိုင် ဖယ်ရှားပြီးပါပြီ");
-  });
-
-  // Paste URL Button & RedNote / TikTok / YouTube Link Handling
-  $("#pasteBtn").addEventListener("click", async () => {
+  // Paste Link Action
+  btnPaste.addEventListener("click", async () => {
     try {
       const text = await navigator.clipboard.readText();
-      $("#urlInput").value = text;
-      showToast("✓ Link ကူးယူပြီးပါပြီ");
-    } catch (err) {
-      showToast("Link ကူးယူ၍မရပါ။ Clipboard ခွင့်ပြုချက်လိုပါသည်။");
+      linkInput.value = text;
+      notifyToast("✓ Link Paste လုပ်ပြီးပါပြီ");
+    } catch (_) {
+      notifyToast("Clipboard ခွင့်ပြုချက်မရပါ");
     }
   });
 
-  $("#fetchBtn").addEventListener("click", () => {
-    const linkVal = $("#urlInput").value.trim();
-    if (!linkVal) {
-      showToast("⚠️ ကျေးဇူးပြု၍ Link ထည့်ပါ");
+  // Fetch Social Media Link (YouTube, TikTok, RedNote)
+  btnFetch.addEventListener("click", () => {
+    const url = linkInput.value.trim();
+    if (!url) {
+      notifyToast("⚠️ ကျေးဇူးပြု၍ Link အရင်ထည့်ပါ");
       return;
     }
-    if (linkVal.includes("xiaohongshu") || linkVal.includes("rednote") || linkVal.includes("xhslink")) {
-      showToast("🌸 RedNote (小红书) Link ကို အောင်မြင်စွာ ဆွဲယူပြီးပါပြီ!");
-    } else if (linkVal.includes("tiktok")) {
-      showToast("🎵 TikTok Link ကို အောင်မြင်စွာ ဆွဲယူပြီးပါပြီ!");
-    } else if (linkVal.includes("youtube") || linkVal.includes("youtu.be")) {
-      showToast("📺 YouTube Link ကို အောင်မြင်စွာ ဆွဲယူပြီးပါပြီ!");
+
+    if (url.includes("xiaohongshu") || url.includes("rednote") || url.includes("xhslink")) {
+      notifyToast("🌸 RedNote (小红书) Link မှ ဗီဒီယို ဖတ်ရှုဆွဲယူပြီးပါပြီ");
+    } else if (url.includes("tiktok")) {
+      notifyToast("🎵 TikTok Link မှ ဗီဒီယို ဖတ်ရှုဆွဲယူပြီးပါပြီ");
+    } else if (url.includes("youtube") || url.includes("youtu.be")) {
+      notifyToast("📺 YouTube Link မှ ဗီဒီယို ဖတ်ရှုဆွဲယူပြီးပါပြီ");
     } else {
-      showToast("🔗 Link အချက်အလက်များကို ဆွဲယူနေပါပြီ...");
+      notifyToast("🔗 Link မှ ဗီဒီယို ရယူနေပါသည်...");
+    }
+
+    // Set demo video stream
+    const demoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+    loadMediaSource(demoUrl, "social_media_video.mp4");
+  });
+
+  function loadMediaSource(source, fileName) {
+    let srcUrl = typeof source === "string" ? source : URL.createObjectURL(source);
+    let name = fileName || (source.name ? source.name : "video.mp4");
+
+    previewVideoPlayer.src = srcUrl;
+    loadedFileName.textContent = name;
+
+    uploadDropzone.classList.add("hidden");
+    playerPreviewWrapper.classList.remove("hidden");
+    notifyToast("✓ Video Preview အဆင်သင့်ဖြစ်ပါပြီ");
+  }
+
+  // Remove Selected Video File
+  btnRemoveFile.addEventListener("click", () => {
+    previewVideoPlayer.pause();
+    previewVideoPlayer.src = "";
+    fileInput.value = "";
+    linkInput.value = "";
+    playerPreviewWrapper.classList.add("hidden");
+    uploadDropzone.classList.remove("hidden");
+    notifyToast("🗑️ ဗီဒီယိုဖိုင် ဖယ်ရှားလိုက်ပါပြီ");
+  });
+
+  // Video Play / Pause Toggle
+  btnPlayToggle.addEventListener("click", () => {
+    if (previewVideoPlayer.paused) {
+      previewVideoPlayer.play();
+      btnPlayToggle.textContent = "❚❚";
+    } else {
+      previewVideoPlayer.pause();
+      btnPlayToggle.textContent = "▶";
     }
   });
 
-  // Ratio Buttons Selection
+  // Time & Progress Updates
+  previewVideoPlayer.addEventListener("timeupdate", () => {
+    if (previewVideoPlayer.duration) {
+      const pct = (previewVideoPlayer.currentTime / previewVideoPlayer.duration) * 100;
+      videoProgressBar.value = pct;
+      timeDisplay.textContent = `${formatTime(previewVideoPlayer.currentTime)} / ${formatTime(previewVideoPlayer.duration)}`;
+    }
+  });
+
+  videoProgressBar.addEventListener("input", (e) => {
+    if (previewVideoPlayer.duration) {
+      previewVideoPlayer.currentTime = (e.target.value / 100) * previewVideoPlayer.duration;
+    }
+  });
+
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  }
+}
+
+/* ---------------- 4. Options Controls & Font Selection ---------------- */
+function initOptionControls() {
+  // Ratio selection
   $$(".ratio-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".ratio-btn").forEach(b => b.classList.remove("active"));
@@ -101,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Language Buttons Selection
+  // Language selection
   $$(".lang-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".lang-btn").forEach(b => b.classList.remove("active"));
@@ -109,24 +183,36 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Zoom Range Change
-  const zoomRange = $("#zoomRange");
-  const zoomVal = $("#zoomVal");
-  zoomRange.addEventListener("input", (e) => {
-    zoomVal.textContent = `${e.target.value}%`;
+  // Font Style selection
+  const subTextDisplay = $("#subTextDisplay");
+  $$(".font-card").forEach(card => {
+    card.addEventListener("click", () => {
+      $$(".font-card").forEach(c => c.classList.remove("active"));
+      card.classList.add("active");
+      const font = card.dataset.font;
+      subTextDisplay.style.fontFamily = `'${font}', sans-serif`;
+      notifyToast(`✓ Subtitle Font: ${font}`);
+    });
   });
 
-  // Submit Action
-  $("#submitBtn").addEventListener("click", () => {
-    showToast("🚀 လုပ်ဆောင်ချက် စတင်နေပါပြီ...");
+  // Zoom range
+  const rngZoom = $("#rngZoom");
+  const zoomValText = $("#zoomValText");
+  rngZoom.addEventListener("input", (e) => {
+    zoomValText.textContent = `${e.target.value}%`;
   });
-});
 
-function showToast(msg) {
-  const container = $("#toastContainer");
-  const t = document.createElement("div");
-  t.className = "toast";
-  t.textContent = msg;
-  container.appendChild(t);
-  setTimeout(() => t.remove(), 3000);
+  // Execute Process
+  $("#btnExecute").addEventListener("click", () => {
+    notifyToast("🚀 Video Dubbing & Subtitle ရယူခြင်း စတင်နေပါပြီ...");
+  });
+}
+
+function notifyToast(msg) {
+  const stack = $("#toastStack");
+  const el = document.createElement("div");
+  el.className = "toast-message";
+  el.textContent = msg;
+  stack.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
 }
