@@ -1,168 +1,256 @@
 <!DOCTYPE html>
-<html lang="my" data-theme="light">
+<html lang="my" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Red Bear Studio - Pro Edition</title>
+  <title>Red Bear Studio v2.0 Pro</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;500;600;700&family=Padauk:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-container">
-    <!-- Top Header Bar -->
-    <header class="top-nav">
-      <div class="nav-left">
-        <span class="brand-title">🐻 Red Bear Studio</span>
-        <span class="breadcrumb">/ Manual ညှိနှိုင်းခြင်း</span>
-      </div>
-      <div class="nav-right">
-        <!-- Auth Section -->
-        <div class="auth-box" id="authBox">
-          <button class="btn-auth" id="loginBtn">🔑 Login</button>
-          <button class="btn-auth primary" id="registerBtn">✨ Create Account</button>
+  <div class="app-shell">
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-header">
+        <div class="brand-logo">🐻</div>
+        <div class="brand-info">
+          <h1 class="brand-name">Red Bear Studio</h1>
+          <span class="brand-tag">v2.0 Pro</span>
         </div>
-        <div class="user-info hidden" id="userInfo">
-          <span class="user-email" id="userEmailDisplay">user@gmail.com</span>
-          <span class="credit-badge">⚡ Credits: 5 Left</span>
-        </div>
-        
-        <!-- Theme Toggle Button -->
-        <button class="theme-toggle-btn" id="themeToggleBtn" title="Theme ပြောင်းရန်">🌙 Dark</button>
-        <button class="btn-upgrade">Upgrade</button>
-      </div>
-    </header>
-
-    <!-- Main Content Wrapper -->
-    <main class="studio-main">
-      
-      <!-- Video Upload / Link Box Section -->
-      <section class="upload-section">
-        <!-- Default Upload Dropzone -->
-        <div class="upload-box" id="dropzone">
-          <div class="upload-icon">📤</div>
-          <h3>ဗီဒီယိုဖိုင်ကို ဤနေရာသို့ ဆွဲထည့်ပါ (သို့မဟုတ်) နှိပ်၍ရွေးပါ</h3>
-          <p>MP4, MKV, MOV (Max size: 500MB)</p>
-          <input type="file" id="videoFileInput" accept="video/*" hidden>
-          <button class="btn-browse" id="browseBtn">ဖိုင်ရွေးချယ်မည်</button>
-        </div>
-
-        <!-- Video Preview Box (Hidden by default, shows when video is selected) -->
-        <div class="preview-box hidden" id="videoPreviewContainer">
-          <video id="sourceVideoPreview" controls></video>
-          <div class="preview-actions">
-            <span id="videoFileName" class="file-name-text">video.mp4</span>
-            <button class="btn-remove-video" id="removeVideoBtn">🗑️ ဖိုင်ဖျက်မည်</button>
-          </div>
-        </div>
-
-        <!-- URL Input Option with RedNote -->
-        <div class="link-input-box">
-          <label class="field-label">သို့မဟုတ် Link ဖြင့် ထည့်ရန် (YouTube, TikTok, RedNote)</label>
-          <div class="link-row">
-            <input type="text" id="urlInput" placeholder="https://www.xiaohongshu.com/... သို့မဟုတ် TikTok/YouTube Link">
-            <button class="btn-paste" id="pasteBtn">📋 Paste</button>
-            <button class="btn-fetch" id="fetchBtn">🔗 ဆွဲယူမည်</button>
-          </div>
-          <div class="platform-tags">
-            <span class="tag youtube">YouTube</span>
-            <span class="tag tiktok">TikTok</span>
-            <span class="tag rednote">RedNote (小红书)</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Options Configuration Grid -->
-      <section class="options-grid">
-        
-        <!-- 1. Subtitle Mode -->
-        <div class="option-card">
-          <label class="card-title">Subtitle Mode</label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input type="radio" name="subMode" value="ai" checked>
-              <span><strong>AI Recap</strong><br><small>အကြောင်းအရာအလိုက် စာသားများကို အလိုအလျောက် စီစစ်ပေးသည်</small></span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="subMode" value="normal">
-              <span><strong>ရိုးရိုး</strong><br><small>မူရင်းပြောသံအတိုင်း တိုက်ရိုက် စာတန်းထိုးထိုးမည်</small></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- 2. TikTok HD / Resolution -->
-        <div class="option-card">
-          <label class="card-title">TikTok HD (1080p)</label>
-          <div class="sub-option">
-            <label class="checkbox-label">
-              <input type="checkbox" id="tiktokHdCheck" checked>
-              <span>TikTokအတွက် အရည်အသွေးမြင့် render ပြုလုပ်မည်</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- 3. Aspect Ratio -->
-        <div class="option-card">
-          <label class="card-title">ဗီဒီယို ratio</label>
-          <div class="ratio-buttons">
-            <button class="ratio-btn active" data-ratio="9:16">9:16</button>
-            <button class="ratio-btn" data-ratio="3:4">3:4</button>
-            <button class="ratio-btn" data-ratio="16:9">16:9</button>
-            <button class="ratio-btn" data-ratio="1:1">1:1</button>
-          </div>
-        </div>
-
-        <!-- 4. Output ဘာသာစကား -->
-        <div class="option-card">
-          <label class="card-title">Output ဘာသာစကား</label>
-          <p class="card-desc">Video ထဲက အသံကို နိုင်ငံခြားဘာသာစကားဖြင့် ပြောင်းလဲနိုင်သည်</p>
-          <div class="lang-buttons">
-            <button class="lang-btn active" data-lang="my">မြန်မာ</button>
-            <button class="lang-btn" data-lang="en">English</button>
-            <button class="lang-btn" data-lang="th">ไทย</button>
-          </div>
-        </div>
-
-        <!-- 5. Blur & Mirror Toggles -->
-        <div class="option-card">
-          <label class="card-title">Blur & Mirror</label>
-          <div class="toggle-row">
-            <span>Blur Background</span>
-            <label class="switch">
-              <input type="checkbox" id="blurToggle">
-              <span class="slider-round"></span>
-            </label>
-          </div>
-          <div class="toggle-row" style="margin-top: 12px;">
-            <span>Mirror (ဗီဒီယိုလှန်ရန်)</span>
-            <label class="switch">
-              <input type="checkbox" id="mirrorToggle">
-              <span class="slider-round"></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- 6. Zoom Option -->
-        <div class="option-card">
-          <label class="card-title">ရූမ် (Zoom)</label>
-          <div class="zoom-row">
-            <input type="range" id="zoomRange" min="100" max="150" value="100" class="range-slider">
-            <span id="zoomVal">100%</span>
-          </div>
-        </div>
-
-      </section>
-
-      <!-- Bottom Action Button -->
-      <div class="action-footer">
-        <button class="btn-submit" id="submitBtn">စတင်ထုတ်ယူမည်</button>
       </div>
 
-    </main>
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" data-page="manual">
+          <span class="nav-icon">⚡</span>
+          <span class="nav-text">Manual ညှိနှိုင်းခြင်း</span>
+        </button>
+        <button class="nav-btn" data-page="recap">
+          <span class="nav-icon">🪄</span>
+          <span class="nav-text">Auto Recap</span>
+        </button>
+        <button class="nav-btn" data-page="history">
+          <span class="nav-icon">📂</span>
+          <span class="nav-text">လုပ်ငန်းမှတ်တမ်း</span>
+        </button>
+        <button class="nav-btn" data-page="keys">
+          <span class="nav-icon">🔑</span>
+          <span class="nav-text">API Keys / ဆက်တင်</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer Quota Card (Shows when logged in) -->
+      <div class="sidebar-quota-card hidden" id="sidebarQuotaCard">
+        <div class="quota-info">
+          <span class="quota-title">Daily Quota</span>
+          <span class="quota-val" id="sidebarQuotaText">5 / 5 Left</span>
+        </div>
+        <div class="quota-progress-bar">
+          <div class="quota-fill" id="sidebarQuotaFill" style="width: 100%;"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTAINER -->
+    <div class="main-layout">
+      <!-- TOP NAV HEADER -->
+      <header class="top-nav">
+        <div class="nav-breadcrumbs">
+          <span class="root">Red Bear Studio</span>
+          <span class="sep">/</span>
+          <span class="current" id="crumbTitle">Manual ညှိနှိုင်းခြင်း</span>
+        </div>
+
+        <div class="top-actions">
+          <!-- Auth State: Logged Out -->
+          <div class="auth-group" id="loggedOutAuth">
+            <button class="btn-auth btn-login" id="btnLogin">Login</button>
+            <button class="btn-auth btn-signup" id="btnSignup">Create Account</button>
+          </div>
+
+          <!-- Auth State: Logged In -->
+          <div class="auth-group hidden" id="loggedInAuth">
+            <span class="user-gmail" id="userEmailLabel">user@gmail.com</span>
+            <span class="credit-chip">⚡ Credits: <strong id="userCreditCount">5</strong></span>
+            <button class="btn-upgrade" id="btnUpgrade">Upgrade</button>
+          </div>
+
+          <!-- Theme Switcher -->
+          <button class="theme-switch-btn" id="themeSwitchBtn">☀️ Light</button>
+        </div>
+      </header>
+
+      <!-- STUDIO CONTENT AREA -->
+      <main class="studio-content">
+        <!-- STEP 1: MEDIA INPUT & ADVANCED PLAYER PREVIEW -->
+        <section class="section-card">
+          <h2 class="section-heading">၁။ ဗီဒီယို တင်သွင်းရန် (Video Input)</h2>
+          
+          <!-- Dropzone Container (Visible by default) -->
+          <div class="upload-dropzone" id="uploadDropzone">
+            <div class="drop-icon">☁️</div>
+            <h3 class="drop-title">ဗီဒီယိုဖိုင်ကို ဤနေရာသို့ ဆွဲထည့်ပါ (သို့မဟုတ်) နှိပ်၍ရွေးပါ</h3>
+            <p class="drop-subtitle">MP4, MKV, MOV, WEBM (Max size: 500MB)</p>
+            <input type="file" id="fileInput" accept="video/*" hidden>
+            <button class="btn-browse" id="btnBrowse">ဖိုင်ရွေးချယ်မည်</button>
+          </div>
+
+          <!-- Social Link Input Container -->
+          <div class="link-input-container">
+            <label class="input-label">သို့မဟုတ် Link ဖြင့် ထည့်ရန် (YouTube, TikTok, RedNote)</label>
+            <div class="link-input-row">
+              <input type="text" id="linkInput" placeholder="https://www.xiaohongshu.com/... သို့မဟုတ် TikTok/YouTube Link">
+              <button class="btn-paste" id="btnPaste">📋 Paste</button>
+              <button class="btn-fetch" id="btnFetch">🔗 ဆွဲယူမည်</button>
+            </div>
+            <div class="social-tags">
+              <span class="social-tag yt">YouTube</span>
+              <span class="social-tag tt">TikTok</span>
+              <span class="social-tag rednote">RedNote (小红书)</span>
+            </div>
+          </div>
+
+          <!-- MOBILE FRAME VIDEO PLAYER PREVIEW (Hidden by default, shown after file upload / link fetch) -->
+          <div class="player-preview-wrapper hidden" id="playerPreviewWrapper">
+            <div class="phone-frame">
+              <!-- Top Overlay Control Buttons -->
+              <div class="phone-top-bar">
+                <button class="phone-icon-btn" id="btnZoomVideo" title="Zoom/Crop">+</button>
+                <button class="phone-icon-btn" id="btnBlurVideo" title="Blur Background">✂️</button>
+                <button class="phone-icon-btn active-check" id="btnConfirmVideo" title="Apply Changes">✓</button>
+              </div>
+
+              <!-- Video Screen & Subtitle Overlay Layer -->
+              <div class="phone-screen">
+                <video id="previewVideoPlayer" playsinline></video>
+                
+                <!-- Subtitle Overlay Box -->
+                <div class="subtitle-overlay-box" id="subtitleOverlayBox">
+                  <span class="sub-text" id="subTextDisplay">ဒီဇာတ်လမ်းကို ကြည့်ကြရအောင်</span>
+                  <div class="sub-drag-handle"></div>
+                </div>
+              </div>
+
+              <!-- Bottom Custom Audio/Video Controls -->
+              <div class="phone-bottom-bar">
+                <button class="play-toggle-btn" id="btnPlayToggle">▶</button>
+                <div class="progress-container">
+                  <input type="range" id="videoProgressBar" value="0" min="0" max="100" step="0.1">
+                </div>
+                <span class="time-display" id="timeDisplay">0:00 / 0:15</span>
+                <button class="settings-mini-btn">— ^</button>
+              </div>
+            </div>
+
+            <div class="player-actions">
+              <span class="file-name-info" id="loadedFileName">video.mp4</span>
+              <button class="btn-remove-file" id="btnRemoveFile">🗑️ ဖိုင်ဖျက်မည်</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- STEP 2: OPTIONS & SUBTITLE/FONT SETTINGS -->
+        <section class="section-card">
+          <h2 class="section-heading">၂။ ပြင်ဆင်ချက်များ (Configuration Grid)</h2>
+          
+          <div class="options-grid">
+            <!-- Subtitle Mode -->
+            <div class="card-option">
+              <h3 class="opt-title">Subtitle Mode</h3>
+              <div class="radio-stack">
+                <label class="radio-item">
+                  <input type="radio" name="subMode" value="ai" checked>
+                  <div class="radio-meta">
+                    <strong>AI Recap</strong>
+                    <small>အကြောင်းအရာအလိုက် စာသားများကို အလိုအလျောက် စီစစ်ပေးသည်</small>
+                  </div>
+                </label>
+                <label class="radio-item">
+                  <input type="radio" name="subMode" value="normal">
+                  <div class="radio-meta">
+                    <strong>ရိုးရိုး</strong>
+                    <small>မူရင်းပြောသံအတိုင်း တိုက်ရိုက် စာတန်းထိုးထိုးမည်</small>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Aspect Ratio -->
+            <div class="card-option">
+              <h3 class="opt-title">ဗီဒီယို ratio</h3>
+              <div class="ratio-btn-group">
+                <button class="ratio-btn active" data-ratio="9:16">9:16</button>
+                <button class="ratio-btn" data-ratio="3:4">3:4</button>
+                <button class="ratio-btn" data-ratio="16:9">16:9</button>
+                <button class="ratio-btn" data-ratio="1:1">1:1</button>
+              </div>
+            </div>
+
+            <!-- Output Language -->
+            <div class="card-option">
+              <h3 class="opt-title">Output ဘာသာစကား</h3>
+              <p class="opt-desc">Video ထဲက အသံကို နိုင်ငံခြားဘာသာစကားဖြင့် ပြောင်းလဲနိုင်သည်</p>
+              <div class="lang-btn-group">
+                <button class="lang-btn active" data-lang="my">မြန်မာ</button>
+                <button class="lang-btn" data-lang="en">English</button>
+                <button class="lang-btn" data-lang="th">ไทย</button>
+              </div>
+            </div>
+
+            <!-- Subtitle Font Style Customization -->
+            <div class="card-option">
+              <h3 class="opt-title">Subtitle Font Style</h3>
+              <div class="font-select-grid">
+                <button class="font-card active" data-font="Noto Sans Myanmar" style="font-family: 'Noto Sans Myanmar', sans-serif;">
+                  <span>Noto Sans</span>
+                  <small>Clean & Modern</small>
+                </button>
+                <button class="font-card" data-font="Padauk" style="font-family: 'Padauk', sans-serif;">
+                  <span>Padauk</span>
+                  <small>Traditional</small>
+                </button>
+              </div>
+            </div>
+
+            <!-- Blur & Mirror Switches -->
+            <div class="card-option">
+              <h3 class="opt-title">Blur & Mirror</h3>
+              <div class="toggle-row">
+                <span>Blur Background</span>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="chkBlur">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+              <div class="toggle-row mt-10">
+                <span>Mirror (ဗီဒီယိုလှန်ရန်)</span>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="chkMirror">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Zoom Control -->
+            <div class="card-option">
+              <h3 class="opt-title">ရူးမ် (Zoom)</h3>
+              <div class="zoom-range-wrapper">
+                <input type="range" id="rngZoom" min="100" max="150" value="100">
+                <span class="zoom-readout" id="zoomValText">100%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="submit-action-container">
+            <button class="btn-execute-process" id="btnExecute">စတင်ထုတ်ယူမည်</button>
+          </div>
+        </section>
+      </main>
+    </div>
   </div>
 
-  <div id="toastContainer"></div>
+  <div class="toast-stack" id="toastStack"></div>
   <script src="app.js"></script>
 </body>
 </html>
