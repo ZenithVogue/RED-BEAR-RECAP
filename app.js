@@ -1,3 +1,7 @@
+/* ============================================================
+   Red Bear Studio v2.0 Pro Dynamic Engine
+   ============================================================ */
+
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
 
@@ -7,8 +11,10 @@ document.addEventListener("DOMContentLoaded", () => {
   initMediaAcquisition();
   initTabsAndControls();
   initOverlaysAndEditing();
+  initBackgroundControls();
 });
 
+/* ---------------- 1. Theme Switcher ---------------- */
 function initThemeSwitcher() {
   const themeToggleBtn = $("#themeToggleBtn");
   const htmlElement = document.documentElement;
@@ -21,6 +27,7 @@ function initThemeSwitcher() {
   });
 }
 
+/* ---------------- 2. Auth Flow Simulation ---------------- */
 function initAuthFlow() {
   const btnLogin = $("#btnLogin");
   const btnSignup = $("#btnSignup");
@@ -40,6 +47,7 @@ function initAuthFlow() {
   }
 }
 
+/* ---------------- 3. Media Ingestion & View Replacement Inside Blue Box ---------------- */
 function initMediaAcquisition() {
   const fileInput = $("#fileInput");
   const btnBrowse = $("#btnBrowse");
@@ -48,8 +56,8 @@ function initMediaAcquisition() {
   const btnPaste = $("#btnPaste");
   const btnFetch = $("#btnFetch");
 
-  const mediaInputBox = $("#mediaInputBox");
-  const phonePreviewContainer = $("#phonePreviewContainer");
+  const mediaInputView = $("#mediaInputView");
+  const phonePreviewView = $("#phonePreviewView");
   const previewVideo = $("#previewVideo");
   const activeFileName = $("#activeFileName");
   const btnRemoveMedia = $("#btnRemoveMedia");
@@ -88,8 +96,9 @@ function initMediaAcquisition() {
     previewVideo.src = streamUrl;
     activeFileName.textContent = fileName;
 
-    mediaInputBox.classList.add("hidden");
-    phonePreviewContainer.classList.remove("hidden");
+    // Direct View Replacement INSIDE the Blue Container Box
+    mediaInputView.classList.add("hidden");
+    phonePreviewView.classList.remove("hidden");
   }
 
   btnRemoveMedia.addEventListener("click", () => {
@@ -98,8 +107,9 @@ function initMediaAcquisition() {
     fileInput.value = "";
     linkInput.value = "";
 
-    phonePreviewContainer.classList.add("hidden");
-    mediaInputBox.classList.remove("hidden");
+    // Revert View INSIDE the Blue Container Box
+    phonePreviewView.classList.add("hidden");
+    mediaInputView.classList.remove("hidden");
   });
 
   btnPlayToggle.addEventListener("click", () => {
@@ -133,6 +143,7 @@ function initMediaAcquisition() {
   }
 }
 
+/* ---------------- 4. Fixed Width Sidebar Tabs & Config Controls ---------------- */
 function initTabsAndControls() {
   $$(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -174,24 +185,28 @@ function initTabsAndControls() {
   });
 }
 
+/* ---------------- 5. Interactive Overlays (Blur & Functional Crop) ---------------- */
 function initOverlaysAndEditing() {
   const btnToggleBlur = $("#btnToggleBlur");
   const btnToggleCrop = $("#btnToggleCrop");
-  const btnConfirmChanges = $("#btnConfirmChanges");
 
   const blurOverlayBox = $("#blurOverlayBox");
   const blurSliderBar = $("#blurSliderBar");
   const btnCloseBlur = $("#btnCloseBlur");
   const rngBlurStrength = $("#rngBlurStrength");
   const blurValText = $("#blurValText");
+  const blurResizeHandle = $("#blurResizeHandle");
 
   const cropOverlayBox = $("#cropOverlayBox");
   const subtitleOverlay = $("#subtitleOverlay");
+  const previewVideo = $("#previewVideo");
 
+  // Blur Activation
   btnToggleBlur.addEventListener("click", () => {
     blurOverlayBox.classList.remove("hidden");
     blurSliderBar.classList.remove("hidden");
     cropOverlayBox.classList.add("hidden");
+    subtitleOverlay.classList.remove("hidden");
   });
 
   btnCloseBlur.addEventListener("click", () => {
@@ -218,6 +233,53 @@ function initOverlaysAndEditing() {
     }
   });
 
+  // Make Blur Box Draggable
+  let isDraggingBlur = false, startX, startY, initialLeft, initialTop;
+
+  blurOverlayBox.addEventListener("mousedown", (e) => {
+    if (e.target === blurResizeHandle || e.target === btnCloseBlur) return;
+    isDraggingBlur = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    initialLeft = blurOverlayBox.offsetLeft;
+    initialTop = blurOverlayBox.offsetTop;
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isDraggingBlur) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    blurOverlayBox.style.left = `${initialLeft + dx}px`;
+    blurOverlayBox.style.top = `${initialTop + dy}px`;
+  });
+
+  document.addEventListener("mouseup", () => { isDraggingBlur = false; });
+
+  // Make Blur Box Resizable via Circle Handle
+  let isResizingBlur = false, rStartX, rStartY, startW, startH;
+
+  blurResizeHandle.addEventListener("mousedown", (e) => {
+    isResizingBlur = true;
+    rStartX = e.clientX;
+    rStartY = e.clientY;
+    startW = blurOverlayBox.offsetWidth;
+    startH = blurOverlayBox.offsetHeight;
+    e.stopPropagation();
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizingBlur) return;
+    const dw = e.clientX - rStartX;
+    const dh = e.clientY - rStartY;
+    blurOverlayBox.style.width = `${Math.max(60, startW + dw)}px`;
+    blurOverlayBox.style.height = `${Math.max(40, startH + dh)}px`;
+  });
+
+  document.addEventListener("mouseup", () => { isResizingBlur = false; });
+
+  // Crop Activation (Temporarily Hides Blur & Subtitles)
   btnToggleCrop.addEventListener("click", () => {
     cropOverlayBox.classList.remove("hidden");
     blurOverlayBox.classList.add("hidden");
@@ -228,12 +290,65 @@ function initOverlaysAndEditing() {
   $("#btnResetCrop").addEventListener("click", () => {
     cropOverlayBox.classList.add("hidden");
     subtitleOverlay.classList.remove("hidden");
+    previewVideo.style.clipPath = "none";
+  });
+}
+
+/* ---------------- 6. Background Controls (Blur BG & Photo BG) ---------------- */
+function initBackgroundControls() {
+  const btnModeBlurBg = $("#btnModeBlurBg");
+  const btnModePhotoBg = $("#btnModePhotoBg");
+  const panelBlurBg = $("#panelBlurBg");
+  const panelPhotoBg = $("#panelPhotoBg");
+
+  const bgPhotoInput = $("#bgPhotoInput");
+  const btnUploadBgPhoto = $("#btnUploadBgPhoto");
+  const photoPreviewWrap = $("#photoPreviewWrap");
+  const photoThumb = $("#photoThumb");
+  const rngBgOpacity = $("#rngBgOpacity");
+  const opacityValText = $("#opacityValText");
+  const bgLayer = $("#bgLayer");
+
+  btnModeBlurBg.addEventListener("click", () => {
+    btnModeBlurBg.classList.add("active");
+    btnModePhotoBg.classList.remove("active");
+    panelBlurBg.classList.remove("hidden");
+    panelPhotoBg.classList.add("hidden");
   });
 
-  btnConfirmChanges.addEventListener("click", () => {
-    cropOverlayBox.classList.add("hidden");
-    blurOverlayBox.classList.add("hidden");
-    blurSliderBar.classList.add("hidden");
-    subtitleOverlay.classList.remove("hidden");
+  btnModePhotoBg.addEventListener("click", () => {
+    btnModePhotoBg.classList.add("active");
+    btnModeBlurBg.classList.remove("active");
+    panelPhotoBg.classList.remove("hidden");
+    panelBlurBg.classList.add("hidden");
+  });
+
+  $$(".blur-preset-card").forEach(card => {
+    card.addEventListener("click", () => {
+      $$(".blur-preset-card").forEach(c => c.classList.remove("active"));
+      card.classList.add("active");
+    });
+  });
+
+  btnUploadBgPhoto.addEventListener("click", () => bgPhotoInput.click());
+
+  bgPhotoInput.addEventListener("change", (e) => {
+    if (e.target.files.length) {
+      const url = URL.createObjectURL(e.target.files[0]);
+      photoThumb.style.backgroundImage = `url(${url})`;
+      bgLayer.style.backgroundImage = `url(${url})`;
+      photoPreviewWrap.classList.remove("hidden");
+    }
+  });
+
+  rngBgOpacity.addEventListener("input", (e) => {
+    opacityValText.textContent = `${e.target.value}%`;
+    bgLayer.style.opacity = e.target.value / 100;
+  });
+
+  $("#btnClearBg").addEventListener("click", () => {
+    bgLayer.style.backgroundImage = "none";
+    photoPreviewWrap.classList.add("hidden");
+    bgPhotoInput.value = "";
   });
 }
