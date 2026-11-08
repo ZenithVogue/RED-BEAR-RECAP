@@ -41,7 +41,6 @@
         </button>
       </nav>
 
-      <!-- Dynamic Quota Card (Visible when Logged In) -->
       <div class="quota-card hidden" id="leftQuotaCard">
         <div class="quota-info">
           <span>Daily Quota</span>
@@ -63,13 +62,11 @@
         </div>
 
         <div class="top-actions">
-          <!-- Not Logged In State (Default) -->
           <div class="auth-group" id="loggedOutAuth">
             <button class="btn-auth btn-login" id="btnLogin">Login</button>
             <button class="btn-auth btn-signup" id="btnSignup">Create Account</button>
           </div>
 
-          <!-- Logged In State (Hidden by default) -->
           <div class="auth-group hidden" id="loggedInAuth">
             <span class="user-gmail" id="userEmailLabel">user@gmail.com</span>
             <span class="credit-chip">⚡ Credits: <strong id="userCreditCount">5</strong></span>
@@ -86,7 +83,6 @@
         <!-- CENTRAL AREA: UPLOAD & VIDEO PREVIEW -->
         <section class="central-stage">
           
-          <!-- State 1: Upload / Link Box (Hidden after media acquisition) -->
           <div class="media-input-box" id="mediaInputBox">
             <h2 class="section-title">၁။ ဗီဒီယို တင်သွင်းရန် (Video Input)</h2>
 
@@ -113,35 +109,30 @@
             </div>
           </div>
 
-          <!-- State 2: Phone Frame Video Preview (Appears in central area) -->
+          <!-- PHONE PREVIEW CONTAINER -->
           <div class="phone-preview-container hidden" id="phonePreviewContainer">
             <div class="phone-frame">
               
-              <!-- Phone Top Controls -->
               <div class="phone-top-bar">
                 <button class="phone-tool-btn" id="btnToggleBlur">+ Blur ထည့်</button>
                 <button class="phone-tool-btn" id="btnToggleCrop">✂️ Crop</button>
                 <button class="phone-tool-btn confirm-btn" id="btnConfirmChanges">✓ ပြီးပြီ</button>
               </div>
 
-              <!-- Phone Screen Viewport -->
               <div class="phone-viewport" id="phoneViewport">
                 <video id="previewVideo" playsinline></video>
                 
-                <!-- Interactive Subtitle Overlay Layer -->
                 <div class="subtitle-overlay" id="subtitleOverlay">
                   <span class="sub-text" id="subTextDisplay">ဒီဇာတ်လမ်းကို ကြည့်ကြရအောင်</span>
                   <div class="sub-drag-node"></div>
                 </div>
 
-                <!-- Interactive Blur Overlay Layer (Controlled via + Blur) -->
                 <div class="blur-overlay-box hidden" id="blurOverlayBox">
                   <div class="blur-close-btn" id="btnCloseBlur">✕</div>
                   <div class="blur-drag-handle">✛</div>
                   <div class="blur-resize-handle"></div>
                 </div>
 
-                <!-- Interactive Crop Overlay Layer (Controlled via Crop) -->
                 <div class="crop-overlay-box hidden" id="cropOverlayBox">
                   <div class="crop-header-actions">
                     <span class="crop-label">နေရာကို ဆွဲချယ်ပါ</span>
@@ -156,7 +147,6 @@
                 </div>
               </div>
 
-              <!-- Blur Controls Bar (Appears when Blur mode active) -->
               <div class="blur-slider-bar hidden" id="blurSliderBar">
                 <span class="blur-label">Blur</span>
                 <button class="btn-step" id="btnBlurDec">-</button>
@@ -165,7 +155,6 @@
                 <span class="blur-val" id="blurValText">20</span>
               </div>
 
-              <!-- Phone Bottom Controls Bar -->
               <div class="phone-bottom-bar">
                 <button class="play-btn" id="btnPlayToggle">▶</button>
                 <div class="progress-wrapper">
@@ -183,10 +172,9 @@
 
         </section>
 
-        <!-- RIGHT CONFIGURATION SIDEBAR WITH TABS -->
+        <!-- RIGHT CONFIGURATION SIDEBAR -->
         <aside class="right-config-sidebar">
           
-          <!-- Tab Headers -->
           <div class="config-tabs-header">
             <button class="tab-btn active" data-tab="tab-video">ဗီဒီယို ပြင်ဆင်ချက်</button>
             <button class="tab-btn" data-tab="tab-audio">အသံ</button>
@@ -194,7 +182,6 @@
             <button class="tab-btn" data-tab="tab-extra">မူပိုင်ခွင့်</button>
           </div>
 
-          <!-- Tab 1: Video Settings -->
           <div class="tab-content active" id="tab-video">
             <div class="config-card">
               <h3 class="config-title">ဗီဒီယို အချိုး (Aspect Ratio)</h3>
@@ -214,4 +201,93 @@
               </label>
             </div>
 
-            <div class="
+            <div class="config-card">
+              <h3 class="config-title">Blur နောက်ခံ & Mirror</h3>
+              <div class="toggle-stack">
+                <label class="switch-row">
+                  <span>Blur နောက်ခံ</span>
+                  <input type="checkbox" id="chkBlurBg">
+                </label>
+                <label class="switch-row mt-10">
+                  <span>Mirror (ဗီဒီယိုလှန်ရန်)</span>
+                  <input type="checkbox" id="chkMirror">
+                </label>
+              </div>
+            </div>
+
+            <div class="config-card">
+              <h3 class="config-title">ရူးမ် (Zoom)</h3>
+              <div class="range-row">
+                <input type="range" id="rngZoom" min="100" max="150" value="100">
+                <span class="range-val" id="zoomVal">100%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-audio">
+            <div class="config-card">
+              <h3 class="config-title">Output ဘာသာစကား</h3>
+              <p class="config-desc">Video ထဲက အသံကို နိုင်ငံခြားဘာသာစကားဖြင့် ပြောင်းလဲနိုင်သည်</p>
+              <div class="lang-btn-group">
+                <button class="lang-btn active" data-lang="my">မြန်မာ</button>
+                <button class="lang-btn" data-lang="en">English</button>
+                <button class="lang-btn" data-lang="th">ไทย</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-sub">
+            <div class="config-card">
+              <h3 class="config-title">Subtitle Mode</h3>
+              <div class="radio-stack">
+                <label class="radio-item">
+                  <input type="radio" name="subModeTab" value="ai" checked>
+                  <div>
+                    <strong>AI Recap</strong>
+                    <small>စကားပြောတဲ့နေရာမှာပဲ စာတန်းထိုးပေးမည်</small>
+                  </div>
+                </label>
+                <label class="radio-item">
+                  <input type="radio" name="subModeTab" value="normal">
+                  <div>
+                    <strong>Subtitle Mode</strong>
+                    <small>မူရင်းအတိုင်း ဘာသာပြန် စာတန်းထိုးမည်</small>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div class="config-card">
+              <h3 class="config-title">Subtitle Font Style</h3>
+              <div class="font-grid">
+                <button class="font-card active" data-font="Noto Sans Myanmar" style="font-family: 'Noto Sans Myanmar', sans-serif;">
+                  <span>Noto Sans</span>
+                  <small>Clean & Modern</small>
+                </button>
+                <button class="font-card" data-font="Padauk" style="font-family: 'Padauk', sans-serif;">
+                  <span>Padauk</span>
+                  <small>Traditional</small>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-extra">
+            <div class="config-card">
+              <h3 class="config-title">မူပိုင်ခွင့် နှင့် စည်းမျဉ်းများ</h3>
+              <p class="config-desc">ဤစနစ်တွင် တည်းဖြတ်သော ဗီဒီယိုများ၏ မူပိုင်ခွင့်နှင့် ပိုင်ဆိုင်မှုအားလုံးသည် ဖန်တီးသူထံ၌သာ ရှိပါသည်။</p>
+            </div>
+          </div>
+
+          <div class="execute-container">
+            <button class="btn-execute" id="btnExecute">စတင်ထုတ်ယူမည်</button>
+          </div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
