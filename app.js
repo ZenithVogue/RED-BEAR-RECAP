@@ -1,7 +1,3 @@
-/* ============================================================
-   Red Bear Studio v2.0 Pro Logic Engine
-   ============================================================ */
-
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
 
@@ -13,7 +9,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initOverlaysAndEditing();
 });
 
-/* ---------------- 1. Theme Switcher ---------------- */
 function initThemeSwitcher() {
   const themeToggleBtn = $("#themeToggleBtn");
   const htmlElement = document.documentElement;
@@ -26,7 +21,6 @@ function initThemeSwitcher() {
   });
 }
 
-/* ---------------- 2. Auth Flow Simulation ---------------- */
 function initAuthFlow() {
   const btnLogin = $("#btnLogin");
   const btnSignup = $("#btnSignup");
@@ -46,7 +40,6 @@ function initAuthFlow() {
   }
 }
 
-/* ---------------- 3. Media Acquisition & Viewport Switching ---------------- */
 function initMediaAcquisition() {
   const fileInput = $("#fileInput");
   const btnBrowse = $("#btnBrowse");
@@ -95,7 +88,6 @@ function initMediaAcquisition() {
     previewVideo.src = streamUrl;
     activeFileName.textContent = fileName;
 
-    // Hide Upload/Link box and show Phone Preview frame in central area
     mediaInputBox.classList.add("hidden");
     phonePreviewContainer.classList.remove("hidden");
   }
@@ -106,7 +98,6 @@ function initMediaAcquisition() {
     fileInput.value = "";
     linkInput.value = "";
 
-    // Revert central area view
     phonePreviewContainer.classList.add("hidden");
     mediaInputBox.classList.remove("hidden");
   });
@@ -142,9 +133,7 @@ function initMediaAcquisition() {
   }
 }
 
-/* ---------------- 4. Tabs & Config Controls ---------------- */
 function initTabsAndControls() {
-  // Tab Switching
   $$(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -155,7 +144,6 @@ function initTabsAndControls() {
     });
   });
 
-  // Aspect Ratio selection
   $$(".ratio-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".ratio-btn").forEach(b => b.classList.remove("active"));
@@ -163,7 +151,6 @@ function initTabsAndControls() {
     });
   });
 
-  // Language selection
   $$(".lang-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".lang-btn").forEach(b => b.classList.remove("active"));
@@ -171,7 +158,6 @@ function initTabsAndControls() {
     });
   });
 
-  // Subtitle Font selection
   const subTextDisplay = $("#subTextDisplay");
   $$(".font-card").forEach(card => {
     card.addEventListener("click", () => {
@@ -181,7 +167,6 @@ function initTabsAndControls() {
     });
   });
 
-  // Zoom control
   const rngZoom = $("#rngZoom");
   const zoomVal = $("#zoomVal");
   rngZoom.addEventListener("input", (e) => {
@@ -189,7 +174,6 @@ function initTabsAndControls() {
   });
 }
 
-/* ---------------- 5. Overlays (Blur & Crop Interaction) ---------------- */
 function initOverlaysAndEditing() {
   const btnToggleBlur = $("#btnToggleBlur");
   const btnToggleCrop = $("#btnToggleCrop");
@@ -204,7 +188,6 @@ function initOverlaysAndEditing() {
   const cropOverlayBox = $("#cropOverlayBox");
   const subtitleOverlay = $("#subtitleOverlay");
 
-  // Blur Toggle
   btnToggleBlur.addEventListener("click", () => {
     blurOverlayBox.classList.remove("hidden");
     blurSliderBar.classList.remove("hidden");
@@ -235,7 +218,6 @@ function initOverlaysAndEditing() {
     }
   });
 
-  // Crop Toggle (Temporarily hides Blur and Subtitles as requested)
   btnToggleCrop.addEventListener("click", () => {
     cropOverlayBox.classList.remove("hidden");
     blurOverlayBox.classList.add("hidden");
