@@ -80,111 +80,113 @@
       <!-- STUDIO CONTENT AREA -->
       <main class="studio-content">
         
-        <!-- CENTRAL AREA: UPLOAD & VIDEO PREVIEW -->
-        <section class="central-stage">
-          
-          <div class="media-input-box" id="mediaInputBox">
-            <h2 class="section-title">၁။ ဗီဒီယို တင်သွင်းရန် (Video Input)</h2>
+        <!-- CENTRAL AREA: BLUE CONTAINER BOX -->
+        <div class="central-column">
+          <section class="blue-container-box" id="blueContainerBox">
+            
+            <!-- STATE 1: UPLOAD & LINK INPUT BOX -->
+            <div class="media-input-view" id="mediaInputView">
+              <h2 class="section-title">၁။ ဗီဒီယို တင်သွင်းရန် (Video Input)</h2>
 
-            <div class="upload-dropzone" id="uploadDropzone">
-              <div class="drop-icon">☁️</div>
-              <h3>ဗီဒီယိုဖိုင်ကို ဤနေရာသို့ ဆွဲထည့်ပါ (သို့မဟုတ်) နှိပ်၍ရွေးပါ</h3>
-              <p>MP4, MKV, MOV, WEBM (Max size: 500MB)</p>
-              <input type="file" id="fileInput" accept="video/*" hidden>
-              <button class="btn-browse" id="btnBrowse">ဖိုင်ရွေးချယ်မည်</button>
+              <div class="upload-dropzone" id="uploadDropzone">
+                <div class="drop-icon">☁️</div>
+                <h3>ဗီဒီယိုဖိုင်ကို ဤနေရာသို့ ဆွဲထည့်ပါ (သို့မဟုတ်) နှိပ်၍ရွေးပါ</h3>
+                <p>MP4, MKV, MOV, WEBM (Max size: 500MB)</p>
+                <input type="file" id="fileInput" accept="video/*" hidden>
+                <button class="btn-browse" id="btnBrowse">ဖိုင်ရွေးချယ်မည်</button>
+              </div>
+
+              <div class="link-input-row">
+                <label class="input-label">သို့မဟုတ် Link ဖြင့် ထည့်ရန် (YouTube, TikTok, RedNote)</label>
+                <div class="link-controls">
+                  <input type="text" id="linkInput" placeholder="https://www.xiaohongshu.com/... သို့မဟုတ် TikTok/YouTube Link">
+                  <button class="btn-paste" id="btnPaste">📋 Paste</button>
+                  <button class="btn-fetch" id="btnFetch">🔗 ဆွဲယူမည်</button>
+                </div>
+                <div class="social-tags">
+                  <span class="social-tag yt">YouTube</span>
+                  <span class="social-tag tt">TikTok</span>
+                  <span class="social-tag rednote">RedNote (小红书)</span>
+                </div>
+              </div>
             </div>
 
-            <div class="link-input-row">
-              <label class="input-label">သို့မဟုတ် Link ဖြင့် ထည့်ရန် (YouTube, TikTok, RedNote)</label>
-              <div class="link-controls">
-                <input type="text" id="linkInput" placeholder="https://www.xiaohongshu.com/... သို့မဟုတ် TikTok/YouTube Link">
-                <button class="btn-paste" id="btnPaste">📋 Paste</button>
-                <button class="btn-fetch" id="btnFetch">🔗 ဆွဲယူမည်</button>
-              </div>
-              <div class="social-tags">
-                <span class="social-tag yt">YouTube</span>
-                <span class="social-tag tt">TikTok</span>
-                <span class="social-tag rednote">RedNote (小红书)</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- PHONE PREVIEW CONTAINER -->
-          <div class="phone-preview-container hidden" id="phonePreviewContainer">
-            <div class="phone-frame">
-              
-              <div class="phone-top-bar">
-                <button class="phone-tool-btn" id="btnToggleBlur">+ Blur ထည့်</button>
-                <button class="phone-tool-btn" id="btnToggleCrop">✂️ Crop</button>
-                <button class="phone-tool-btn confirm-btn" id="btnConfirmChanges">✓ ပြီးပြီ</button>
-              </div>
-
-              <div class="phone-viewport" id="phoneViewport">
-                <video id="previewVideo" playsinline></video>
+            <!-- STATE 2: PHONE PREVIEW FRAME (Appears INSIDE the Blue Container Box) -->
+            <div class="phone-preview-view hidden" id="phonePreviewView">
+              <div class="phone-frame" id="phoneFrame">
                 
-                <div class="subtitle-overlay" id="subtitleOverlay">
-                  <span class="sub-text" id="subTextDisplay">ဒီဇာတ်လမ်းကို ကြည့်ကြရအောင်</span>
-                  <div class="sub-drag-node"></div>
+                <!-- Phone Viewport -->
+                <div class="phone-viewport" id="phoneViewport">
+                  <!-- Video Component -->
+                  <video id="previewVideo" playsinline></video>
+                  <div class="bg-layer" id="bgLayer"></div>
+
+                  <!-- Subtitle Overlay -->
+                  <div class="subtitle-overlay" id="subtitleOverlay">
+                    <span class="sub-text" id="subTextDisplay">ဒီဇာတ်လမ်းကို ကြည့်ကြရအောင်</span>
+                    <div class="sub-drag-node"></div>
+                  </div>
+
+                  <!-- Interactive Blur Overlay Box (Full line border, rounded corner, resizable & draggable) -->
+                  <div class="blur-overlay-box hidden" id="blurOverlayBox">
+                    <div class="blur-close-btn" id="btnCloseBlur">✕</div>
+                    <div class="blur-drag-handle">✛</div>
+                    <div class="blur-resize-handle" id="blurResizeHandle"></div>
+                  </div>
+
+                  <!-- Actual Functional Crop Overlay Box -->
+                  <div class="crop-overlay-box hidden" id="cropOverlayBox">
+                    <div class="crop-header-actions">
+                      <span class="crop-label">နေရာကို ဆွဲချယ်ပါ</span>
+                      <button class="crop-reset-btn" id="btnResetCrop">ဖြတ်ယူမှုများကို ဖျက်မည်</button>
+                    </div>
+                    <div class="crop-box" id="cropBox">
+                      <div class="crop-corner top-left"></div>
+                      <div class="crop-corner top-right"></div>
+                      <div class="crop-corner bottom-left"></div>
+                      <div class="crop-corner bottom-right"></div>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="blur-overlay-box hidden" id="blurOverlayBox">
-                  <div class="blur-close-btn" id="btnCloseBlur">✕</div>
-                  <div class="blur-drag-handle">✛</div>
-                  <div class="blur-resize-handle"></div>
+                <!-- Blur Slider Bar (Strength Controller) -->
+                <div class="blur-slider-bar hidden" id="blurSliderBar">
+                  <span class="blur-label">Blur</span>
+                  <button class="btn-step" id="btnBlurDec">-</button>
+                  <input type="range" id="rngBlurStrength" min="0" max="50" value="20">
+                  <button class="btn-step" id="btnBlurInc">+</button>
+                  <span class="blur-val" id="blurValText">20</span>
                 </div>
 
-                <div class="crop-overlay-box hidden" id="cropOverlayBox">
-                  <div class="crop-header-actions">
-                    <span class="crop-label">နေရာကို ဆွဲချယ်ပါ</span>
-                    <button class="crop-reset-btn" id="btnResetCrop">ဖြတ်ယူမှုများကို ဖျက်မည်</button>
+                <!-- Phone Bottom Bar -->
+                <div class="phone-bottom-bar">
+                  <button class="play-btn" id="btnPlayToggle">▶</button>
+                  <div class="progress-wrapper">
+                    <input type="range" id="videoProgress" value="0" min="0" max="100" step="0.1">
                   </div>
-                  <div class="crop-box">
-                    <div class="crop-corner top-left"></div>
-                    <div class="crop-corner top-right"></div>
-                    <div class="crop-corner bottom-left"></div>
-                    <div class="crop-corner bottom-right"></div>
-                  </div>
+                  <span class="time-readout" id="timeReadout">0:00 / 0:15</span>
                 </div>
               </div>
 
-              <div class="blur-slider-bar hidden" id="blurSliderBar">
-                <span class="blur-label">Blur</span>
-                <button class="btn-step" id="btnBlurDec">-</button>
-                <input type="range" id="rngBlurStrength" min="0" max="50" value="20">
-                <button class="btn-step" id="btnBlurInc">+</button>
-                <span class="blur-val" id="blurValText">20</span>
-              </div>
-
-              <div class="phone-bottom-bar">
-                <button class="play-btn" id="btnPlayToggle">▶</button>
-                <div class="progress-wrapper">
-                  <input type="range" id="videoProgress" value="0" min="0" max="100" step="0.1">
+              <!-- Bottom Footer Controls -->
+              <div class="preview-footer-actions">
+                <span class="file-info-text" id="activeFileName">video.mp4</span>
+                <div class="action-btn-group">
+                  <button class="btn-tool" id="btnToggleBlur">+ Blur ထည့်</button>
+                  <button class="btn-tool" id="btnToggleCrop">✂️ Crop</button>
+                  <button class="btn-remove-media" id="btnRemoveMedia">🗑️ ဖိုင်ဖျက်မည်</button>
                 </div>
-                <span class="time-readout" id="timeReadout">0:00 / 0:15</span>
               </div>
             </div>
 
-            <div class="preview-footer-actions">
-              <span class="file-info-text" id="activeFileName">video.mp4</span>
-              <button class="btn-remove-media" id="btnRemoveMedia">🗑️ ဖိုင်ဖျက်မည်</button>
-            </div>
-          </div>
+          </section>
 
-        </section>
-
-        <!-- RIGHT CONFIGURATION SIDEBAR -->
-        <aside class="right-config-sidebar">
-          
-          <div class="config-tabs-header">
-            <button class="tab-btn active" data-tab="tab-video">ဗီဒီယို ပြင်ဆင်ချက်</button>
-            <button class="tab-btn" data-tab="tab-audio">အသံ</button>
-            <button class="tab-btn" data-tab="tab-sub">စာတန်းထိုး</button>
-            <button class="tab-btn" data-tab="tab-extra">မူပိုင်ခွင့်</button>
-          </div>
-
-          <div class="tab-content active" id="tab-video">
-            <div class="config-card">
-              <h3 class="config-title">ဗီဒီယို အချိုး (Aspect Ratio)</h3>
+          <!-- BOTTOM HORIZONTAL CONTROLS ROW -->
+          <div class="bottom-controls-row">
+            
+            <!-- Card 1: Aspect Ratio -->
+            <div class="ctrl-card">
+              <h3 class="ctrl-title">ဗီဒီယို အချိုး (Aspect Ratio)</h3>
               <div class="ratio-btn-group">
                 <button class="ratio-btn active" data-ratio="9:16">9:16</button>
                 <button class="ratio-btn" data-ratio="3:4">3:4</button>
@@ -193,37 +195,129 @@
               </div>
             </div>
 
-            <div class="config-card">
-              <h3 class="config-title">TikTok HD (1080p)</h3>
-              <label class="switch-row">
-                <span>TikTok အတွက် အရည်အသွေးမြင့် render ဖြင့် Render ပြုလုပ်မည်</span>
-                <input type="checkbox" id="chkTikTokHD" checked>
-              </label>
-            </div>
-
-            <div class="config-card">
-              <h3 class="config-title">Blur နောက်ခံ & Mirror</h3>
+            <!-- Card 2: Blur Bg & Mirror -->
+            <div class="ctrl-card">
+              <h3 class="ctrl-title">Blur နောက်ခံ & Mirror</h3>
               <div class="toggle-stack">
                 <label class="switch-row">
                   <span>Blur နောက်ခံ</span>
                   <input type="checkbox" id="chkBlurBg">
                 </label>
-                <label class="switch-row mt-10">
+                <label class="switch-row">
                   <span>Mirror (ဗီဒီယိုလှန်ရန်)</span>
                   <input type="checkbox" id="chkMirror">
                 </label>
               </div>
             </div>
 
-            <div class="config-card">
-              <h3 class="config-title">ရူးမ် (Zoom)</h3>
+            <!-- Card 3: Zoom -->
+            <div class="ctrl-card">
+              <h3 class="ctrl-title">ရူးမ် (Zoom)</h3>
               <div class="range-row">
                 <input type="range" id="rngZoom" min="100" max="150" value="100">
                 <span class="range-val" id="zoomVal">100%</span>
               </div>
             </div>
+
+            <!-- Card 4: Dynamic Background (Blur BG & Photo BG) -->
+            <div class="ctrl-card bg-ctrl-card">
+              <div class="ctrl-card-header">
+                <h3 class="ctrl-title">နောက်ခံပုံ (Background)</h3>
+                <button class="btn-card-close" id="btnClearBg" title="Clear Background">✕</button>
+              </div>
+
+              <div class="bg-mode-selector">
+                <button class="bg-mode-btn active" id="btnModeBlurBg">Blur BG</button>
+                <button class="bg-mode-btn" id="btnModePhotoBg">Photo BG</button>
+              </div>
+
+              <!-- Sub-option A: Blur BG Options (Soft, Medium, Hard) -->
+              <div class="bg-sub-panel" id="panelBlurBg">
+                <div class="blur-presets-grid">
+                  <button class="blur-preset-card active" data-preset="soft">
+                    <div class="preset-preview soft"></div>
+                    <span>Soft</span>
+                  </button>
+                  <button class="blur-preset-card" data-preset="medium">
+                    <div class="preset-preview medium"></div>
+                    <span>Medium</span>
+                  </button>
+                  <button class="blur-preset-card" data-preset="hard">
+                    <div class="preset-preview hard"></div>
+                    <span>Hard</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Sub-option B: Photo BG Options (Upload + Opacity Slider) -->
+              <div class="bg-sub-panel hidden" id="panelPhotoBg">
+                <input type="file" id="bgPhotoInput" accept="image/*" hidden>
+                <button class="btn-upload-bg-photo" id="btnUploadBgPhoto">📷 ပုံဖိုင် ရွေးချယ်မည်</button>
+                
+                <div class="photo-preview-wrap hidden" id="photoPreviewWrap">
+                  <div class="photo-thumb" id="photoThumb"></div>
+                  <div class="opacity-slider-row">
+                    <span>Opacity</span>
+                    <input type="range" id="rngBgOpacity" min="10" max="100" value="100">
+                    <span id="opacityValText">100%</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        <!-- RIGHT CONFIGURATION SIDEBAR (FIXED WIDTH: 340px) -->
+        <aside class="right-config-sidebar">
+          
+          <div class="config-tabs-header">
+            <button class="tab-btn active" data-tab="tab-settings">ပြင်ဆင်ချက်</button>
+            <button class="tab-btn" data-tab="tab-audio">အသံ</button>
+            <button class="tab-btn" data-tab="tab-sub">စာတန်းထိုး</button>
+            <button class="tab-btn" data-tab="tab-extra">မူပိုင်ခွင့်</button>
           </div>
 
+          <!-- Tab 1: ပြင်ဆင်ချက် -->
+          <div class="tab-content active" id="tab-settings">
+            <div class="config-card">
+              <h3 class="config-title">Subtitle / Audio Mode</h3>
+              <div class="radio-stack">
+                <label class="radio-item">
+                  <input type="radio" name="subModeTab" value="ai" checked>
+                  <div>
+                    <strong>AI Recap</strong>
+                    <small>စကားပြောသည့်နေရာအလိုက် စာတန်းထိုးပေးမည်</small>
+                  </div>
+                </label>
+                <label class="radio-item">
+                  <input type="radio" name="subModeTab" value="normal">
+                  <div>
+                    <strong>Subtitle Mode</strong>
+                    <small>မူရင်းအတိုင်း ဘာသာပြန် စာတန်းထိုးမည်</small>
+                  </div>
+                </label>
+                <label class="radio-item">
+                  <input type="radio" name="subModeTab" value="dubbing">
+                  <div>
+                    <strong>Dubbing Mode</strong>
+                    <small>အသံသစ်ဖြင့် နောက်ခံ အသံပြန်သွင်းမည်</small>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div class="config-card">
+              <h3 class="config-title">TikTok HD (1080p)</h3>
+              <label class="switch-row">
+                <span>TikTok အတွက် အရည်အသွေးမြင့် render ဖြင့် ပြုလုပ်မည်</span>
+                <input type="checkbox" id="chkTikTokHD" checked>
+              </label>
+            </div>
+          </div>
+
+          <!-- Tab 2: အသံ -->
           <div class="tab-content" id="tab-audio">
             <div class="config-card">
               <h3 class="config-title">Output ဘာသာစကား</h3>
@@ -236,27 +330,8 @@
             </div>
           </div>
 
+          <!-- Tab 3: စာတန်းထိုး -->
           <div class="tab-content" id="tab-sub">
-            <div class="config-card">
-              <h3 class="config-title">Subtitle Mode</h3>
-              <div class="radio-stack">
-                <label class="radio-item">
-                  <input type="radio" name="subModeTab" value="ai" checked>
-                  <div>
-                    <strong>AI Recap</strong>
-                    <small>စကားပြောတဲ့နေရာမှာပဲ စာတန်းထိုးပေးမည်</small>
-                  </div>
-                </label>
-                <label class="radio-item">
-                  <input type="radio" name="subModeTab" value="normal">
-                  <div>
-                    <strong>Subtitle Mode</strong>
-                    <small>မူရင်းအတိုင်း ဘာသာပြန် စာတန်းထိုးမည်</small>
-                  </div>
-                </label>
-              </div>
-            </div>
-
             <div class="config-card">
               <h3 class="config-title">Subtitle Font Style</h3>
               <div class="font-grid">
@@ -272,6 +347,7 @@
             </div>
           </div>
 
+          <!-- Tab 4: မူပိုင်ခွင့် -->
           <div class="tab-content" id="tab-extra">
             <div class="config-card">
               <h3 class="config-title">မူပိုင်ခွင့် နှင့် စည်းမျဉ်းများ</h3>
