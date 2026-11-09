@@ -28,11 +28,6 @@
         <button class="nav-btn"><span class="nav-icon">📂</span><span>လုပ်ငန်းမှတ်တမ်း</span></button>
         <button class="nav-btn"><span class="nav-icon">🔑</span><span>API Keys / ဆက်တင်</span></button>
       </nav>
-
-      <div class="quota-card hidden" id="leftQuotaCard">
-        <div class="quota-info"><span>Daily Quota</span><span class="quota-val">5 / 5 Left</span></div>
-        <div class="quota-bar"><div class="quota-fill" style="width: 100%;"></div></div>
-      </div>
     </aside>
 
     <!-- MAIN WRAPPER -->
@@ -42,19 +37,12 @@
           <span class="root">Red Bear Studio</span><span class="sep">/</span><span class="current">Manual ညှိနှိုင်းခြင်း</span>
         </div>
         <div class="top-actions">
-          <div class="auth-group" id="loggedOutAuth">
-            <button class="btn-auth btn-login" id="btnLogin">Login</button>
-            <button class="btn-auth btn-signup" id="btnSignup">Create Account</button>
-          </div>
-          <div class="auth-group hidden" id="loggedInAuth">
-            <span class="user-gmail" id="userEmailLabel">user@gmail.com</span>
-            <span class="credit-chip">⚡ Credits: <strong>5</strong></span>
-          </div>
           <button class="theme-toggle-btn" id="themeToggleBtn">☀️ Light</button>
         </div>
       </header>
 
       <main class="studio-content">
+        
         <!-- CENTRAL STAGE: BLUE CONTAINER BOX -->
         <div class="central-column">
           <section class="blue-container-box" id="blueContainerBox">
@@ -71,10 +59,9 @@
               </div>
 
               <div class="link-input-row">
-                <label class="input-label">သို့မဟုတ် Link ဖြင့် ထည့်ရန် (YouTube, TikTok, RedNote)</label>
+                <label class="input-label">သို့မဟုတ် Link ဖြင့် ထည့်ရန်</label>
                 <div class="link-controls">
                   <input type="text" id="linkInput" placeholder="https://... Link ထည့်ပါ">
-                  <button class="btn-paste" id="btnPaste">📋 Paste</button>
                   <button class="btn-fetch" id="btnFetch">🔗 ဆွဲယူမည်</button>
                 </div>
               </div>
@@ -87,24 +74,24 @@
                   <video id="previewVideo" playsinline></video>
                   <div class="bg-layer" id="bgLayer"></div>
 
-                  <!-- SUBTITLE OVERLAY (Normal size, constrained drag) -->
+                  <!-- SUBTITLE OVERLAY (Default compact size, constrained drag) -->
                   <div class="subtitle-overlay" id="subtitleOverlay">
                     <span class="sub-text" id="subTextDisplay">စာသားနမူနာကြည့်ရအောင်</span>
                   </div>
 
-                  <!-- BLUR CONTAINERS (Strict Viewport Boundary) -->
+                  <!-- BLUR CONTAINERS -->
                   <div id="blurContainer"></div>
 
-                  <!-- CROP OVERLAY (Strict Viewport Boundary) -->
+                  <!-- CROP OVERLAY WITH 4 CORNER HANDLES -->
                   <div class="crop-overlay-box hidden" id="cropOverlayBox">
                     <div class="crop-top-bar">
                       <button class="crop-reset-btn" id="btnResetCrop">ဖျက်သိမ်းမည်</button>
                     </div>
                     <div class="crop-box" id="cropBox">
-                      <div class="crop-handle handle-tl"></div>
-                      <div class="crop-handle handle-tr"></div>
-                      <div class="crop-handle handle-bl"></div>
-                      <div class="crop-handle handle-br"></div>
+                      <div class="crop-handle handle-tl" data-handle="tl"></div>
+                      <div class="crop-handle handle-tr" data-handle="tr"></div>
+                      <div class="crop-handle handle-bl" data-handle="bl"></div>
+                      <div class="crop-handle handle-br" data-handle="br"></div>
                     </div>
                   </div>
                 </div>
@@ -225,46 +212,44 @@
                 <label class="radio-item"><input type="radio" name="subMode" value="dubbing"><span>Dubbing Mode</span></label>
               </div>
             </div>
-
-            <div class="config-card">
-              <h3 class="config-title">TikTok HD (1080p)</h3>
-              <label class="switch-row">
-                <span>1080p High Quality Render</span>
-                <input type="checkbox" checked>
-              </label>
-            </div>
           </div>
 
-          <!-- TAB 2: အသံ -->
+          <!-- TAB 2: အသံ (Voice Settings Complete) -->
           <div class="tab-content" id="tab-audio">
             <div class="config-card">
-              <h3 class="config-title">အသံ ဆက်တင်များ (Audio Settings)</h3>
+              <h3 class="config-title">Choose Voice (အသံအမျိုးအစား)</h3>
+              <div class="lang-btn-group">
+                <button class="lang-btn active" data-alang="my">မြန်မာ</button>
+                <button class="lang-btn" data-alang="en">English</button>
+                <button class="lang-btn" data-alang="th">ไทย</button>
+              </div>
+              <select class="voice-select-dropdown" id="voiceSelectDropdown">
+                <option value="m1">Ko Htet (Male - Deep & Clear)</option>
+                <option value="f1">Thiri (Female - Warm & Friendly)</option>
+                <option value="m2">Aung Kyaw (Male - News Style)</option>
+              </select>
+            </div>
+
+            <div class="config-card">
+              <h3 class="config-title">Voice Adjustments</h3>
               <div class="range-row">
-                <span>Original Volume</span>
-                <input type="range" min="0" max="100" value="100">
+                <span>Speed (အမြန်နှုန်း)</span>
+                <input type="range" min="0.5" max="2.0" step="0.1" value="1.0" id="rngVoiceSpeed">
               </div>
               <div class="range-row mt-10">
-                <span>AI Voice Volume</span>
-                <input type="range" min="0" max="100" value="80">
+                <span>Pitch (အသံအနိမ့်အမြင့်)</span>
+                <input type="range" min="0.5" max="1.5" step="0.1" value="1.0" id="rngVoicePitch">
               </div>
-              <label class="switch-row mt-10">
-                <span>Noise Reduction (ဆူညံသံ လျှော့ရန်)</span>
-                <input type="checkbox" checked>
-              </label>
             </div>
           </div>
 
-          <!-- TAB 3: စာတန်းထိုး -->
+          <!-- TAB 3: စာတန်းထိုး (Caption Width only, Bottom/Middle/Custom removed) -->
           <div class="tab-content" id="tab-sub">
             <div class="config-card">
               <h3 class="config-title">Captions Styling</h3>
               <div class="range-row">
-                <span>Caption Opacity</span>
-                <input type="range" id="rngSubOpacity" min="20" max="100" value="100">
-              </div>
-              <div class="range-row mt-10">
-                <span>Caption Width</span>
-                <input type="range" id="rngSubWidth" min="40" max="100" value="85">
+                <span>Caption Width (စာတန်းအကျယ်)</span>
+                <input type="range" id="rngSubWidth" min="40" max="100" value="70">
               </div>
             </div>
 
