@@ -12,7 +12,7 @@
 <body>
   <div class="app-shell">
     
-    <!-- LEFT NAVIGATION SIDEBAR -->
+    <!-- LEFT SIDEBAR -->
     <aside class="left-sidebar">
       <div class="brand-header">
         <div class="brand-logo">🐻</div>
@@ -23,71 +23,45 @@
       </div>
 
       <nav class="sidebar-nav">
-        <button class="nav-btn active">
-          <span class="nav-icon">⚡</span>
-          <span class="nav-text">Manual ညှိနှိုင်းခြင်း</span>
-        </button>
-        <button class="nav-btn">
-          <span class="nav-icon">🪄</span>
-          <span class="nav-text">Auto Recap</span>
-        </button>
-        <button class="nav-btn">
-          <span class="nav-icon">📂</span>
-          <span class="nav-text">လုပ်ငန်းမှတ်တမ်း</span>
-        </button>
-        <button class="nav-btn">
-          <span class="nav-icon">🔑</span>
-          <span class="nav-text">API Keys / ဆက်တင်</span>
-        </button>
+        <button class="nav-btn active"><span class="nav-icon">⚡</span><span>Manual ညှိနှိုင်းခြင်း</span></button>
+        <button class="nav-btn"><span class="nav-icon">🪄</span><span>Auto Recap</span></button>
+        <button class="nav-btn"><span class="nav-icon">📂</span><span>လုပ်ငန်းမှတ်တမ်း</span></button>
+        <button class="nav-btn"><span class="nav-icon">🔑</span><span>API Keys / ဆက်တင်</span></button>
       </nav>
 
       <div class="quota-card hidden" id="leftQuotaCard">
-        <div class="quota-info">
-          <span>Daily Quota</span>
-          <span class="quota-val" id="quotaText">5 / 5 Left</span>
-        </div>
+        <div class="quota-info"><span>Daily Quota</span><span class="quota-val">5 / 5 Left</span></div>
         <div class="quota-bar"><div class="quota-fill" style="width: 100%;"></div></div>
       </div>
     </aside>
 
     <!-- MAIN WRAPPER -->
     <div class="main-wrapper">
-      
-      <!-- TOP HEADER BAR -->
       <header class="top-nav">
         <div class="breadcrumb">
-          <span class="root">Red Bear Studio</span>
-          <span class="sep">/</span>
-          <span class="current">Manual ညှိနှိုင်းခြင်း</span>
+          <span class="root">Red Bear Studio</span><span class="sep">/</span><span class="current">Manual ညှိနှိုင်းခြင်း</span>
         </div>
-
         <div class="top-actions">
           <div class="auth-group" id="loggedOutAuth">
             <button class="btn-auth btn-login" id="btnLogin">Login</button>
             <button class="btn-auth btn-signup" id="btnSignup">Create Account</button>
           </div>
-
           <div class="auth-group hidden" id="loggedInAuth">
             <span class="user-gmail" id="userEmailLabel">user@gmail.com</span>
-            <span class="credit-chip">⚡ Credits: <strong id="userCreditCount">5</strong></span>
-            <button class="btn-upgrade">Upgrade</button>
+            <span class="credit-chip">⚡ Credits: <strong>5</strong></span>
           </div>
-
           <button class="theme-toggle-btn" id="themeToggleBtn">☀️ Light</button>
         </div>
       </header>
 
-      <!-- STUDIO CONTENT AREA -->
       <main class="studio-content">
-        
-        <!-- CENTRAL AREA: BLUE CONTAINER BOX -->
+        <!-- CENTRAL STAGE: BLUE CONTAINER BOX -->
         <div class="central-column">
           <section class="blue-container-box" id="blueContainerBox">
             
-            <!-- STATE 1: UPLOAD & LINK INPUT BOX -->
+            <!-- INPUT STAGE -->
             <div class="media-input-view" id="mediaInputView">
               <h2 class="section-title">၁။ ဗီဒီယို တင်သွင်းရန် (Video Input)</h2>
-
               <div class="upload-dropzone" id="uploadDropzone">
                 <div class="drop-icon">☁️</div>
                 <h3>ဗီဒီယိုဖိုင်ကို ဤနေရာသို့ ဆွဲထည့်ပါ (သို့မဟုတ်) နှိပ်၍ရွေးပါ</h3>
@@ -99,51 +73,43 @@
               <div class="link-input-row">
                 <label class="input-label">သို့မဟုတ် Link ဖြင့် ထည့်ရန် (YouTube, TikTok, RedNote)</label>
                 <div class="link-controls">
-                  <input type="text" id="linkInput" placeholder="https://www.xiaohongshu.com/... သို့မဟုတ် TikTok/YouTube Link">
+                  <input type="text" id="linkInput" placeholder="https://... Link ထည့်ပါ">
                   <button class="btn-paste" id="btnPaste">📋 Paste</button>
                   <button class="btn-fetch" id="btnFetch">🔗 ဆွဲယူမည်</button>
-                </div>
-                <div class="social-tags">
-                  <span class="social-tag yt">YouTube</span>
-                  <span class="social-tag tt">TikTok</span>
-                  <span class="social-tag rednote">RedNote (小红书)</span>
                 </div>
               </div>
             </div>
 
-            <!-- STATE 2: PHONE PREVIEW VIEW (INSIDE BLUE BOX) -->
+            <!-- PREVIEW STAGE (INSIDE BLUE CONTAINER BOX) -->
             <div class="phone-preview-view hidden" id="phonePreviewView">
-              <div class="phone-frame" id="phoneFrame">
-                
-                <!-- Phone Viewport -->
+              <div class="phone-frame">
                 <div class="phone-viewport" id="phoneViewport">
                   <video id="previewVideo" playsinline></video>
                   <div class="bg-layer" id="bgLayer"></div>
 
-                  <!-- Subtitle Overlay (Name renamed to "စာသားနမူနာကြည့်ရအောင်") -->
+                  <!-- SUBTITLE OVERLAY (Normal size, constrained drag) -->
                   <div class="subtitle-overlay" id="subtitleOverlay">
                     <span class="sub-text" id="subTextDisplay">စာသားနမူနာကြည့်ရအောင်</span>
-                    <div class="sub-drag-node"></div>
                   </div>
 
-                  <!-- Dynamic Blur Boxes Container (Limit: 3) -->
-                  <div id="blurBoxesContainer"></div>
+                  <!-- BLUR CONTAINERS (Strict Viewport Boundary) -->
+                  <div id="blurContainer"></div>
 
-                  <!-- Actual Functional Crop Overlay Box -->
+                  <!-- CROP OVERLAY (Strict Viewport Boundary) -->
                   <div class="crop-overlay-box hidden" id="cropOverlayBox">
-                    <div class="crop-header-actions">
+                    <div class="crop-top-bar">
                       <button class="crop-reset-btn" id="btnResetCrop">ဖျက်သိမ်းမည်</button>
                     </div>
                     <div class="crop-box" id="cropBox">
-                      <div class="crop-corner top-left" data-handle="tl"></div>
-                      <div class="crop-corner top-right" data-handle="tr"></div>
-                      <div class="crop-corner bottom-left" data-handle="bl"></div>
-                      <div class="crop-corner bottom-right" data-handle="br"></div>
+                      <div class="crop-handle handle-tl"></div>
+                      <div class="crop-handle handle-tr"></div>
+                      <div class="crop-handle handle-bl"></div>
+                      <div class="crop-handle handle-br"></div>
                     </div>
                   </div>
                 </div>
 
-                <!-- Phone Bottom Bar -->
+                <!-- PHONE BOTTOM BAR -->
                 <div class="phone-bottom-bar">
                   <button class="play-btn" id="btnPlayToggle">▶</button>
                   <div class="progress-wrapper">
@@ -153,7 +119,6 @@
                 </div>
               </div>
 
-              <!-- Bottom Footer Controls -->
               <div class="preview-footer-actions">
                 <span class="file-info-text" id="activeFileName">video.mp4</span>
                 <div class="action-btn-group">
@@ -166,10 +131,8 @@
 
           </section>
 
-          <!-- BOTTOM HORIZONTAL CONTROLS ROW -->
+          <!-- BOTTOM CONTROLS ROW -->
           <div class="bottom-controls-row">
-            
-            <!-- Card 1: Aspect Ratio -->
             <div class="ctrl-card">
               <h3 class="ctrl-title">ဗီဒီယို အချိုး (Aspect Ratio)</h3>
               <div class="ratio-btn-group">
@@ -180,12 +143,11 @@
               </div>
             </div>
 
-            <!-- Card 2: Auto Color & Mirror -->
             <div class="ctrl-card">
               <h3 class="ctrl-title">အရောင် & Mirror</h3>
               <div class="toggle-stack">
                 <label class="switch-row">
-                  <span>Auto Color (အရောင်မြှင့်တင်ရန်)</span>
+                  <span>Auto Color (အရောင်မြှင့်ရန်)</span>
                   <input type="checkbox" id="chkAutoColor">
                 </label>
                 <label class="switch-row">
@@ -195,7 +157,6 @@
               </div>
             </div>
 
-            <!-- Card 3: Zoom -->
             <div class="ctrl-card">
               <h3 class="ctrl-title">ရူးမ် (Zoom)</h3>
               <div class="range-row">
@@ -204,59 +165,39 @@
               </div>
             </div>
 
-            <!-- Card 4: Dynamic Background (Blur BG & Photo BG) -->
             <div class="ctrl-card bg-ctrl-card">
               <div class="ctrl-card-header">
                 <h3 class="ctrl-title">နောက်ခံပုံ (Background)</h3>
-                <button class="btn-card-close" id="btnClearBg" title="Clear Background">✕</button>
+                <button class="btn-card-close" id="btnClearBg">✕</button>
               </div>
-
               <div class="bg-mode-selector">
                 <button class="bg-mode-btn active" id="btnModeBlurBg">Blur BG</button>
                 <button class="bg-mode-btn" id="btnModePhotoBg">Photo BG</button>
               </div>
-
-              <!-- Sub-option A: Blur BG Options -->
               <div class="bg-sub-panel" id="panelBlurBg">
                 <div class="blur-presets-grid">
-                  <button class="blur-preset-card active" data-preset="soft">
-                    <div class="preset-preview soft"></div>
-                    <span>Soft</span>
-                  </button>
-                  <button class="blur-preset-card" data-preset="medium">
-                    <div class="preset-preview medium"></div>
-                    <span>Medium</span>
-                  </button>
-                  <button class="blur-preset-card" data-preset="hard">
-                    <div class="preset-preview hard"></div>
-                    <span>Hard</span>
-                  </button>
+                  <button class="blur-preset-card active" data-preset="soft"><span>Soft</span></button>
+                  <button class="blur-preset-card" data-preset="medium"><span>Medium</span></button>
+                  <button class="blur-preset-card" data-preset="hard"><span>Hard</span></button>
                 </div>
               </div>
-
-              <!-- Sub-option B: Photo BG Options -->
               <div class="bg-sub-panel hidden" id="panelPhotoBg">
                 <input type="file" id="bgPhotoInput" accept="image/*" hidden>
-                <button class="btn-upload-bg-photo" id="btnUploadBgPhoto">📷 ပုံဖိုင် ရွေးချယ်မည်</button>
-                
+                <button class="btn-upload-bg-photo" id="btnUploadBgPhoto">📷 ပုံဖိုင် ရွေးမည်</button>
                 <div class="photo-preview-wrap hidden" id="photoPreviewWrap">
                   <div class="photo-thumb" id="photoThumb"></div>
                   <div class="opacity-slider-row">
                     <span>Opacity</span>
                     <input type="range" id="rngBgOpacity" min="10" max="100" value="100">
-                    <span id="opacityValText">100%</span>
                   </div>
                 </div>
               </div>
-
             </div>
-
           </div>
         </div>
 
-        <!-- RIGHT CONFIGURATION SIDEBAR (FIXED WIDTH: 340px) -->
+        <!-- RIGHT SIDEBAR (FIXED WIDTH: 340px) -->
         <aside class="right-config-sidebar">
-          
           <div class="config-tabs-header">
             <button class="tab-btn active" data-tab="tab-settings">ပြင်ဆင်ချက်</button>
             <button class="tab-btn" data-tab="tab-audio">အသံ</button>
@@ -264,103 +205,91 @@
             <button class="tab-btn" data-tab="tab-extra">မူပိုင်ခွင့်</button>
           </div>
 
-          <!-- Tab 1: ပြင်ဆင်ချက် -->
+          <!-- TAB 1: ပြင်ဆင်ချက် -->
           <div class="tab-content active" id="tab-settings">
+            <div class="config-card">
+              <h3 class="config-title">Video ဘာသာစကား</h3>
+              <p class="config-desc">စာတန်းထိုး ပြသမည့် ဘာသာစကား ရွေးချယ်ပါ</p>
+              <div class="lang-btn-group">
+                <button class="lang-btn active" data-vlang="my">မြန်မာ</button>
+                <button class="lang-btn" data-vlang="en">English</button>
+                <button class="lang-btn" data-vlang="ja">日本語</button>
+              </div>
+            </div>
+
             <div class="config-card">
               <h3 class="config-title">Subtitle / Audio Mode</h3>
               <div class="radio-stack">
-                <label class="radio-item">
-                  <input type="radio" name="subModeTab" value="ai" checked>
-                  <div>
-                    <strong>AI Recap</strong>
-                    <small>စကားပြောသည့်နေရာအလိုက် စာတန်းထိုးမည်</small>
-                  </div>
-                </label>
-                <label class="radio-item">
-                  <input type="radio" name="subModeTab" value="normal">
-                  <div>
-                    <strong>Subtitle Mode</strong>
-                    <small>မူရင်းအတိုင်း ဘာသာပြန် စာတန်းထိုးမည်</small>
-                  </div>
-                </label>
-                <label class="radio-item">
-                  <input type="radio" name="subModeTab" value="dubbing">
-                  <div>
-                    <strong>Dubbing Mode</strong>
-                    <small>အသံသစ်ဖြင့် နောက်ခံ အသံပြန်သွင်းမည်</small>
-                  </div>
-                </label>
+                <label class="radio-item"><input type="radio" name="subMode" value="ai" checked><span>AI Recap</span></label>
+                <label class="radio-item"><input type="radio" name="subMode" value="normal"><span>Subtitle Mode</span></label>
+                <label class="radio-item"><input type="radio" name="subMode" value="dubbing"><span>Dubbing Mode</span></label>
               </div>
             </div>
 
             <div class="config-card">
               <h3 class="config-title">TikTok HD (1080p)</h3>
               <label class="switch-row">
-                <span>TikTok အတွက် အရည်အသွေးမြင့် render ဖြင့် ပြုလုပ်မည်</span>
-                <input type="checkbox" id="chkTikTokHD" checked>
+                <span>1080p High Quality Render</span>
+                <input type="checkbox" checked>
               </label>
             </div>
           </div>
 
-          <!-- Tab 2: အသံ -->
+          <!-- TAB 2: အသံ -->
           <div class="tab-content" id="tab-audio">
             <div class="config-card">
-              <h3 class="config-title">Output ဘာသာစကား</h3>
-              <p class="config-desc">Video ထဲက အသံကို နိုင်ငံခြားဘာသာစကားဖြင့် ပြောင်းလဲနိုင်သည်</p>
-              <div class="lang-btn-group">
-                <button class="lang-btn active" data-lang="my">မြန်မာ</button>
-                <button class="lang-btn" data-lang="en">English</button>
-                <button class="lang-btn" data-lang="th">ไทย</button>
+              <h3 class="config-title">အသံ ဆက်တင်များ (Audio Settings)</h3>
+              <div class="range-row">
+                <span>Original Volume</span>
+                <input type="range" min="0" max="100" value="100">
               </div>
+              <div class="range-row mt-10">
+                <span>AI Voice Volume</span>
+                <input type="range" min="0" max="100" value="80">
+              </div>
+              <label class="switch-row mt-10">
+                <span>Noise Reduction (ဆူညံသံ လျှော့ရန်)</span>
+                <input type="checkbox" checked>
+              </label>
             </div>
           </div>
 
-          <!-- Tab 3: စာတန်းထိုး (Captions & Width Added) -->
+          <!-- TAB 3: စာတန်းထိုး -->
           <div class="tab-content" id="tab-sub">
             <div class="config-card">
-              <h3 class="config-title">Captions ဆက်တင်များ</h3>
-              
-              <div class="range-row mt-10">
-                <span>Opacity</span>
+              <h3 class="config-title">Captions Styling</h3>
+              <div class="range-row">
+                <span>Caption Opacity</span>
                 <input type="range" id="rngSubOpacity" min="20" max="100" value="100">
-                <span id="subOpacityVal">100%</span>
               </div>
-
               <div class="range-row mt-10">
                 <span>Caption Width</span>
-                <input type="range" id="rngSubWidth" min="50" max="100" value="90">
-                <span id="subWidthVal">90%</span>
+                <input type="range" id="rngSubWidth" min="40" max="100" value="85">
               </div>
             </div>
 
             <div class="config-card">
-              <h3 class="config-title">Subtitle Font Style</h3>
+              <h3 class="config-title">Font Style</h3>
               <div class="font-grid">
-                <button class="font-card active" data-font="Noto Sans Myanmar" style="font-family: 'Noto Sans Myanmar', sans-serif;">
-                  <span>Noto Sans</span>
-                  <small>Clean & Modern</small>
-                </button>
-                <button class="font-card" data-font="Padauk" style="font-family: 'Padauk', sans-serif;">
-                  <span>Padauk</span>
-                  <small>Traditional</small>
-                </button>
+                <button class="font-card active" data-font="Noto Sans Myanmar">Noto Sans</button>
+                <button class="font-card" data-font="Padauk">Padauk</button>
               </div>
             </div>
           </div>
 
-          <!-- Tab 4: မူပိုင်ခွင့် -->
+          <!-- TAB 4: မူပိုင်ခွင့် -->
           <div class="tab-content" id="tab-extra">
             <div class="config-card">
-              <h3 class="config-title">မူပိုင်ခွင့် နှင့် စည်းမျဉ်းများ</h3>
-              <p class="config-desc">ဤစနစ်တွင် တည်းဖြတ်သော ဗီဒီယိုများ၏ မူပိုင်ခွင့်နှင့် ပိုင်ဆိုင်မှုအားလုံးသည် ဖန်တီးသူထံ၌သာ ရှိပါသည်။</p>
+              <h3 class="config-title">မူပိုင်ခွင့်</h3>
+              <p class="config-desc">ဖန်တီးထားသော ဗီဒီယိုများ၏ မူပိုင်ခွင့်သည် ဖန်တီးသူထံ၌သာ ရှိပါသည်။</p>
             </div>
           </div>
 
           <div class="execute-container">
-            <button class="btn-execute" id="btnExecute">စတင်ထုတ်ယူမည်</button>
+            <button class="btn-execute">စတင်ထုတ်ယူမည်</button>
           </div>
-
         </aside>
+
       </main>
     </div>
   </div>
