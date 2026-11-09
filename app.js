@@ -96,7 +96,6 @@ function initMediaAcquisition() {
     previewVideo.src = streamUrl;
     activeFileName.textContent = fileName;
 
-    // Direct View Replacement INSIDE the Blue Container Box
     mediaInputView.classList.add("hidden");
     phonePreviewView.classList.remove("hidden");
   }
@@ -107,7 +106,6 @@ function initMediaAcquisition() {
     fileInput.value = "";
     linkInput.value = "";
 
-    // Revert View INSIDE the Blue Container Box
     phonePreviewView.classList.add("hidden");
     mediaInputView.classList.remove("hidden");
   });
@@ -143,7 +141,7 @@ function initMediaAcquisition() {
   }
 }
 
-/* ---------------- 4. Fixed Width Sidebar Tabs & Config Controls ---------------- */
+/* ---------------- 4. Sidebar Tabs, Captions & Mirror/Color Logic ---------------- */
 function initTabsAndControls() {
   $$(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -183,107 +181,154 @@ function initTabsAndControls() {
   rngZoom.addEventListener("input", (e) => {
     zoomVal.textContent = `${e.target.value}%`;
   });
+
+  // Mirror & Auto Color Toggles
+  const chkMirror = $("#chkMirror");
+  const chkAutoColor = $("#chkAutoColor");
+  const previewVideo = $("#previewVideo");
+
+  function updateVideoFilters() {
+    let transforms = [];
+    let filters = [];
+
+    if (chkMirror.checked) transforms.push("scaleX(-1)");
+    if (chkAutoColor.checked) filters.push("saturate(1.4) contrast(1.2) brightness(1.1)");
+
+    previewVideo.style.transform = transforms.join(" ");
+    previewVideo.style.filter = filters.join(" ");
+  }
+
+  chkMirror.addEventListener("change", updateVideoFilters);
+  chkAutoColor.addEventListener("change", updateVideoFilters);
+
+  // Captions Tab Controls (Opacity & Width)
+  const rngSubOpacity = $("#rngSubOpacity");
+  const subOpacityVal = $("#subOpacityVal");
+  const rngSubWidth = $("#rngSubWidth");
+  const subWidthVal = $("#subWidthVal");
+  const subtitleOverlay = $("#subtitleOverlay");
+
+  rngSubOpacity.addEventListener("input", (e) => {
+    subOpacityVal.textContent = `${e.target.value}%`;
+    subtitleOverlay.style.opacity = e.target.value / 100;
+  });
+
+  rngSubWidth.addEventListener("input", (e) => {
+    subWidthVal.textContent = `${e.target.value}%`;
+    subtitleOverlay.style.width = `${e.target.value}%`;
+  });
 }
 
-/* ---------------- 5. Interactive Overlays (Blur & Functional Crop) ---------------- */
+/* ---------------- 5. Interactive Overlays (Multiple Blur Boxes & Functional Crop) ---------------- */
 function initOverlaysAndEditing() {
   const btnToggleBlur = $("#btnToggleBlur");
   const btnToggleCrop = $("#btnToggleCrop");
-
-  const blurOverlayBox = $("#blurOverlayBox");
-  const blurSliderBar = $("#blurSliderBar");
-  const btnCloseBlur = $("#btnCloseBlur");
-  const rngBlurStrength = $("#rngBlurStrength");
-  const blurValText = $("#blurValText");
-  const blurResizeHandle = $("#blurResizeHandle");
-
+  const blurBoxesContainer = $("#blurBoxesContainer");
   const cropOverlayBox = $("#cropOverlayBox");
   const subtitleOverlay = $("#subtitleOverlay");
+  const phoneViewport = $("#phoneViewport");
   const previewVideo = $("#previewVideo");
 
-  // Blur Activation
+  let blurBoxCount = 0;
+
+  // Add Blur Box (Limit: 3)
   btnToggleBlur.addEventListener("click", () => {
-    blurOverlayBox.classList.remove("hidden");
-    blurSliderBar.classList.remove("hidden");
-    cropOverlayBox.classList.add("hidden");
-    subtitleOverlay.classList.remove("hidden");
-  });
-
-  btnCloseBlur.addEventListener("click", () => {
-    blurOverlayBox.classList.add("hidden");
-    blurSliderBar.classList.add("hidden");
-  });
-
-  rngBlurStrength.addEventListener("input", (e) => {
-    blurValText.textContent = e.target.value;
-    blurOverlayBox.style.backdropFilter = `blur(${e.target.value / 2}px)`;
-  });
-
-  $("#btnBlurDec").addEventListener("click", () => {
-    if (rngBlurStrength.value > 0) {
-      rngBlurStrength.value--;
-      rngBlurStrength.dispatchEvent(new Event("input"));
+    if (blurBoxCount >= 3) {
+      alert("Blur box အများဆုံး ၃ ခုသာ ထည့်သွင်းနိုင်ပါသည်။");
+      return;
     }
+    blurBoxCount++;
+
+    const box = document.createElement("div");
+    box.className = "blur-overlay-box";
+    box.innerHTML = `
+      <div class="blur-close-btn">✕</div>
+      <div class="blur-drag-handle">✛</div>
+      <div class="blur-resize-handle"></div>
+    `;
+    blurBoxesContainer.appendChild(box);
+
+    // Close Button
+    box.querySelector(".blur-close-btn").addEventListener("click", () => {
+      box.remove();
+      blurBoxCount--;
+    });
+
+    // Make Drag & Bound inside Viewport
+    let isDragging = false, startX, startY, initL, initT;
+    box.addEventListener("mousedown", (e) => {
+      if (e.target.classList.contains("blur-resize-handle") || e.target.classList.contains("blur-close-btn")) return;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      initL = box.offsetLeft;
+      initT = box.offsetTop;
+      e.stopPropagation();
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const maxL = phoneViewport.clientWidth - box.offsetWidth;
+      const maxT = phoneViewport.clientHeight - box.offsetHeight;
+
+      box.style.left = `${Math.max(0, Math.min(maxL, initL + dx))}px`;
+      box.style.top = `${Math.max(0, Math.min(maxT, initT + dy))}px`;
+    });
+
+    document.addEventListener("mouseup", () => { isDragging = false; });
+
+    // Make Resizable
+    const resizeHandle = box.querySelector(".blur-resize-handle");
+    let isResizing = false, rX, rY, initW, initH;
+    resizeHandle.addEventListener("mousedown", (e) => {
+      isResizing = true;
+      rX = e.clientX;
+      rY = e.clientY;
+      initW = box.offsetWidth;
+      initH = box.offsetHeight;
+      e.stopPropagation();
+      e.preventDefault();
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!isResizing) return;
+      box.style.width = `${Math.max(50, initW + (e.clientX - rX))}px`;
+      box.style.height = `${Math.max(30, initH + (e.clientY - rY))}px`;
+    });
+
+    document.addEventListener("mouseup", () => { isResizing = false; });
   });
 
-  $("#btnBlurInc").addEventListener("click", () => {
-    if (rngBlurStrength.value < 50) {
-      rngBlurStrength.value++;
-      rngBlurStrength.dispatchEvent(new Event("input"));
-    }
-  });
-
-  // Make Blur Box Draggable
-  let isDraggingBlur = false, startX, startY, initialLeft, initialTop;
-
-  blurOverlayBox.addEventListener("mousedown", (e) => {
-    if (e.target === blurResizeHandle || e.target === btnCloseBlur) return;
-    isDraggingBlur = true;
-    startX = e.clientX;
-    startY = e.clientY;
-    initialLeft = blurOverlayBox.offsetLeft;
-    initialTop = blurOverlayBox.offsetTop;
-    e.preventDefault();
-  });
-
-  document.addEventListener("mousemove", (e) => {
-    if (!isDraggingBlur) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    blurOverlayBox.style.left = `${initialLeft + dx}px`;
-    blurOverlayBox.style.top = `${initialTop + dy}px`;
-  });
-
-  document.addEventListener("mouseup", () => { isDraggingBlur = false; });
-
-  // Make Blur Box Resizable via Circle Handle
-  let isResizingBlur = false, rStartX, rStartY, startW, startH;
-
-  blurResizeHandle.addEventListener("mousedown", (e) => {
-    isResizingBlur = true;
-    rStartX = e.clientX;
-    rStartY = e.clientY;
-    startW = blurOverlayBox.offsetWidth;
-    startH = blurOverlayBox.offsetHeight;
+  // Subtitle Overlay Boundary Dragging
+  let isSubDragging = false, subStartX, subStartY, subInitL, subInitT;
+  subtitleOverlay.addEventListener("mousedown", (e) => {
+    isSubDragging = true;
+    subStartX = e.clientX;
+    subStartY = e.clientY;
+    subInitL = subtitleOverlay.offsetLeft;
+    subInitT = subtitleOverlay.offsetTop;
     e.stopPropagation();
-    e.preventDefault();
   });
 
   document.addEventListener("mousemove", (e) => {
-    if (!isResizingBlur) return;
-    const dw = e.clientX - rStartX;
-    const dh = e.clientY - rStartY;
-    blurOverlayBox.style.width = `${Math.max(60, startW + dw)}px`;
-    blurOverlayBox.style.height = `${Math.max(40, startH + dh)}px`;
+    if (!isSubDragging) return;
+    const dx = e.clientX - subStartX;
+    const dy = e.clientY - subStartY;
+    const maxL = phoneViewport.clientWidth - subtitleOverlay.offsetWidth;
+    const maxT = phoneViewport.clientHeight - subtitleOverlay.offsetHeight;
+
+    subtitleOverlay.style.left = `${Math.max(0, Math.min(maxL, subInitL + dx))}px`;
+    subtitleOverlay.style.top = `${Math.max(0, Math.min(maxT, subInitT + dy))}px`;
+    subtitleOverlay.style.transform = "none";
   });
 
-  document.addEventListener("mouseup", () => { isResizingBlur = false; });
+  document.addEventListener("mouseup", () => { isSubDragging = false; });
 
-  // Crop Activation (Temporarily Hides Blur & Subtitles)
+  // Crop Activation
   btnToggleCrop.addEventListener("click", () => {
     cropOverlayBox.classList.remove("hidden");
-    blurOverlayBox.classList.add("hidden");
-    blurSliderBar.classList.add("hidden");
     subtitleOverlay.classList.add("hidden");
   });
 
@@ -292,6 +337,29 @@ function initOverlaysAndEditing() {
     subtitleOverlay.classList.remove("hidden");
     previewVideo.style.clipPath = "none";
   });
+
+  // Functional Crop Box Dragging & Resizing
+  const cropBox = $("#cropBox");
+  let isCropDragging = false, cStartX, cStartY, cInitL, cInitT;
+
+  cropBox.addEventListener("mousedown", (e) => {
+    if (e.target.classList.contains("crop-corner")) return;
+    isCropDragging = true;
+    cStartX = e.clientX;
+    cStartY = e.clientY;
+    cInitL = cropBox.offsetLeft;
+    cInitT = cropBox.offsetTop;
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isCropDragging) return;
+    const dx = e.clientX - cStartX;
+    const dy = e.clientY - cStartY;
+    cropBox.style.left = `${cInitL + dx}px`;
+    cropBox.style.top = `${cInitT + dy}px`;
+  });
+
+  document.addEventListener("mouseup", () => { isCropDragging = false; });
 }
 
 /* ---------------- 6. Background Controls (Blur BG & Photo BG) ---------------- */
@@ -327,6 +395,9 @@ function initBackgroundControls() {
     card.addEventListener("click", () => {
       $$(".blur-preset-card").forEach(c => c.classList.remove("active"));
       card.classList.add("active");
+      const preset = card.dataset.preset;
+      let blurVal = preset === "soft" ? "3px" : preset === "medium" ? "8px" : "15px";
+      bgLayer.style.backdropFilter = `blur(${blurVal})`;
     });
   });
 
@@ -348,6 +419,7 @@ function initBackgroundControls() {
 
   $("#btnClearBg").addEventListener("click", () => {
     bgLayer.style.backgroundImage = "none";
+    bgLayer.style.backdropFilter = "none";
     photoPreviewWrap.classList.add("hidden");
     bgPhotoInput.value = "";
   });
