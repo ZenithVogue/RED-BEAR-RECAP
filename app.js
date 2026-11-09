@@ -87,9 +87,9 @@ function initSidebarTabs() {
 
 function initVideoLanguageSwitch() {
   const subTextDisplay = $("#subTextDisplay");
-  $$(".lang-btn").forEach(btn => {
+  $$(".lang-btn[data-vlang]").forEach(btn => {
     btn.addEventListener("click", () => {
-      $$(".lang-btn").forEach(b => b.classList.remove("active"));
+      $$(".lang-btn[data-vlang]").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       const lang = btn.dataset.vlang;
       if (lang === "my") subTextDisplay.textContent = "စာသားနမူနာကြည့်ရအောင်";
@@ -98,16 +98,22 @@ function initVideoLanguageSwitch() {
     });
   });
 
-  // Subtitle Width Slider Control
+  // Subtitle Width Slider Control only
   $("#rngSubWidth").addEventListener("input", (e) => {
-    subTextDisplay.style.fontSize = `${10 + (e.target.value / 20)}px`;
+    $("#subtitleOverlay").style.width = `${e.target.value}%`;
   });
-  $("#rngSubOpacity").addEventListener("input", (e) => {
-    $("#subtitleOverlay").style.opacity = e.target.value / 100;
+
+  // Font Style Switcher
+  $$(".font-card").forEach(card => {
+    card.addEventListener("click", () => {
+      $$(".font-card").forEach(c => c.classList.remove("active"));
+      card.classList.add("active");
+      subTextDisplay.style.fontFamily = `'${card.dataset.font}', sans-serif`;
+    });
   });
 }
 
-/* STRICT BOUNDARY OVERLAYS (BLUR, SUBTITLE & CROP) */
+/* STRICT BOUNDARY OVERLAYS (BLUR, SUBTITLE & CROP WITH CORNER RESIZING) */
 function initOverlays() {
   const vp = $("#phoneViewport");
   const blurContainer = $("#blurContainer");
@@ -137,17 +143,100 @@ function initOverlays() {
   makeConstrainedDraggable(subOverlay, vp);
 
   // Crop Toggle & Reset
-  const cropBox = $("#cropOverlayBox");
+  const cropBoxEl = $("#cropOverlayBox");
   $("#btnToggleCrop").addEventListener("click", () => {
-    cropBox.classList.remove("hidden");
+    cropBoxEl.classList.remove("hidden");
   });
   $("#btnResetCrop").addEventListener("click", () => {
-    cropBox.classList.add("hidden");
+    cropBoxEl.classList.add("hidden");
   });
-  makeConstrainedDraggable($("#cropBox"), vp);
+
+  // Crop Box Dragging and Corner Resizing
+  initCropInteractivity();
 }
 
-// BOUNDARY-LOCKED DRAG LOGIC (Strict Container Bounds)
+// CROP CORNER RESIZING & DRAGGING LOGIC
+function initCropInteractivity() {
+  const cropBox = $("#cropBox");
+  const vp = $("#phoneViewport");
+
+  // Move Crop Box
+  let isDrag = false, sX, sY, iL, iT;
+  cropBox.addEventListener("mousedown", (e) => {
+    if (e.target.classList.contains("crop-handle")) return;
+    isDrag = true;
+    sX = e.clientX;
+    sY = e.clientY;
+    iL = cropBox.offsetLeft;
+    iT = cropBox.offsetTop;
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isDrag) return;
+    const maxL = vp.clientWidth - cropBox.offsetWidth;
+    const maxT = vp.clientHeight - cropBox.offsetHeight;
+    let nL = iL + (e.clientX - sX);
+    let nT = iT + (e.clientY - sY);
+    cropBox.style.left = `${Math.max(0, Math.min(maxL, nL))}px`;
+    cropBox.style.top = `${Math.max(0, Math.min(maxT, nT))}px`;
+  });
+
+  document.addEventListener("mouseup", () => { isDrag = false; });
+
+  // 4-Corner Resizing Handles
+  $$(".crop-handle").forEach(handle => {
+    let isResize = false, hType = handle.dataset.handle;
+    let startX, startY, startL, startT, startW, startH;
+
+    handle.addEventListener("mousedown", (e) => {
+      isResize = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startL = cropBox.offsetLeft;
+      startT = cropBox.offsetTop;
+      startW = cropBox.offsetWidth;
+      startH = cropBox.offsetHeight;
+      e.stopPropagation();
+      e.preventDefault();
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!isResize) return;
+      let dx = e.clientX - startX;
+      let dy = e.clientY - startY;
+
+      let newL = startL, newT = startT, newW = startW, newH = startH;
+
+      if (hType.includes("l")) {
+        newL = Math.max(0, startL + dx);
+        newW = startW - (newL - startL);
+      }
+      if (hType.includes("r")) {
+        newW = Math.min(vp.clientWidth - startL, startW + dx);
+      }
+      if (hType.includes("t")) {
+        newT = Math.max(0, startT + dy);
+        newH = startH - (newT - startT);
+      }
+      if (hType.includes("b")) {
+        newH = Math.min(vp.clientHeight - startT, startH + dy);
+      }
+
+      if (newW >= 50) {
+        cropBox.style.left = `${newL}px`;
+        cropBox.style.width = `${newW}px`;
+      }
+      if (newH >= 50) {
+        cropBox.style.top = `${newT}px`;
+        cropBox.style.height = `${newH}px`;
+      }
+    });
+
+    document.addEventListener("mouseup", () => { isResize = false; });
+  });
+}
+
+// BOUNDARY-LOCKED DRAG LOGIC
 function makeConstrainedDraggable(el, container) {
   let isDrag = false, sX, sY, iL, iT;
 
