@@ -43,7 +43,7 @@
 
       <main class="studio-content">
         
-        <!-- CENTRAL STAGE: BLUE CONTAINER BOX -->
+        <!-- CENTRAL STAGE -->
         <div class="central-column">
           <section class="blue-container-box" id="blueContainerBox">
             
@@ -67,16 +67,16 @@
               </div>
             </div>
 
-            <!-- PREVIEW STAGE (INSIDE BLUE CONTAINER BOX) -->
+            <!-- PREVIEW STAGE -->
             <div class="phone-preview-view hidden" id="phonePreviewView">
               <div class="phone-frame">
                 <div class="phone-viewport" id="phoneViewport">
                   <video id="previewVideo" playsinline></video>
                   <div class="bg-layer" id="bgLayer"></div>
 
-                  <!-- SUBTITLE OVERLAY (Default compact size, constrained drag) -->
+                  <!-- SUBTITLE OVERLAY (Fixed Compact Size, Move-Only Drag) -->
                   <div class="subtitle-overlay" id="subtitleOverlay">
-                    <span class="sub-text" id="subTextDisplay">စာသားနမူနာကြည့်ရအောင်</span>
+                    <span class="sub-text" id="subTextDisplay">ဒီနေရာမှာ စာတန်းထိုး ပေါ်မယ်</span>
                   </div>
 
                   <!-- BLUR CONTAINERS -->
@@ -214,7 +214,7 @@
             </div>
           </div>
 
-          <!-- TAB 2: အသံ (Voice Settings Complete) -->
+          <!-- TAB 2: အသံ (Voice Settings + Speed/Pitch Values) -->
           <div class="tab-content" id="tab-audio">
             <div class="config-card">
               <h3 class="config-title">Choose Voice (အသံအမျိုးအစား)</h3>
@@ -232,32 +232,94 @@
 
             <div class="config-card">
               <h3 class="config-title">Voice Adjustments</h3>
-              <div class="range-row">
+              <div class="range-row-label">
                 <span>Speed (အမြန်နှုန်း)</span>
+                <span class="range-val-text" id="speedValText">1.0x</span>
+              </div>
+              <div class="range-row">
                 <input type="range" min="0.5" max="2.0" step="0.1" value="1.0" id="rngVoiceSpeed">
               </div>
-              <div class="range-row mt-10">
+
+              <div class="range-row-label mt-10">
                 <span>Pitch (အသံအနိမ့်အမြင့်)</span>
+                <span class="range-val-text" id="pitchValText">1.0</span>
+              </div>
+              <div class="range-row">
                 <input type="range" min="0.5" max="1.5" step="0.1" value="1.0" id="rngVoicePitch">
               </div>
             </div>
           </div>
 
-          <!-- TAB 3: စာတန်းထိုး (Caption Width only, Bottom/Middle/Custom removed) -->
+          <!-- TAB 3: စာတန်းထိုး (Captions - Image Reference Layout) -->
           <div class="tab-content" id="tab-sub">
             <div class="config-card">
-              <h3 class="config-title">Captions Styling</h3>
-              <div class="range-row">
-                <span>Caption Width (စာတန်းအကျယ်)</span>
-                <input type="range" id="rngSubWidth" min="40" max="100" value="70">
+              <div class="card-header-checkbox">
+                <h3 class="config-title">Captions</h3>
+                <input type="checkbox" id="chkEnableCaptions" checked>
+              </div>
+              <div class="caption-live-preview-box" id="captionLivePreviewBox">
+                <span id="captionPreviewText">ဒီနေရာမှာ စာတန်းထိုး ပေါ်မယ်</span>
               </div>
             </div>
 
             <div class="config-card">
-              <h3 class="config-title">Font Style</h3>
-              <div class="font-grid">
-                <button class="font-card active" data-font="Noto Sans Myanmar">Noto Sans</button>
-                <button class="font-card" data-font="Padauk">Padauk</button>
+              <label class="field-label">Font</label>
+              <select class="voice-select-dropdown" id="fontDropdown">
+                <option value="Noto Sans Myanmar">Noto Sans (regular)</option>
+                <option value="Padauk">Padauk</option>
+              </select>
+
+              <div class="range-row-label mt-10">
+                <span>Font size</span>
+                <span class="range-val-text" id="fontSizeText">18px</span>
+              </div>
+              <div class="stepper-range-row">
+                <button class="btn-step" id="btnFontSizeDec">-</button>
+                <input type="range" id="rngFontSize" min="12" max="32" value="18">
+                <button class="btn-step" id="btnFontSizeInc">+</button>
+              </div>
+
+              <div class="color-picker-section mt-10">
+                <div class="range-row-label">
+                  <span>Text color</span>
+                  <div class="color-indicator-swatch" id="textColorIndicator"></div>
+                </div>
+                <div class="color-swatch-grid">
+                  <button class="color-circle" style="background:#ffffff;" data-color="#ffffff"></button>
+                  <button class="color-circle active" style="background:#ffeb3b;" data-color="#ffeb3b"></button>
+                  <button class="color-circle" style="background:#38bdf8;" data-color="#38bdf8"></button>
+                  <button class="color-circle" style="background:#f472b6;" data-color="#f472b6"></button>
+                  <button class="color-circle" style="background:#4ade80;" data-color="#4ade80"></button>
+                  <button class="color-circle" style="background:#fb923c;" data-color="#fb923c"></button>
+                </div>
+              </div>
+
+              <div class="range-row-label mt-10">
+                <span>Outline color</span>
+                <div class="color-indicator-swatch" id="outlineColorIndicator" style="background:#000000;"></div>
+              </div>
+
+              <div class="range-row-label mt-10">
+                <span>Outline width</span>
+                <span class="range-val-text" id="outlineWidthText">3px</span>
+              </div>
+              <div class="stepper-range-row">
+                <button class="btn-step" id="btnOutlineDec">-</button>
+                <input type="range" id="rngOutlineWidth" min="0" max="8" value="3">
+                <button class="btn-step" id="btnOutlineInc">+</button>
+              </div>
+
+              <div class="switch-row mt-10">
+                <span>Box (background)</span>
+                <input type="checkbox" id="chkBoxBg" checked>
+              </div>
+
+              <div class="range-row-label mt-10">
+                <span>Caption Width (စာတန်းအကျယ်)</span>
+                <span class="range-val-text" id="captionWidthText">70%</span>
+              </div>
+              <div class="range-row">
+                <input type="range" id="rngSubWidth" min="40" max="100" value="70">
               </div>
             </div>
           </div>
