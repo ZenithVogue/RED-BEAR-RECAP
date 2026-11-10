@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initSidebarTabs();
   initOverlays();
   initVideoLanguageSwitch();
+  initAudioSliders();
+  initCaptionsControls();
 });
 
 function initTheme() {
@@ -73,7 +75,7 @@ function initMedia() {
   chkAutoColor.addEventListener("change", applyFilters);
 }
 
-/* SIDEBAR TABS & VIDEO LANGUAGE SWITCH */
+/* SIDEBAR TABS */
 function initSidebarTabs() {
   $$(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -85,42 +87,116 @@ function initSidebarTabs() {
   });
 }
 
+/* VIDEO LANGUAGE SWITCH */
 function initVideoLanguageSwitch() {
   const subTextDisplay = $("#subTextDisplay");
+  const captionPreviewText = $("#captionPreviewText");
   $$(".lang-btn[data-vlang]").forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".lang-btn[data-vlang]").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       const lang = btn.dataset.vlang;
-      if (lang === "my") subTextDisplay.textContent = "စာသားနမူနာကြည့်ရအောင်";
-      else if (lang === "en") subTextDisplay.textContent = "Let's see the subtitle sample";
-      else if (lang === "ja") subTextDisplay.textContent = "字幕サンプルを見てみましょう";
-    });
-  });
-
-  // Subtitle Width Slider Control only
-  $("#rngSubWidth").addEventListener("input", (e) => {
-    $("#subtitleOverlay").style.width = `${e.target.value}%`;
-  });
-
-  // Font Style Switcher
-  $$(".font-card").forEach(card => {
-    card.addEventListener("click", () => {
-      $$(".font-card").forEach(c => c.classList.remove("active"));
-      card.classList.add("active");
-      subTextDisplay.style.fontFamily = `'${card.dataset.font}', sans-serif`;
+      let text = "ဒီနေရာမှာ စာတန်းထိုး ပေါ်မယ်";
+      if (lang === "en") text = "Let's see the subtitle sample";
+      else if (lang === "ja") text = "字幕サンプルを見てみましょう";
+      
+      subTextDisplay.textContent = text;
+      if (captionPreviewText) captionPreviewText.textContent = text;
     });
   });
 }
 
-/* STRICT BOUNDARY OVERLAYS (BLUR, SUBTITLE & CROP WITH CORNER RESIZING) */
+/* AUDIO SLIDERS INDICATORS */
+function initAudioSliders() {
+  const rngVoiceSpeed = $("#rngVoiceSpeed");
+  const speedValText = $("#speedValText");
+  if (rngVoiceSpeed) {
+    rngVoiceSpeed.addEventListener("input", (e) => {
+      speedValText.textContent = `${parseFloat(e.target.value).toFixed(1)}x`;
+    });
+  }
+
+  const rngVoicePitch = $("#rngVoicePitch");
+  const pitchValText = $("#pitchValText");
+  if (rngVoicePitch) {
+    rngVoicePitch.addEventListener("input", (e) => {
+      pitchValText.textContent = parseFloat(e.target.value).toFixed(1);
+    });
+  }
+}
+
+/* CAPTIONS TAB CONTROLS (IMAGE REFERENCE LOGIC) */
+function initCaptionsControls() {
+  const subTextDisplay = $("#subTextDisplay");
+  const captionPreviewText = $("#captionPreviewText");
+
+  // Subtitle Width Slider Control at the end
+  $("#rngSubWidth").addEventListener("input", (e) => {
+    const val = e.target.value;
+    $("#captionWidthText").textContent = `${val}%`;
+    $("#subtitleOverlay").style.width = `${val}%`;
+  });
+
+  // Font Family Dropdown
+  $("#fontDropdown").addEventListener("change", (e) => {
+    const font = e.target.value;
+    subTextDisplay.style.fontFamily = `'${font}', sans-serif`;
+    captionPreviewText.style.fontFamily = `'${font}', sans-serif`;
+  });
+
+  // Font Size Stepper Range
+  const rngFontSize = $("#rngFontSize");
+  const fontSizeText = $("#fontSizeText");
+  function updateFontSize(val) {
+    rngFontSize.value = val;
+    fontSizeText.textContent = `${val}px`;
+    subTextDisplay.style.fontSize = `${val}px`;
+    captionPreviewText.style.fontSize = `${val}px`;
+  }
+  rngFontSize.addEventListener("input", (e) => updateFontSize(e.target.value));
+  $("#btnFontSizeDec").addEventListener("click", () => updateFontSize(Math.max(12, parseInt(rngFontSize.value) - 1)));
+  $("#btnFontSizeInc").addEventListener("click", () => updateFontSize(Math.min(32, parseInt(rngFontSize.value) + 1)));
+
+  // Text Color Swatches
+  $$(".color-circle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      $$(".color-circle").forEach(c => c.classList.remove("active"));
+      btn.classList.add("active");
+      const col = btn.dataset.color;
+      $("#textColorIndicator").style.background = col;
+      subTextDisplay.style.color = col;
+      captionPreviewText.style.color = col;
+    });
+  });
+
+  // Outline Width Stepper
+  const rngOutlineWidth = $("#rngOutlineWidth");
+  const outlineWidthText = $("#outlineWidthText");
+  function updateOutline(val) {
+    rngOutlineWidth.value = val;
+    outlineWidthText.textContent = `${val}px`;
+    subTextDisplay.style.webkitTextStroke = `${val}px #000`;
+    captionPreviewText.style.webkitTextStroke = `${val}px #000`;
+  }
+  rngOutlineWidth.addEventListener("input", (e) => updateOutline(e.target.value));
+  $("#btnOutlineDec").addEventListener("click", () => updateOutline(Math.max(0, parseInt(rngOutlineWidth.value) - 1)));
+  $("#btnOutlineInc").addEventListener("click", () => updateOutline(Math.min(8, parseInt(rngOutlineWidth.value) + 1)));
+
+  // Box Background Checkbox Toggle
+  $("#chkBoxBg").addEventListener("change", (e) => {
+    const bg = e.target.checked ? "rgba(43, 49, 64, 0.9)" : "transparent";
+    $("#subtitleOverlay").style.background = bg;
+  });
+}
+
+/* STRICT OVERLAYS LOGIC (BLUR & FIXED SUBTITLE MOVE-ONLY) */
 function initOverlays() {
   const vp = $("#phoneViewport");
   const blurContainer = $("#blurContainer");
   const subOverlay = $("#subtitleOverlay");
   let blurCount = 0;
 
-  // Blur Box Adder (Limit 3, Constrained inside Viewport)
+  // Blur Box Adder
   $("#btnToggleBlur").addEventListener("click", () => {
     if (blurCount >= 3) return;
     blurCount++;
@@ -139,7 +215,7 @@ function initOverlays() {
     makeResizable(box, vp);
   });
 
-  // Subtitle Draggable (Constrained)
+  // Subtitle Overlay Dragging (Move-Only without sizing Handles)
   makeConstrainedDraggable(subOverlay, vp);
 
   // Crop Toggle & Reset
@@ -236,7 +312,7 @@ function initCropInteractivity() {
   });
 }
 
-// BOUNDARY-LOCKED DRAG LOGIC
+// BOUNDARY-LOCKED DRAG LOGIC (FOR SUBTITLE & BLUR)
 function makeConstrainedDraggable(el, container) {
   let isDrag = false, sX, sY, iL, iT;
 
