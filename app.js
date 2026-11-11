@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initAudioSliders();
   initCaptionsControls();
   initSubtitleResizer();
+  initBackgroundControls();
 });
 
 function initTheme() {
@@ -89,7 +90,7 @@ function initSidebarTabs() {
   });
 }
 
-/* VIDEO MODE CARDS INTERACTIVITY */
+/* VIDEO MODE CARDS */
 function initVideoModeCards() {
   $$(".mode-card-item").forEach(card => {
     card.addEventListener("click", () => {
@@ -116,7 +117,7 @@ function initVideoModeCards() {
   });
 }
 
-/* AUDIO SLIDERS DYNAMIC INDICATORS */
+/* AUDIO SLIDERS */
 function initAudioSliders() {
   const rngVoiceSpeed = $("#rngVoiceSpeed");
   const speedValText = $("#speedValText");
@@ -135,26 +136,65 @@ function initAudioSliders() {
   }
 }
 
-/* CAPTIONS TAB CONTROLS WITH NATIVE COLOR PICKER POPUP */
+/* BACKGROUND BLUR & PHOTO PRESETS */
+function initBackgroundControls() {
+  const bgLayer = $("#bgLayer");
+  const panelBlurBg = $("#panelBlurBg");
+  const panelPhotoBg = $("#panelPhotoBg");
+
+  $("#btnModeBlurBg").addEventListener("click", () => {
+    $("#btnModeBlurBg").classList.add("active");
+    $("#btnModePhotoBg").classList.remove("active");
+    panelBlurBg.classList.remove("hidden");
+    panelPhotoBg.classList.add("hidden");
+    bgLayer.style.backgroundImage = "none";
+    bgLayer.style.filter = "blur(10px)";
+  });
+
+  $("#btnModePhotoBg").addEventListener("click", () => {
+    $("#btnModePhotoBg").classList.add("active");
+    $("#btnModeBlurBg").classList.remove("active");
+    panelPhotoBg.classList.remove("hidden");
+    panelBlurBg.classList.add("hidden");
+  });
+
+  // Soft / Medium / Hard Preset blur buttons
+  $$(".blur-preset-card").forEach(btn => {
+    btn.addEventListener("click", () => {
+      $$(".blur-preset-card").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const preset = btn.dataset.preset;
+      let blurPx = "8px";
+      if (preset === "medium") blurPx = "16px";
+      else if (preset === "hard") blurPx = "28px";
+      
+      bgLayer.style.filter = `blur(${blurPx})`;
+    });
+  });
+
+  $("#btnClearBg").addEventListener("click", () => {
+    bgLayer.style.backgroundImage = "none";
+    bgLayer.style.filter = "none";
+  });
+}
+
+/* CAPTIONS TAB CONTROLS */
 function initCaptionsControls() {
   const subTextDisplay = $("#subTextDisplay");
   const captionPreviewText = $("#captionPreviewText");
 
-  // Caption Width Slider (Bottom Positioned)
   $("#rngSubWidth").addEventListener("input", (e) => {
     const val = e.target.value;
     $("#captionWidthText").textContent = `${val}%`;
     $("#subtitleOverlay").style.width = `${val}%`;
   });
 
-  // Font Dropdown
   $("#fontDropdown").addEventListener("change", (e) => {
     const font = e.target.value;
     subTextDisplay.style.fontFamily = `'${font}', sans-serif`;
     captionPreviewText.style.fontFamily = `'${font}', sans-serif`;
   });
 
-  // Font Size Stepper
   const rngFontSize = $("#rngFontSize");
   const fontSizeText = $("#fontSizeText");
   function updateFontSize(val) {
@@ -167,7 +207,6 @@ function initCaptionsControls() {
   $("#btnFontSizeDec").addEventListener("click", () => updateFontSize(Math.max(12, parseInt(rngFontSize.value) - 1)));
   $("#btnFontSizeInc").addEventListener("click", () => updateFontSize(Math.min(32, parseInt(rngFontSize.value) + 1)));
 
-  // Text Color Circles Swatches
   $$(".color-circle").forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".color-circle").forEach(c => c.classList.remove("active"));
@@ -180,7 +219,6 @@ function initCaptionsControls() {
     });
   });
 
-  // Native Text Color Picker Popup Listener
   const nativeTextColorPicker = $("#nativeTextColorPicker");
   nativeTextColorPicker.addEventListener("input", (e) => {
     const col = e.target.value;
@@ -189,7 +227,6 @@ function initCaptionsControls() {
     captionPreviewText.style.color = col;
   });
 
-  // Native Outline Color Picker Popup Listener
   const nativeOutlineColorPicker = $("#nativeOutlineColorPicker");
   nativeOutlineColorPicker.addEventListener("input", (e) => {
     const col = e.target.value;
@@ -199,7 +236,6 @@ function initCaptionsControls() {
     captionPreviewText.style.webkitTextStroke = `${w}px ${col}`;
   });
 
-  // Outline Width Stepper
   const rngOutlineWidth = $("#rngOutlineWidth");
   const outlineWidthText = $("#outlineWidthText");
   function updateOutline(val) {
@@ -213,14 +249,13 @@ function initCaptionsControls() {
   $("#btnOutlineDec").addEventListener("click", () => updateOutline(Math.max(0, parseInt(rngOutlineWidth.value) - 1)));
   $("#btnOutlineInc").addEventListener("click", () => updateOutline(Math.min(8, parseInt(rngOutlineWidth.value) + 1)));
 
-  // Box Background Toggle
   $("#chkBoxBg").addEventListener("change", (e) => {
     const bg = e.target.checked ? "rgba(15, 23, 42, 0.9)" : "transparent";
     $("#subtitleOverlay").style.background = bg;
   });
 }
 
-/* SUBTITLE RIGHT HANDLE WIDTH RESIZING LOGIC (PREVENTS AUTO GROWING) */
+/* SUBTITLE RIGHT HANDLE WIDTH RESIZING (PREVENTS AUTO GROWING) */
 function initSubtitleResizer() {
   const subOverlay = $("#subtitleOverlay");
   const handleR = $("#subHandleR");
@@ -390,7 +425,7 @@ function makeConstrainedDraggable(el, container) {
 
     el.style.left = `${Math.max(0, Math.min(maxL, nL))}px`;
     el.style.top = `${Math.max(0, Math.min(maxT, nT))}px`;
-    el.style.transform = "none";
+    el.style.transform = "none"; // Keeps scale fixed, preventing any auto-growing bug
   });
 
   document.addEventListener("mouseup", () => { isDrag = false; });
