@@ -432,27 +432,42 @@ function initOverlays() {
 }
 
 /* RESIZE BLUR HANDLE */
+/* RESIZE BLUR HANDLE */
 function makeResizable(box, container) {
   const handle = box.querySelector(".blur-resize-handle");
   if (!handle) return;
   let isResize = false, sX, sY, sW, sH;
 
   handle.addEventListener("mousedown", (e) => {
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault(); 
+    e.stopPropagation(); // Box တစ်ခုလုံး Drag မဖြစ်သွားအောင် တားဆီးခြင်း
+    
     isResize = true;
-    sX = e.clientX; sY = e.clientY;
-    sW = box.offsetWidth; sH = box.offsetHeight;
+    sX = e.clientX;
+    sY = e.clientY;
+    sW = box.offsetWidth;
+    sH = box.offsetHeight;
   });
 
   document.addEventListener("mousemove", (e) => {
     if (!isResize) return;
-    const newW = Math.max(30, Math.min(container.clientWidth  - box.offsetLeft, sW + (e.clientX - sX)));
-    const newH = Math.max(30, Math.min(container.clientHeight - box.offsetTop,  sH + (e.clientY - sY)));
-    box.style.width  = newW + "px";
-    box.style.height = newH + "px";
+    
+    // X (ဘယ်ညာ) နဲ့ Y (အပေါ်အောက်) နှစ်ခုလုံးအတွက် အကွာအဝေးတွက်ချက်ခြင်း
+    let dx = e.clientX - sX;
+    let dy = e.clientY - sY;
+
+    // အနည်းဆုံး အရွယ်အစား 30px ထားပြီး Viewport ဘောင်အတွင်း ရှိနေစေရန် ထိန်းချုပ်ခြင်း
+    let newW = Math.max(30, Math.min(container.clientWidth  - box.offsetLeft, sW + dx));
+    let newH = Math.max(30, Math.min(container.clientHeight - box.offsetTop,  sH + dy));
+    
+    // Width နဲ့ Height နှစ်ခုလုံးကို တစ်ခါတည်း Update လုပ်ခြင်း
+    box.style.setProperty('width', newW + "px", "important");
+    box.style.setProperty('height', newH + "px", "important");
   });
 
-  document.addEventListener("mouseup", () => { isResize = false; });
+  document.addEventListener("mouseup", () => { 
+    isResize = false; 
+  });
 }
 
 /* CROP INTERACTIVITY */
