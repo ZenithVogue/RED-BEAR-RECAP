@@ -452,6 +452,10 @@ function makeConstrainedDraggable(el, container) {
     sY = e.clientY;
     iL = el.offsetLeft;
     iT = el.offsetTop;
+    
+    // Drag စတင်တဲ့အချိန်မှာ Box ရဲ့ လက်ရှိ Width နဲ့ Height ကို အတိအကျ Fix လုပ်မည်
+    el.style.width = `${el.offsetWidth}px`;
+    el.style.height = `${el.offsetHeight}px`;
     e.stopPropagation();
   });
 
@@ -462,12 +466,13 @@ function makeConstrainedDraggable(el, container) {
     let nL = iL + (e.clientX - sX);
     let nT = iT + (e.clientY - sY);
 
-    // Box ကို ရွှေ့တဲ့အခါ width/height လုံးဝ မပြောင်းလဲစေဘဲ နေရာ (left, top) ကိုသာ တိကျစွာ ရွှေ့မည်
+    // Box ရဲ့ နေရာကိုသာ left နဲ့ top သုံးပြီး တိကျစွာ ရွှေ့မည် (အရွယ်အစား လုံးဝ မပြောင်းစေရ)
     el.style.left = `${Math.max(0, Math.min(maxL, nL))}px`;
     el.style.top = `${Math.max(0, Math.min(maxT, nT))}px`;
     el.style.transform = "none";
-    el.style.width = `${el.offsetWidth}px`; // Box အရွယ်အစား မပြောင်းလဲအောင် Fixed Width ပေးခြင်း
   });
 
-  document.addEventListener("mouseup", () => { isDrag = false; });
+  document.addEventListener("mouseup", () => { 
+    isDrag = false; 
+  });
 }
