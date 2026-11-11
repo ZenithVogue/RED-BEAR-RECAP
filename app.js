@@ -10,9 +10,10 @@ document.addEventListener("DOMContentLoaded", () => {
   initMedia();
   initSidebarTabs();
   initOverlays();
-  initVideoLanguageSwitch();
+  initVideoModeCards();
   initAudioSliders();
   initCaptionsControls();
+  initSubtitleResizer();
 });
 
 function initTheme() {
@@ -62,7 +63,6 @@ function initMedia() {
     }
   });
 
-  // Mirror & Auto Color Filter
   const chkMirror = $("#chkMirror");
   const chkAutoColor = $("#chkAutoColor");
   function applyFilters() {
@@ -87,8 +87,16 @@ function initSidebarTabs() {
   });
 }
 
-/* VIDEO LANGUAGE SWITCH */
-function initVideoLanguageSwitch() {
+/* VIDEO MODE CARDS INTERACTIVITY */
+function initVideoModeCards() {
+  $$(".mode-card-item").forEach(card => {
+    card.addEventListener("click", () => {
+      $$(".mode-card-item").forEach(c => c.classList.remove("active"));
+      card.classList.add("active");
+      card.querySelector("input").checked = true;
+    });
+  });
+
   const subTextDisplay = $("#subTextDisplay");
   const captionPreviewText = $("#captionPreviewText");
   $$(".lang-btn[data-vlang]").forEach(btn => {
@@ -98,7 +106,7 @@ function initVideoLanguageSwitch() {
       const lang = btn.dataset.vlang;
       let text = "ဒီနေရာမှာ စာတန်းထိုး ပေါ်မယ်";
       if (lang === "en") text = "Let's see the subtitle sample";
-      else if (lang === "ja") text = "字幕サンプルを見てみましょう";
+      else if (lang === "th") text = "ดูตัวอย่างคำบรรยาย";
       
       subTextDisplay.textContent = text;
       if (captionPreviewText) captionPreviewText.textContent = text;
@@ -106,7 +114,7 @@ function initVideoLanguageSwitch() {
   });
 }
 
-/* AUDIO SLIDERS INDICATORS */
+/* AUDIO SLIDERS DYNAMIC INDICATORS */
 function initAudioSliders() {
   const rngVoiceSpeed = $("#rngVoiceSpeed");
   const speedValText = $("#speedValText");
@@ -125,26 +133,26 @@ function initAudioSliders() {
   }
 }
 
-/* CAPTIONS TAB CONTROLS (IMAGE REFERENCE LOGIC) */
+/* CAPTIONS TAB CONTROLS WITH NATIVE COLOR PICKER POPUP */
 function initCaptionsControls() {
   const subTextDisplay = $("#subTextDisplay");
   const captionPreviewText = $("#captionPreviewText");
 
-  // Subtitle Width Slider Control at the end
+  // Caption Width Slider (Bottom Positioned)
   $("#rngSubWidth").addEventListener("input", (e) => {
     const val = e.target.value;
     $("#captionWidthText").textContent = `${val}%`;
     $("#subtitleOverlay").style.width = `${val}%`;
   });
 
-  // Font Family Dropdown
+  // Font Dropdown
   $("#fontDropdown").addEventListener("change", (e) => {
     const font = e.target.value;
     subTextDisplay.style.fontFamily = `'${font}', sans-serif`;
     captionPreviewText.style.fontFamily = `'${font}', sans-serif`;
   });
 
-  // Font Size Stepper Range
+  // Font Size Stepper
   const rngFontSize = $("#rngFontSize");
   const fontSizeText = $("#fontSizeText");
   function updateFontSize(val) {
@@ -157,16 +165,36 @@ function initCaptionsControls() {
   $("#btnFontSizeDec").addEventListener("click", () => updateFontSize(Math.max(12, parseInt(rngFontSize.value) - 1)));
   $("#btnFontSizeInc").addEventListener("click", () => updateFontSize(Math.min(32, parseInt(rngFontSize.value) + 1)));
 
-  // Text Color Swatches
+  // Text Color Circles Swatches
   $$(".color-circle").forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".color-circle").forEach(c => c.classList.remove("active"));
       btn.classList.add("active");
       const col = btn.dataset.color;
       $("#textColorIndicator").style.background = col;
+      $("#nativeTextColorPicker").value = col;
       subTextDisplay.style.color = col;
       captionPreviewText.style.color = col;
     });
+  });
+
+  // Native Text Color Picker Popup Listener
+  const nativeTextColorPicker = $("#nativeTextColorPicker");
+  nativeTextColorPicker.addEventListener("input", (e) => {
+    const col = e.target.value;
+    $("#textColorIndicator").style.background = col;
+    subTextDisplay.style.color = col;
+    captionPreviewText.style.color = col;
+  });
+
+  // Native Outline Color Picker Popup Listener
+  const nativeOutlineColorPicker = $("#nativeOutlineColorPicker");
+  nativeOutlineColorPicker.addEventListener("input", (e) => {
+    const col = e.target.value;
+    $("#outlineColorIndicator").style.background = col;
+    const w = $("#rngOutlineWidth").value;
+    subTextDisplay.style.webkitTextStroke = `${w}px ${col}`;
+    captionPreviewText.style.webkitTextStroke = `${w}px ${col}`;
   });
 
   // Outline Width Stepper
@@ -175,28 +203,64 @@ function initCaptionsControls() {
   function updateOutline(val) {
     rngOutlineWidth.value = val;
     outlineWidthText.textContent = `${val}px`;
-    subTextDisplay.style.webkitTextStroke = `${val}px #000`;
-    captionPreviewText.style.webkitTextStroke = `${val}px #000`;
+    const col = nativeOutlineColorPicker.value;
+    subTextDisplay.style.webkitTextStroke = `${val}px ${col}`;
+    captionPreviewText.style.webkitTextStroke = `${val}px ${col}`;
   }
   rngOutlineWidth.addEventListener("input", (e) => updateOutline(e.target.value));
   $("#btnOutlineDec").addEventListener("click", () => updateOutline(Math.max(0, parseInt(rngOutlineWidth.value) - 1)));
   $("#btnOutlineInc").addEventListener("click", () => updateOutline(Math.min(8, parseInt(rngOutlineWidth.value) + 1)));
 
-  // Box Background Checkbox Toggle
+  // Box Background Toggle
   $("#chkBoxBg").addEventListener("change", (e) => {
-    const bg = e.target.checked ? "rgba(43, 49, 64, 0.9)" : "transparent";
+    const bg = e.target.checked ? "rgba(30, 41, 59, 0.9)" : "transparent";
     $("#subtitleOverlay").style.background = bg;
   });
 }
 
-/* STRICT OVERLAYS LOGIC (BLUR & FIXED SUBTITLE MOVE-ONLY) */
+/* SUBTITLE RIGHT HANDLE WIDTH RESIZING LOGIC */
+function initSubtitleResizer() {
+  const subOverlay = $("#subtitleOverlay");
+  const handleR = $("#subHandleR");
+  const vp = $("#phoneViewport");
+  const rngSubWidth = $("#rngSubWidth");
+  const captionWidthText = $("#captionWidthText");
+
+  let isResizing = false, startX, startW;
+
+  handleR.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startW = subOverlay.offsetWidth;
+    e.stopPropagation();
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+    let dx = e.clientX - startX;
+    let newWidthPx = startW + (dx * 2);
+
+    let pct = Math.round((newWidthPx / vp.clientWidth) * 100);
+    pct = Math.max(30, Math.min(95, pct));
+
+    subOverlay.style.width = `${pct}%`;
+    if (rngSubWidth) rngSubWidth.value = pct;
+    if (captionWidthText) captionWidthText.textContent = `${pct}%`;
+  });
+
+  document.addEventListener("mouseup", () => {
+    isResizing = false;
+  });
+}
+
+/* OVERLAYS LOGIC (BLUR & BOUNDARY DRAG) */
 function initOverlays() {
   const vp = $("#phoneViewport");
   const blurContainer = $("#blurContainer");
   const subOverlay = $("#subtitleOverlay");
   let blurCount = 0;
 
-  // Blur Box Adder
   $("#btnToggleBlur").addEventListener("click", () => {
     if (blurCount >= 3) return;
     blurCount++;
@@ -215,28 +279,19 @@ function initOverlays() {
     makeResizable(box, vp);
   });
 
-  // Subtitle Overlay Dragging (Move-Only without sizing Handles)
   makeConstrainedDraggable(subOverlay, vp);
 
-  // Crop Toggle & Reset
   const cropBoxEl = $("#cropOverlayBox");
-  $("#btnToggleCrop").addEventListener("click", () => {
-    cropBoxEl.classList.remove("hidden");
-  });
-  $("#btnResetCrop").addEventListener("click", () => {
-    cropBoxEl.classList.add("hidden");
-  });
+  $("#btnToggleCrop").addEventListener("click", () => cropBoxEl.classList.remove("hidden"));
+  $("#btnResetCrop").addEventListener("click", () => cropBoxEl.classList.add("hidden"));
 
-  // Crop Box Dragging and Corner Resizing
   initCropInteractivity();
 }
 
-// CROP CORNER RESIZING & DRAGGING LOGIC
 function initCropInteractivity() {
   const cropBox = $("#cropBox");
   const vp = $("#phoneViewport");
 
-  // Move Crop Box
   let isDrag = false, sX, sY, iL, iT;
   cropBox.addEventListener("mousedown", (e) => {
     if (e.target.classList.contains("crop-handle")) return;
@@ -259,7 +314,6 @@ function initCropInteractivity() {
 
   document.addEventListener("mouseup", () => { isDrag = false; });
 
-  // 4-Corner Resizing Handles
   $$(".crop-handle").forEach(handle => {
     let isResize = false, hType = handle.dataset.handle;
     let startX, startY, startL, startT, startW, startH;
@@ -312,12 +366,11 @@ function initCropInteractivity() {
   });
 }
 
-// BOUNDARY-LOCKED DRAG LOGIC (FOR SUBTITLE & BLUR)
 function makeConstrainedDraggable(el, container) {
   let isDrag = false, sX, sY, iL, iT;
 
   el.addEventListener("mousedown", (e) => {
-    if (e.target.classList.contains("blur-resize-handle") || e.target.classList.contains("blur-close-btn")) return;
+    if (e.target.classList.contains("blur-resize-handle") || e.target.classList.contains("blur-close-btn") || e.target.classList.contains("sub-handle-r")) return;
     isDrag = true;
     sX = e.clientX;
     sY = e.clientY;
