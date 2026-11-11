@@ -362,33 +362,54 @@ function initOverlays() {
   const subOverlay    = $("#subtitleOverlay");
   let blurCount = 0;
 
-  $("#btnToggleBlur").addEventListener("click", () => {
+    $("#btnToggleBlur").addEventListener("click", () => {
     if (blurCount >= 3) return;
     blurCount++;
+    
+    // Blur Box အသစ်ဆောက်ခြင်း
     const box = document.createElement("div");
     box.className = "blur-overlay-box";
-    box.innerHTML = `<div class="blur-close-btn">✕</div><div class="blur-resize-handle"></div>`;
+    // blur-overlay-box အတွင်း Control Bar ထည့်ထားသည်
+    box.innerHTML = `
+      <div class="blur-toolbar">
+        <span class="blur-label">Blur</span>
+        <button class="blur-btn blur-dec">−</button>
+        <input type="range" class="blur-strength" min="0" max="30" value="10">
+        <button class="blur-btn blur-inc">+</button>
+        <span class="blur-val">10</span>
+      </div>
+      <div class="blur-close-btn">✕</div>
+      <div class="blur-resize-handle"></div>
+    `;
     blurContainer.appendChild(box);
+
+    // အပေါ်ကနေ ဖျက်မယ့် button
     box.querySelector(".blur-close-btn").addEventListener("click", () => {
       box.remove(); blurCount--;
     });
+
+    // Blur Strength ထိန်းချုပ်မယ့် Logic
+    const strengthSlider = box.querySelector(".blur-strength");
+    const strengthVal = box.querySelector(".blur-val");
+    const applyStrength = (val) => {
+      val = Math.max(0, Math.min(30, val));
+      strengthSlider.value = val;
+      strengthVal.textContent = val;
+      box.style.backdropFilter = `blur(${val}px)`;
+      box.style.webkitBackdropFilter = `blur(${val}px)`;
+    };
+
+    strengthSlider.addEventListener("input", (e) => applyStrength(parseInt(e.target.value)));
+    box.querySelector(".blur-dec").addEventListener("click", (e) => { e.stopPropagation(); applyStrength(parseInt(strengthSlider.value) - 1); });
+    box.querySelector(".blur-inc").addEventListener("click", (e) => { e.stopPropagation(); applyStrength(parseInt(strengthSlider.value) + 1); });
+    
+    // စစချင်း Blur ကို 10px သတ်မှတ်
+    applyStrength(10);
+
+    // Drag နဲ့ Resize ချိတ်ဆက်ခြင်း
     makeConstrainedDraggable(box, vp);
     makeResizable(box, vp);
   });
-
-  makeConstrainedDraggable(subOverlay, vp);
-
-  const cropOverlay = $("#cropOverlayBox");
-  $("#btnToggleCrop").addEventListener("click", () => cropOverlay.classList.remove("hidden"));
-  $("#btnResetCrop").addEventListener("click", () => {
-    cropOverlay.classList.add("hidden");
-    const c = $("#cropBox");
-    c.style.left = "15%"; c.style.top = "15%";
-    c.style.width = "70%"; c.style.height = "70%";
-  });
-
-  initCropInteractivity();
-}
 
 function makeResizable(box, container) {
   const handle = box.querySelector(".blur-resize-handle");
