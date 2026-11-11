@@ -17,11 +17,13 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initTheme() {
-  $("#themeToggleBtn").addEventListener("click", () => {
+  const btn = $("#themeToggleBtn");
+  btn.addEventListener("click", () => {
     const html = document.documentElement;
     const isDark = html.getAttribute("data-theme") === "dark";
     html.setAttribute("data-theme", isDark ? "light" : "dark");
-    $("#themeToggleBtn").textContent = isDark ? "🌙 Dark" : "☀️ Light";
+    btn.querySelector(".theme-icon").textContent = isDark ? "🌙" : "☀️";
+    btn.querySelector(".theme-text").textContent = isDark ? "Dark" : "Light";
   });
 }
 
@@ -213,12 +215,12 @@ function initCaptionsControls() {
 
   // Box Background Toggle
   $("#chkBoxBg").addEventListener("change", (e) => {
-    const bg = e.target.checked ? "rgba(30, 41, 59, 0.9)" : "transparent";
+    const bg = e.target.checked ? "rgba(15, 23, 42, 0.9)" : "transparent";
     $("#subtitleOverlay").style.background = bg;
   });
 }
 
-/* SUBTITLE RIGHT HANDLE WIDTH RESIZING LOGIC */
+/* SUBTITLE RIGHT HANDLE WIDTH RESIZING LOGIC (PREVENTS AUTO GROWING) */
 function initSubtitleResizer() {
   const subOverlay = $("#subtitleOverlay");
   const handleR = $("#subHandleR");
