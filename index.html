@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="my" data-theme="dark">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Red Bear Studio v2.0 Pro</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;500;600;700&family=Padauk:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Myanmar:wght@400;500;600;700&family=Padauk:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -74,9 +74,10 @@
                   <video id="previewVideo" playsinline></video>
                   <div class="bg-layer" id="bgLayer"></div>
 
-                  <!-- SUBTITLE OVERLAY (Fixed Compact Size, Move-Only Drag) -->
+                  <!-- SUBTITLE OVERLAY (With Right Edge Handle for Dynamic Width) -->
                   <div class="subtitle-overlay" id="subtitleOverlay">
                     <span class="sub-text" id="subTextDisplay">ဒီနေရာမှာ စာတန်းထိုး ပေါ်မယ်</span>
+                    <div class="sub-handle-r" id="subHandleR"></div>
                   </div>
 
                   <!-- BLUR CONTAINERS -->
@@ -121,7 +122,7 @@
           <!-- BOTTOM CONTROLS ROW -->
           <div class="bottom-controls-row">
             <div class="ctrl-card">
-              <h3 class="ctrl-title">ဗီဒီယို အချိုး (Aspect Ratio)</h3>
+              <h3 class="ctrl-title">Ratio (ဗီဒီယို အချိုး)</h3>
               <div class="ratio-btn-group">
                 <button class="ratio-btn active" data-ratio="9:16">9:16</button>
                 <button class="ratio-btn" data-ratio="3:4">3:4</button>
@@ -131,21 +132,21 @@
             </div>
 
             <div class="ctrl-card">
-              <h3 class="ctrl-title">အရောင် & Mirror</h3>
+              <h3 class="ctrl-title">Color & Mirror</h3>
               <div class="toggle-stack">
                 <label class="switch-row">
-                  <span>Auto Color (အရောင်မြှင့်ရန်)</span>
+                  <span>Auto Color</span>
                   <input type="checkbox" id="chkAutoColor">
                 </label>
                 <label class="switch-row">
-                  <span>Mirror (ဗီဒီယိုလှန်ရန်)</span>
+                  <span>Mirror</span>
                   <input type="checkbox" id="chkMirror">
                 </label>
               </div>
             </div>
 
             <div class="ctrl-card">
-              <h3 class="ctrl-title">ရူးမ် (Zoom)</h3>
+              <h3 class="ctrl-title">Zoom (ရူးမ်)</h3>
               <div class="range-row">
                 <input type="range" id="rngZoom" min="100" max="150" value="100">
                 <span class="range-val" id="zoomVal">100%</span>
@@ -154,7 +155,7 @@
 
             <div class="ctrl-card bg-ctrl-card">
               <div class="ctrl-card-header">
-                <h3 class="ctrl-title">နောက်ခံပုံ (Background)</h3>
+                <h3 class="ctrl-title">Background</h3>
                 <button class="btn-card-close" id="btnClearBg">✕</button>
               </div>
               <div class="bg-mode-selector">
@@ -183,57 +184,76 @@
           </div>
         </div>
 
-        <!-- RIGHT SIDEBAR (FIXED WIDTH: 340px) -->
+        <!-- RIGHT SIDEBAR (340px CLASSIC HIGH-CONTRAST CARDS) -->
         <aside class="right-config-sidebar">
+          
+          <!-- TAB HEADER WITH WHITE PILL HIGHLIGHT -->
           <div class="config-tabs-header">
-            <button class="tab-btn active" data-tab="tab-settings">ပြင်ဆင်ချက်</button>
-            <button class="tab-btn" data-tab="tab-audio">အသံ</button>
-            <button class="tab-btn" data-tab="tab-sub">စာတန်းထိုး</button>
-            <button class="tab-btn" data-tab="tab-extra">မူပိုင်ခွင့်</button>
+            <button class="tab-btn active" data-tab="tab-video">Video</button>
+            <button class="tab-btn" data-tab="tab-voice">Voice</button>
+            <button class="tab-btn" data-tab="tab-captions">Captions</button>
+            <button class="tab-btn" data-tab="tab-extras">Extras</button>
           </div>
 
-          <!-- TAB 1: ပြင်ဆင်ချက် -->
-          <div class="tab-content active" id="tab-settings">
+          <!-- TAB 1: VIDEO (With Mode Card Descriptions) -->
+          <div class="tab-content active" id="tab-video">
             <div class="config-card">
-              <h3 class="config-title">Video ဘာသာစကား</h3>
-              <p class="config-desc">စာတန်းထိုး ပြသမည့် ဘာသာစကား ရွေးချယ်ပါ</p>
+              <h3 class="config-title">Mode</h3>
+              <div class="mode-card-stack">
+                <label class="mode-card-item active">
+                  <input type="radio" name="videoMode" value="ai" checked>
+                  <div class="mode-info">
+                    <span class="mode-title">AI Recap</span>
+                    <span class="mode-desc">Narrates only where people talk</span>
+                  </div>
+                </label>
+
+                <label class="mode-card-item">
+                  <input type="radio" name="videoMode" value="pro_ai">
+                  <div class="mode-info">
+                    <div class="mode-title-row">
+                      <span class="mode-title">Pro AI Recap</span>
+                      <span class="badge-pro">PRO</span>
+                    </div>
+                    <span class="mode-desc">Skips silent scenes, narrates nonstop</span>
+                  </div>
+                </label>
+
+                <label class="mode-card-item">
+                  <input type="radio" name="videoMode" value="sub">
+                  <div class="mode-info">
+                    <span class="mode-title">Subtitle Mode</span>
+                    <span class="mode-desc">Faithful translation with captions</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div class="config-card">
+              <h3 class="config-title">Output language</h3>
               <div class="lang-btn-group">
                 <button class="lang-btn active" data-vlang="my">မြန်မာ</button>
                 <button class="lang-btn" data-vlang="en">English</button>
-                <button class="lang-btn" data-vlang="ja">日本語</button>
-              </div>
-            </div>
-
-            <div class="config-card">
-              <h3 class="config-title">Subtitle / Audio Mode</h3>
-              <div class="radio-stack">
-                <label class="radio-item"><input type="radio" name="subMode" value="ai" checked><span>AI Recap</span></label>
-                <label class="radio-item"><input type="radio" name="subMode" value="normal"><span>Subtitle Mode</span></label>
-                <label class="radio-item"><input type="radio" name="subMode" value="dubbing"><span>Dubbing Mode</span></label>
+                <button class="lang-btn" data-vlang="th">ไทย</button>
               </div>
             </div>
           </div>
 
-          <!-- TAB 2: အသံ (Voice Settings + Speed/Pitch Values) -->
-          <div class="tab-content" id="tab-audio">
+          <!-- TAB 2: VOICE (Voice Settings + Speed/Pitch Value Displays) -->
+          <div class="tab-content" id="tab-voice">
             <div class="config-card">
-              <h3 class="config-title">Choose Voice (အသံအမျိုးအစား)</h3>
-              <div class="lang-btn-group">
-                <button class="lang-btn active" data-alang="my">မြန်မာ</button>
-                <button class="lang-btn" data-alang="en">English</button>
-                <button class="lang-btn" data-alang="th">ไทย</button>
-              </div>
+              <h3 class="config-title">Choose Voice</h3>
               <select class="voice-select-dropdown" id="voiceSelectDropdown">
-                <option value="m1">Ko Htet (Male - Deep & Clear)</option>
-                <option value="f1">Thiri (Female - Warm & Friendly)</option>
-                <option value="m2">Aung Kyaw (Male - News Style)</option>
+                <option value="m1">Thiha (Male - Myanmar)</option>
+                <option value="f1">Thiri (Female - Myanmar)</option>
+                <option value="en1">Alex (Male - English)</option>
               </select>
             </div>
 
             <div class="config-card">
               <h3 class="config-title">Voice Adjustments</h3>
               <div class="range-row-label">
-                <span>Speed (အမြန်နှုန်း)</span>
+                <span>Speed</span>
                 <span class="range-val-text" id="speedValText">1.0x</span>
               </div>
               <div class="range-row">
@@ -241,7 +261,7 @@
               </div>
 
               <div class="range-row-label mt-10">
-                <span>Pitch (အသံအနိမ့်အမြင့်)</span>
+                <span>Pitch</span>
                 <span class="range-val-text" id="pitchValText">1.0</span>
               </div>
               <div class="range-row">
@@ -250,8 +270,8 @@
             </div>
           </div>
 
-          <!-- TAB 3: စာတန်းထိုး (Captions - Image Reference Layout) -->
-          <div class="tab-content" id="tab-sub">
+          <!-- TAB 3: CAPTIONS (Image-Matched Layout + Native Color Picker + Bottom Caption Width Slider) -->
+          <div class="tab-content" id="tab-captions">
             <div class="config-card">
               <div class="card-header-checkbox">
                 <h3 class="config-title">Captions</h3>
@@ -279,10 +299,14 @@
                 <button class="btn-step" id="btnFontSizeInc">+</button>
               </div>
 
+              <!-- TEXT COLOR WITH NATIVE COLOR PICKER POPUP -->
               <div class="color-picker-section mt-10">
                 <div class="range-row-label">
                   <span>Text color</span>
-                  <div class="color-indicator-swatch" id="textColorIndicator"></div>
+                  <div class="color-swatch-wrapper">
+                    <input type="color" id="nativeTextColorPicker" value="#ffeb3b" class="hidden-color-input">
+                    <div class="color-indicator-swatch" id="textColorIndicator" style="background:#ffeb3b;"></div>
+                  </div>
                 </div>
                 <div class="color-swatch-grid">
                   <button class="color-circle" style="background:#ffffff;" data-color="#ffffff"></button>
@@ -294,9 +318,13 @@
                 </div>
               </div>
 
+              <!-- OUTLINE COLOR WITH NATIVE COLOR PICKER POPUP -->
               <div class="range-row-label mt-10">
                 <span>Outline color</span>
-                <div class="color-indicator-swatch" id="outlineColorIndicator" style="background:#000000;"></div>
+                <div class="color-swatch-wrapper">
+                  <input type="color" id="nativeOutlineColorPicker" value="#000000" class="hidden-color-input">
+                  <div class="color-indicator-swatch" id="outlineColorIndicator" style="background:#000000;"></div>
+                </div>
               </div>
 
               <div class="range-row-label mt-10">
@@ -314,20 +342,21 @@
                 <input type="checkbox" id="chkBoxBg" checked>
               </div>
 
-              <div class="range-row-label mt-10">
-                <span>Caption Width (စာတန်းအကျယ်)</span>
+              <!-- CAPTION WIDTH SLIDER AT THE VERY BOTTOM -->
+              <div class="range-row-label mt-12 border-top-divider">
+                <span>Caption Width</span>
                 <span class="range-val-text" id="captionWidthText">70%</span>
               </div>
               <div class="range-row">
-                <input type="range" id="rngSubWidth" min="40" max="100" value="70">
+                <input type="range" id="rngSubWidth" min="30" max="95" value="70">
               </div>
             </div>
           </div>
 
-          <!-- TAB 4: မူပိုင်ခွင့် -->
-          <div class="tab-content" id="tab-extra">
+          <!-- TAB 4: EXTRAS -->
+          <div class="tab-content" id="tab-extras">
             <div class="config-card">
-              <h3 class="config-title">မူပိုင်ခွင့်</h3>
+              <h3 class="config-title">မူပိုင်ခွင့် & Extras</h3>
               <p class="config-desc">ဖန်တီးထားသော ဗီဒီယိုများ၏ မူပိုင်ခွင့်သည် ဖန်တီးသူထံ၌သာ ရှိပါသည်။</p>
             </div>
           </div>
