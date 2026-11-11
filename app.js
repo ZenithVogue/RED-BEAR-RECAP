@@ -1,22 +1,25 @@
 /* ============================================================
-   Red Bear Studio v2.0 Pro Engine
+   Red Bear Studio v2.0 Pro Engine — Fixed Build
    ============================================================ */
-
-const $ = (s) => document.querySelector(s);
+const $  = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   initMedia();
   initSidebarTabs();
-  initOverlays();
   initVideoModeCards();
   initAudioSliders();
   initCaptionsControls();
-  initSubtitleResizer();
+  initSubtitleResizer();     // ✅ called ONCE
+  initOverlays();
   initBackgroundControls();
+  initRatioControls();
+  initZoomControl();
+  initExecuteButton();
 });
 
+/* THEME */
 function initTheme() {
   const btn = $("#themeToggleBtn");
   btn.addEventListener("click", () => {
@@ -28,54 +31,66 @@ function initTheme() {
   });
 }
 
+/* MEDIA + PLAYBACK SYNC */
 function initMedia() {
-  const fileInput = $("#fileInput");
-  const previewVideo = $("#previewVideo");
+  const fileInput     = $("#fileInput");
+  const previewVideo  = $("#previewVideo");
+  const videoProgress = $("#videoProgress");
+  const timeReadout   = $("#timeReadout");
+  const btnPlayToggle = $("#btnPlayToggle");
 
-  $("#btnBrowse").addEventListener("click", () => fileInput.click());
+  const loadVideo = (src) => {
+    previewVideo.src = src;
+    $("#mediaInputView").classList.add("hidden");
+    $("#phonePreviewView").classList.remove("hidden");
+  };
+
+  $("#btnBrowse").addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
   $("#uploadDropzone").addEventListener("click", () => fileInput.click());
 
   fileInput.addEventListener("change", (e) => {
-    if (e.target.files.length) {
-      previewVideo.src = URL.createObjectURL(e.target.files[0]);
-      $("#mediaInputView").classList.add("hidden");
-      $("#phonePreviewView").classList.remove("hidden");
-    }
+    if (e.target.files.length) loadVideo(URL.createObjectURL(e.target.files[0]));
   });
 
   $("#btnFetch").addEventListener("click", () => {
-    previewVideo.src = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
-    $("#mediaInputView").classList.add("hidden");
-    $("#phonePreviewView").classList.remove("hidden");
+    const url = $("#linkInput").value.trim() ||
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+    loadVideo(url);
   });
 
   $("#btnRemoveMedia").addEventListener("click", () => {
     previewVideo.pause();
-    previewVideo.src = "";
+    previewVideo.removeAttribute("src");
+    previewVideo.load();
     $("#phonePreviewView").classList.add("hidden");
     $("#mediaInputView").classList.remove("hidden");
   });
 
-  $("#btnPlayToggle").addEventListener("click", () => {
-    if (previewVideo.paused) {
-      previewVideo.play();
-      $("#btnPlayToggle").textContent = "❚❚";
-    } else {
-      previewVideo.pause();
-      $("#btnPlayToggle").textContent = "▶";
-    }
+  btnPlayToggle.addEventListener("click", () => {
+    previewVideo.paused ? previewVideo.play() : previewVideo.pause();
   });
+  previewVideo.addEventListener("play",  () => btnPlayToggle.textContent = "❚❚");
+  previewVideo.addEventListener("pause", () => btnPlayToggle.textContent = "▶");
 
-  const chkMirror = $("#chkMirror");
-  const chkAutoColor = $("#chkAutoColor");
-  function applyFilters() {
-    let t = chkMirror.checked ? "scaleX(-1)" : "none";
-    let f = chkAutoColor.checked ? "saturate(1.4) contrast(1.2)" : "none";
-    previewVideo.style.transform = t;
-    previewVideo.style.filter = f;
-  }
-  chkMirror.addEventListener("change", applyFilters);
-  chkAutoColor.addEventListener("change", applyFilters);
+  previewVideo.addEventListener("timeupdate", () => {
+    if (!previewVideo.duration) return;
+    videoProgress.value = (previewVideo.currentTime / previewVideo.duration) * 100;
+    timeReadout.textContent = `${fmt(previewVideo.currentTime)} / ${fmt(previewVideo.duration)}`;
+  });
+  videoProgress.addEventListener("input", (e) => {
+    if (previewVideo.duration) previewVideo.currentTime = (e.target.value / 100) * previewVideo.duration;
+  });
+  const fmt = (s) => {
+    if (!isFinite(s)) return "0:00";
+    return `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,"0")}`;
+  };
+
+  const applyFilters = () => {
+    previewVideo.style.transform = $("#chkMirror").checked ? "scaleX(-1)" : "none";
+    previewVideo.style.filter    = $("#chkAutoColor").checked ? "saturate(1.4) contrast(1.2)" : "none";
+  };
+  $("#chkMirror").addEventListener("change", applyFilters);
+  $("#chkAutoColor").addEventListener("change", applyFilters);
 }
 
 /* SIDEBAR TABS */
@@ -90,7 +105,7 @@ function initSidebarTabs() {
   });
 }
 
-/* VIDEO MODE CARDS */
+/* VIDEO MODE + LANGUAGE */
 function initVideoModeCards() {
   $$(".mode-card-item").forEach(card => {
     card.addEventListener("click", () => {
@@ -100,112 +115,70 @@ function initVideoModeCards() {
     });
   });
 
-  const subTextDisplay = $("#subTextDisplay");
-  const captionPreviewText = $("#captionPreviewText");
+  const TEXTS = {
+    my: "ဒီနေရာမှာ စာတန်းထိုး ပေါ်မယ်",
+    en: "Let's see the subtitle sample",
+    th: "ดูตัวอย่างคำบรรยาย",
+  };
   $$(".lang-btn[data-vlang]").forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".lang-btn[data-vlang]").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
-      const lang = btn.dataset.vlang;
-      let text = "ဒီနေရာမှာ စာတန်းထိုး ပေါ်မယ်";
-      if (lang === "en") text = "Let's see the subtitle sample";
-      else if (lang === "th") text = "ดูตัวอย่างคำบรรยาย";
-      
-      subTextDisplay.textContent = text;
-      if (captionPreviewText) captionPreviewText.textContent = text;
+      const t = TEXTS[btn.dataset.vlang] || TEXTS.my;
+      $("#subTextDisplay").textContent = t;
+      const cp = $("#captionPreviewText");
+      if (cp) cp.textContent = t;
     });
   });
 }
 
-/* AUDIO SLIDERS */
+/* AUDIO */
 function initAudioSliders() {
   const rngVoiceSpeed = $("#rngVoiceSpeed");
-  const speedValText = $("#speedValText");
-  if (rngVoiceSpeed) {
-    rngVoiceSpeed.addEventListener("input", (e) => {
-      speedValText.textContent = `${parseFloat(e.target.value).toFixed(1)}x`;
-    });
-  }
-
+  rngVoiceSpeed?.addEventListener("input", (e) => {
+    $("#speedValText").textContent = `${parseFloat(e.target.value).toFixed(1)}x`;
+  });
   const rngVoicePitch = $("#rngVoicePitch");
-  const pitchValText = $("#pitchValText");
-  if (rngVoicePitch) {
-    rngVoicePitch.addEventListener("input", (e) => {
-      pitchValText.textContent = parseFloat(e.target.value).toFixed(1);
-    });
-  }
-}
-
-/* BACKGROUND BLUR & PHOTO PRESETS */
-function initBackgroundControls() {
-  const bgLayer = $("#bgLayer");
-  const panelBlurBg = $("#panelBlurBg");
-  const panelPhotoBg = $("#panelPhotoBg");
-
-  $("#btnModeBlurBg").addEventListener("click", () => {
-    $("#btnModeBlurBg").classList.add("active");
-    $("#btnModePhotoBg").classList.remove("active");
-    panelBlurBg.classList.remove("hidden");
-    panelPhotoBg.classList.add("hidden");
-    bgLayer.style.backgroundImage = "none";
-    bgLayer.style.filter = "blur(10px)";
-  });
-
-  $("#btnModePhotoBg").addEventListener("click", () => {
-    $("#btnModePhotoBg").classList.add("active");
-    $("#btnModeBlurBg").classList.remove("active");
-    panelPhotoBg.classList.remove("hidden");
-    panelBlurBg.classList.add("hidden");
-  });
-
-  // Soft / Medium / Hard Preset blur buttons
-  $$(".blur-preset-card").forEach(btn => {
-    btn.addEventListener("click", () => {
-      $$(".blur-preset-card").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      const preset = btn.dataset.preset;
-      let blurPx = "8px";
-      if (preset === "medium") blurPx = "16px";
-      else if (preset === "hard") blurPx = "28px";
-      
-      bgLayer.style.filter = `blur(${blurPx})`;
-    });
-  });
-
-  $("#btnClearBg").addEventListener("click", () => {
-    bgLayer.style.backgroundImage = "none";
-    bgLayer.style.filter = "none";
+  rngVoicePitch?.addEventListener("input", (e) => {
+    $("#pitchValText").textContent = parseFloat(e.target.value).toFixed(1);
   });
 }
 
-/* CAPTIONS TAB CONTROLS */
+/* CAPTIONS CONTROLS */
 function initCaptionsControls() {
-  const subTextDisplay = $("#subTextDisplay");
+  const subTextDisplay     = $("#subTextDisplay");
   const captionPreviewText = $("#captionPreviewText");
+  const subOverlay         = $("#subtitleOverlay");
+  const vp                 = $("#phoneViewport");
 
+  // Width slider — always sync + clamp
   $("#rngSubWidth").addEventListener("input", (e) => {
-    const val = e.target.value;
+    const val = parseInt(e.target.value);
     $("#captionWidthText").textContent = `${val}%`;
-    $("#subtitleOverlay").style.width = `${val}%`;
+    subOverlay.style.width     = `${val}%`;
+    subOverlay.style.height    = "";
+    subOverlay.style.minHeight = "";
+    subOverlay.style.maxHeight = "";
+    clampToViewport(subOverlay, vp);
   });
 
   $("#fontDropdown").addEventListener("change", (e) => {
-    const font = e.target.value;
-    subTextDisplay.style.fontFamily = `'${font}', sans-serif`;
-    captionPreviewText.style.fontFamily = `'${font}', sans-serif`;
+    const f = `'${e.target.value}', sans-serif`;
+    subTextDisplay.style.fontFamily     = f;
+    captionPreviewText.style.fontFamily = f;
   });
 
   const rngFontSize = $("#rngFontSize");
-  const fontSizeText = $("#fontSizeText");
-  function updateFontSize(val) {
-    rngFontSize.value = val;
-    fontSizeText.textContent = `${val}px`;
-    subTextDisplay.style.fontSize = `${val}px`;
-    captionPreviewText.style.fontSize = `${val}px`;
-  }
-  rngFontSize.addEventListener("input", (e) => updateFontSize(e.target.value));
-  $("#btnFontSizeDec").addEventListener("click", () => updateFontSize(Math.max(12, parseInt(rngFontSize.value) - 1)));
-  $("#btnFontSizeInc").addEventListener("click", () => updateFontSize(Math.min(32, parseInt(rngFontSize.value) + 1)));
+  const setFontSize = (v) => {
+    v = Math.max(12, Math.min(32, parseInt(v)));
+    rngFontSize.value = v;
+    $("#fontSizeText").textContent = `${v}px`;
+    subTextDisplay.style.fontSize     = `${v}px`;
+    captionPreviewText.style.fontSize = `${v}px`;
+  };
+  rngFontSize.addEventListener("input", (e) => setFontSize(e.target.value));
+  $("#btnFontSizeDec").addEventListener("click", () => setFontSize(parseInt(rngFontSize.value) - 1));
+  $("#btnFontSizeInc").addEventListener("click", () => setFontSize(parseInt(rngFontSize.value) + 1));
 
   $$(".color-circle").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -214,141 +187,250 @@ function initCaptionsControls() {
       const col = btn.dataset.color;
       $("#textColorIndicator").style.background = col;
       $("#nativeTextColorPicker").value = col;
-      subTextDisplay.style.color = col;
+      subTextDisplay.style.color     = col;
       captionPreviewText.style.color = col;
     });
   });
 
-  const nativeTextColorPicker = $("#nativeTextColorPicker");
-  nativeTextColorPicker.addEventListener("input", (e) => {
+  $("#nativeTextColorPicker").addEventListener("input", (e) => {
     const col = e.target.value;
     $("#textColorIndicator").style.background = col;
-    subTextDisplay.style.color = col;
+    subTextDisplay.style.color     = col;
     captionPreviewText.style.color = col;
   });
 
-  const nativeOutlineColorPicker = $("#nativeOutlineColorPicker");
-  nativeOutlineColorPicker.addEventListener("input", (e) => {
+  $("#nativeOutlineColorPicker").addEventListener("input", (e) => {
     const col = e.target.value;
     $("#outlineColorIndicator").style.background = col;
     const w = $("#rngOutlineWidth").value;
-    subTextDisplay.style.webkitTextStroke = `${w}px ${col}`;
+    subTextDisplay.style.webkitTextStroke     = `${w}px ${col}`;
     captionPreviewText.style.webkitTextStroke = `${w}px ${col}`;
   });
 
   const rngOutlineWidth = $("#rngOutlineWidth");
-  const outlineWidthText = $("#outlineWidthText");
-  function updateOutline(val) {
-    rngOutlineWidth.value = val;
-    outlineWidthText.textContent = `${val}px`;
-    const col = nativeOutlineColorPicker.value;
-    subTextDisplay.style.webkitTextStroke = `${val}px ${col}`;
-    captionPreviewText.style.webkitTextStroke = `${val}px ${col}`;
-  }
-  rngOutlineWidth.addEventListener("input", (e) => updateOutline(e.target.value));
-  $("#btnOutlineDec").addEventListener("click", () => updateOutline(Math.max(0, parseInt(rngOutlineWidth.value) - 1)));
-  $("#btnOutlineInc").addEventListener("click", () => updateOutline(Math.min(8, parseInt(rngOutlineWidth.value) + 1)));
+  const setOutline = (v) => {
+    v = Math.max(0, Math.min(8, parseInt(v)));
+    rngOutlineWidth.value = v;
+    $("#outlineWidthText").textContent = `${v}px`;
+    const col = $("#nativeOutlineColorPicker").value;
+    subTextDisplay.style.webkitTextStroke     = `${v}px ${col}`;
+    captionPreviewText.style.webkitTextStroke = `${v}px ${col}`;
+  };
+  rngOutlineWidth.addEventListener("input", (e) => setOutline(e.target.value));
+  $("#btnOutlineDec").addEventListener("click", () => setOutline(parseInt(rngOutlineWidth.value) - 1));
+  $("#btnOutlineInc").addEventListener("click", () => setOutline(parseInt(rngOutlineWidth.value) + 1));
 
   $("#chkBoxBg").addEventListener("change", (e) => {
-    const bg = e.target.checked ? "rgba(15, 23, 42, 0.9)" : "transparent";
-    $("#subtitleOverlay").style.background = bg;
+    subOverlay.style.background = e.target.checked ? "rgba(15,23,42,0.9)" : "transparent";
+  });
+
+  $("#chkEnableCaptions").addEventListener("change", (e) => {
+    subOverlay.style.display = e.target.checked ? "" : "none";
+    $("#captionLivePreviewBox").style.opacity = e.target.checked ? "1" : "0.4";
   });
 }
 
-/* SUBTITLE RIGHT HANDLE WIDTH RESIZING (PREVENTS AUTO GROWING) */
+/* ============================================================
+   SUBTITLE RIGHT-HANDLE WIDTH RESIZE (fixed — no auto-grow)
+   ============================================================ */
 function initSubtitleResizer() {
   const subOverlay = $("#subtitleOverlay");
-  const handleR = $("#subHandleR");
-  const vp = $("#phoneViewport");
-  const rngSubWidth = $("#rngSubWidth");
-  const captionWidthText = $("#captionWidthText");
+  const handleR    = $("#subHandleR");
+  const vp         = $("#phoneViewport");
 
-  let isResizing = false, startX, startW;
+  let isResizing = false;
+  let startX, startW, lockLeft, lockH;
 
   handleR.addEventListener("mousedown", (e) => {
-    isResizing = true;
-    startX = e.clientX;
-    startW = subOverlay.offsetWidth;
-    e.stopPropagation();
     e.preventDefault();
+    e.stopPropagation();
+
+    const cRect = vp.getBoundingClientRect();
+    const eRect = subOverlay.getBoundingClientRect();
+
+    // Snap from centered → absolute left/top
+    const curL = eRect.left - cRect.left;
+    const curT = eRect.top  - cRect.top;
+
+    subOverlay.style.left      = curL + "px";
+    subOverlay.style.top       = curT + "px";
+    subOverlay.style.bottom    = "auto";
+    subOverlay.style.right     = "auto";
+    subOverlay.style.transform = "none";
+    subOverlay.style.height    = eRect.height + "px";
+    subOverlay.style.minHeight = eRect.height + "px";
+    subOverlay.style.maxHeight = eRect.height + "px";
+
+    lockLeft = curL;
+    lockH    = eRect.height;
+    startX   = e.clientX;
+    startW   = eRect.width;
+    isResizing = true;
   });
 
   document.addEventListener("mousemove", (e) => {
     if (!isResizing) return;
-    let dx = e.clientX - startX;
-    let newWidthPx = startW + (dx * 2);
+    const dx = e.clientX - startX;
+    const minPx = vp.clientWidth * 0.30;
+    const maxPx = Math.min(vp.clientWidth * 0.95, vp.clientWidth - lockLeft);
+    const newW  = Math.max(minPx, Math.min(startW + dx, maxPx));
 
-    let pct = Math.round((newWidthPx / vp.clientWidth) * 100);
-    pct = Math.max(30, Math.min(95, pct));
+    subOverlay.style.width  = newW + "px";
+    subOverlay.style.height = lockH + "px";    // ✅ height never changes
 
-    subOverlay.style.width = `${pct}%`;
-    if (rngSubWidth) rngSubWidth.value = pct;
-    if (captionWidthText) captionWidthText.textContent = `${pct}%`;
+    const pct = Math.round((newW / vp.clientWidth) * 100);
+    $("#rngSubWidth").value = pct;
+    $("#captionWidthText").textContent = pct + "%";
   });
 
-  document.addEventListener("mouseup", () => {
-    isResizing = false;
-  });
+  document.addEventListener("mouseup", () => { isResizing = false; });
 }
 
-/* OVERLAYS LOGIC (BLUR & BOUNDARY DRAG) */
+/* ============================================================
+   CONSTRAINED DRAGGABLE — no jump, no auto-grow
+   ============================================================ */
+function makeConstrainedDraggable(el, container) {
+  let isDrag = false;
+  let startMouseX, startMouseY, startLeft, startTop;
+  let lockedW, lockedH, maxL, maxT;
+
+  el.addEventListener("mousedown", (e) => {
+    if (e.target.closest(".blur-resize-handle, .blur-close-btn, .sub-handle-r, .crop-handle")) return;
+    e.preventDefault();
+
+    const cRect = container.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+
+    // ✅ Use actual visual rect (handles translateX(-50%) etc.)
+    startLeft = eRect.left - cRect.left;
+    startTop  = eRect.top  - cRect.top;
+    lockedW   = eRect.width;
+    lockedH   = eRect.height;
+
+    // Convert any centering/bottom positioning → explicit left/top
+    el.style.left      = startLeft + "px";
+    el.style.top       = startTop  + "px";
+    el.style.bottom    = "auto";
+    el.style.right     = "auto";
+    el.style.transform = "none";
+    el.style.width     = lockedW + "px";
+    el.style.height    = lockedH + "px";
+    el.style.minHeight = lockedH + "px";
+    el.style.maxHeight = lockedH + "px";
+
+    maxL = Math.max(0, cRect.width  - lockedW);
+    maxT = Math.max(0, cRect.height - lockedH);
+    startMouseX = e.clientX;
+    startMouseY = e.clientY;
+    isDrag = true;
+    e.stopPropagation();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isDrag) return;
+    let nL = startLeft + (e.clientX - startMouseX);
+    let nT = startTop  + (e.clientY - startMouseY);
+    nL = Math.max(0, Math.min(maxL, nL));
+    nT = Math.max(0, Math.min(maxT, nT));
+    el.style.left = nL + "px";
+    el.style.top  = nT + "px";
+    // ⚠️ NEVER touch height/padding/line-height here
+  });
+
+  document.addEventListener("mouseup", () => { isDrag = false; });
+}
+
+function clampToViewport(el, container) {
+  if (!el || el.classList.contains("hidden")) return;
+  const cRect = container.getBoundingClientRect();
+  const eRect = el.getBoundingClientRect();
+  const curL  = eRect.left - cRect.left;
+  const curT  = eRect.top  - cRect.top;
+  const maxL  = Math.max(0, cRect.width  - eRect.width);
+  const maxT  = Math.max(0, cRect.height - eRect.height);
+  el.style.left      = Math.max(0, Math.min(maxL, curL)) + "px";
+  el.style.top       = Math.max(0, Math.min(maxT, curT)) + "px";
+  el.style.bottom    = "auto";
+  el.style.right     = "auto";
+  el.style.transform = "none";
+}
+
+/* OVERLAYS (Blur boxes + Crop) */
 function initOverlays() {
-  const vp = $("#phoneViewport");
+  const vp            = $("#phoneViewport");
   const blurContainer = $("#blurContainer");
-  const subOverlay = $("#subtitleOverlay");
+  const subOverlay    = $("#subtitleOverlay");
   let blurCount = 0;
 
   $("#btnToggleBlur").addEventListener("click", () => {
     if (blurCount >= 3) return;
     blurCount++;
-
     const box = document.createElement("div");
     box.className = "blur-overlay-box";
     box.innerHTML = `<div class="blur-close-btn">✕</div><div class="blur-resize-handle"></div>`;
     blurContainer.appendChild(box);
-
     box.querySelector(".blur-close-btn").addEventListener("click", () => {
-      box.remove();
-      blurCount--;
+      box.remove(); blurCount--;
     });
-
     makeConstrainedDraggable(box, vp);
     makeResizable(box, vp);
   });
 
   makeConstrainedDraggable(subOverlay, vp);
 
-  const cropBoxEl = $("#cropOverlayBox");
-  $("#btnToggleCrop").addEventListener("click", () => cropBoxEl.classList.remove("hidden"));
-  $("#btnResetCrop").addEventListener("click", () => cropBoxEl.classList.add("hidden"));
+  const cropOverlay = $("#cropOverlayBox");
+  $("#btnToggleCrop").addEventListener("click", () => cropOverlay.classList.remove("hidden"));
+  $("#btnResetCrop").addEventListener("click", () => {
+    cropOverlay.classList.add("hidden");
+    const c = $("#cropBox");
+    c.style.left = "15%"; c.style.top = "15%";
+    c.style.width = "70%"; c.style.height = "70%";
+  });
 
   initCropInteractivity();
 }
 
+function makeResizable(box, container) {
+  const handle = box.querySelector(".blur-resize-handle");
+  if (!handle) return;
+  let isResize = false, sX, sY, sW, sH;
+
+  handle.addEventListener("mousedown", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    isResize = true;
+    sX = e.clientX; sY = e.clientY;
+    sW = box.offsetWidth; sH = box.offsetHeight;
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResize) return;
+    const newW = Math.max(30, Math.min(container.clientWidth  - box.offsetLeft, sW + (e.clientX - sX)));
+    const newH = Math.max(30, Math.min(container.clientHeight - box.offsetTop,  sH + (e.clientY - sY)));
+    box.style.width  = newW + "px";
+    box.style.height = newH + "px";
+  });
+
+  document.addEventListener("mouseup", () => { isResize = false; });
+}
+
 function initCropInteractivity() {
   const cropBox = $("#cropBox");
-  const vp = $("#phoneViewport");
+  const vp      = $("#phoneViewport");
 
   let isDrag = false, sX, sY, iL, iT;
   cropBox.addEventListener("mousedown", (e) => {
     if (e.target.classList.contains("crop-handle")) return;
     isDrag = true;
-    sX = e.clientX;
-    sY = e.clientY;
-    iL = cropBox.offsetLeft;
-    iT = cropBox.offsetTop;
+    sX = e.clientX; sY = e.clientY;
+    iL = cropBox.offsetLeft; iT = cropBox.offsetTop;
   });
-
   document.addEventListener("mousemove", (e) => {
     if (!isDrag) return;
-    const maxL = vp.clientWidth - cropBox.offsetWidth;
+    const maxL = vp.clientWidth  - cropBox.offsetWidth;
     const maxT = vp.clientHeight - cropBox.offsetHeight;
-    let nL = iL + (e.clientX - sX);
-    let nT = iT + (e.clientY - sY);
-    cropBox.style.left = `${Math.max(0, Math.min(maxL, nL))}px`;
-    cropBox.style.top = `${Math.max(0, Math.min(maxT, nT))}px`;
+    cropBox.style.left = `${Math.max(0, Math.min(maxL, iL + e.clientX - sX))}px`;
+    cropBox.style.top  = `${Math.max(0, Math.min(maxT, iT + e.clientY - sY))}px`;
   });
-
   document.addEventListener("mouseup", () => { isDrag = false; });
 
   $$(".crop-handle").forEach(handle => {
@@ -357,122 +439,183 @@ function initCropInteractivity() {
 
     handle.addEventListener("mousedown", (e) => {
       isResize = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      startL = cropBox.offsetLeft;
-      startT = cropBox.offsetTop;
-      startW = cropBox.offsetWidth;
-      startH = cropBox.offsetHeight;
-      e.stopPropagation();
-      e.preventDefault();
+      startX = e.clientX; startY = e.clientY;
+      startL = cropBox.offsetLeft; startT = cropBox.offsetTop;
+      startW = cropBox.offsetWidth; startH = cropBox.offsetHeight;
+      e.stopPropagation(); e.preventDefault();
     });
 
     document.addEventListener("mousemove", (e) => {
       if (!isResize) return;
-      let dx = e.clientX - startX;
-      let dy = e.clientY - startY;
-
-      let newL = startL, newT = startT, newW = startW, newH = startH;
-
-      if (hType.includes("l")) {
-        newL = Math.max(0, startL + dx);
-        newW = startW - (newL - startL);
-      }
-      if (hType.includes("r")) {
-        newW = Math.min(vp.clientWidth - startL, startW + dx);
-      }
-      if (hType.includes("t")) {
-        newT = Math.max(0, startT + dy);
-        newH = startH - (newT - startT);
-      }
-      if (hType.includes("b")) {
-        newH = Math.min(vp.clientHeight - startT, startH + dy);
-      }
-
-      if (newW >= 50) {
-        cropBox.style.left = `${newL}px`;
-        cropBox.style.width = `${newW}px`;
-      }
-      if (newH >= 50) {
-        cropBox.style.top = `${newT}px`;
-        cropBox.style.height = `${newH}px`;
-      }
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      let nL = startL, nT = startT, nW = startW, nH = startH;
+      if (hType.includes("l")) { nL = Math.max(0, startL + dx); nW = startW - (nL - startL); }
+      if (hType.includes("r")) { nW = Math.min(vp.clientWidth  - startL, startW + dx); }
+      if (hType.includes("t")) { nT = Math.max(0, startT + dy); nH = startH - (nT - startT); }
+      if (hType.includes("b")) { nH = Math.min(vp.clientHeight - startT, startH + dy); }
+      if (nW >= 50) { cropBox.style.left = `${nL}px`; cropBox.style.width = `${nW}px`; }
+      if (nH >= 50) { cropBox.style.top  = `${nT}px`; cropBox.style.height = `${nH}px`; }
     });
-
     document.addEventListener("mouseup", () => { isResize = false; });
   });
 }
 
 /* ============================================================
-   Fixed Subtitle Dragging & Resizing Logic (No Auto-Growing)
+   BACKGROUND — Blur presets + Photo BG (fixed reactivity)
    ============================================================ */
-function initSubtitleResizer() {
-  const subOverlay = $("#subtitleOverlay");
-  const handleR = $("#subHandleR");
-  const vp = $("#phoneViewport");
-  const rngSubWidth = $("#rngSubWidth");
-  const captionWidthText = $("#captionWidthText");
+function initBackgroundControls() {
+  const bgLayer       = $("#bgLayer");
+  const previewVideo  = $("#previewVideo");
+  const panelBlurBg   = $("#panelBlurBg");
+  const panelPhotoBg  = $("#panelPhotoBg");
+  const BLUR_MAP      = { soft: 8, medium: 16, hard: 28 };
 
-  let isResizing = false, startX, startW;
+  const bgPhotoInput     = $("#bgPhotoInput");
+  const photoPreviewWrap = $("#photoPreviewWrap");
+  const photoThumb       = $("#photoThumb");
 
-  handleR.addEventListener("mousedown", (e) => {
-    isResizing = true;
-    startX = e.clientX;
-    startW = subOverlay.offsetWidth;
-    e.stopPropagation();
-    e.preventDefault();
+  $("#btnUploadBgPhoto").addEventListener("click", () => bgPhotoInput.click());
+  bgPhotoInput.addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    bgLayer.style.backgroundImage    = `url(${url})`;
+    bgLayer.style.backgroundSize     = "cover";
+    bgLayer.style.backgroundPosition = "center";
+    photoThumb.style.backgroundImage = `url(${url})`;
+    photoPreviewWrap.classList.remove("hidden");
   });
 
-  document.addEventListener("mousemove", (e) => {
-    if (!isResizing) return;
-    let dx = e.clientX - startX;
-    // မူလ ၂ ဆ မြှောက်ထားမှုကို ဖြုတ်ပြီး mouse ရွေ့သလောက် ပုံမှန် Pixel အတိုင်းသာ Width ကို ချိန်မည်
-    let newWidthPx = startW + dx;
-
-    let pct = Math.round((newWidthPx / vp.clientWidth) * 100);
-    pct = Math.max(30, Math.min(95, pct));
-
-    subOverlay.style.width = `${pct}%`;
-    if (rngSubWidth) rngSubWidth.value = pct;
-    if (captionWidthText) captionWidthText.textContent = `${pct}%`;
+  $("#rngBgOpacity").addEventListener("input", (e) => {
+    bgLayer.style.opacity = (parseInt(e.target.value) / 100).toString();
   });
 
-  document.addEventListener("mouseup", () => {
-    isResizing = false;
+  $("#btnModeBlurBg").addEventListener("click", () => {
+    $("#btnModeBlurBg").classList.add("active");
+    $("#btnModePhotoBg").classList.remove("active");
+    panelBlurBg.classList.remove("hidden");
+    panelPhotoBg.classList.add("hidden");
+    bgLayer.style.backgroundImage = "none";
+    // re-apply current preset
+    const active = document.querySelector(".blur-preset-card.active");
+    if (active) applyBlur(active.dataset.preset);
+  });
+
+  $("#btnModePhotoBg").addEventListener("click", () => {
+    $("#btnModePhotoBg").classList.add("active");
+    $("#btnModeBlurBg").classList.remove("active");
+    panelPhotoBg.classList.remove("hidden");
+    panelBlurBg.classList.add("hidden");
+    // Use background image on bgLayer
+    bgLayer.style.backdropFilter = "none";
+    bgLayer.style.webkitBackdropFilter = "none";
+    bgLayer.style.filter = "none";
+  });
+
+  function applyBlur(preset) {
+    const px = BLUR_MAP[preset] ?? 16;
+    // ✅ backdrop-filter blurs the video BELOW the layer → visible effect
+    bgLayer.style.backdropFilter      = `blur(${px}px) brightness(0.55)`;
+    bgLayer.style.webkitBackdropFilter = `blur(${px}px) brightness(0.55)`;
+  }
+
+  $$(".blur-preset-card").forEach(btn => {
+    btn.addEventListener("click", () => {
+      $$(".blur-preset-card").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      applyBlur(btn.dataset.preset);
+    });
+  });
+
+  $("#btnClearBg").addEventListener("click", () => {
+    bgLayer.style.backgroundImage      = "none";
+    bgLayer.style.backdropFilter       = "none";
+    bgLayer.style.webkitBackdropFilter = "none";
+    bgLayer.style.filter               = "none";
+    bgLayer.style.opacity              = "1";
   });
 }
 
-function makeConstrainedDraggable(el, container) {
-  let isDrag = false, sX, sY, iL, iT;
-
-  el.addEventListener("mousedown", (e) => {
-    if (e.target.classList.contains("blur-resize-handle") || e.target.classList.contains("blur-close-btn") || e.target.classList.contains("sub-handle-r")) return;
-    isDrag = true;
-    sX = e.clientX;
-    sY = e.clientY;
-    iL = el.offsetLeft;
-    iT = el.offsetTop;
-    
-    // Drag စတင်တဲ့အချိန်မှာ Box ရဲ့ လက်ရှိ Width နဲ့ Height ကို အတိအကျ Fix လုပ်မည်
-    el.style.width = `${el.offsetWidth}px`;
-    el.style.height = `${el.offsetHeight}px`;
-    e.stopPropagation();
+/* RATIO */
+function initRatioControls() {
+  const vp = $("#phoneViewport");
+  $$(".ratio-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      $$(".ratio-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      vp.dataset.ratio = btn.dataset.ratio;
+      // Re-clamp overlays after layout change
+      requestAnimationFrame(() => {
+        clampToViewport($("#subtitleOverlay"), vp);
+        $$("#blurContainer .blur-overlay-box").forEach(b => clampToViewport(b, vp));
+      });
+    });
   });
+}
 
-  document.addEventListener("mousemove", (e) => {
-    if (!isDrag) return;
-    const maxL = container.clientWidth - el.offsetWidth;
-    const maxT = container.clientHeight - el.offsetHeight;
-    let nL = iL + (e.clientX - sX);
-    let nT = iT + (e.clientY - sY);
-
-    // Box ရဲ့ နေရာကိုသာ left နဲ့ top သုံးပြီး တိကျစွာ ရွှေ့မည် (အရွယ်အစား လုံးဝ မပြောင်းစေရ)
-    el.style.left = `${Math.max(0, Math.min(maxL, nL))}px`;
-    el.style.top = `${Math.max(0, Math.min(maxT, nT))}px`;
-    el.style.transform = "none";
+/* ZOOM */
+function initZoomControl() {
+  const rngZoom      = $("#rngZoom");
+  const previewVideo = $("#previewVideo");
+  rngZoom.addEventListener("input", (e) => {
+    const z = parseInt(e.target.value);
+    $("#zoomVal").textContent = z + "%";
+    const mirror = $("#chkMirror").checked ? "scaleX(-1) " : "";
+    previewVideo.style.transform = mirror + `scale(${z / 100})`;
   });
+}
 
-  document.addEventListener("mouseup", () => { 
-    isDrag = false; 
+/* EXECUTE */
+function initExecuteButton() {
+  $(".btn-execute").addEventListener("click", () => {
+    const payload = buildRenderPayload();
+    console.log("🎬 Render payload:", payload);
+    alert("Payload built! (Console မှာ ကြည့်ပါ — backend endpoint မချိတ်ရသေးပါ)");
   });
+}
+
+function buildRenderPayload() {
+  const vp  = $("#phoneViewport");
+  const sub = $("#subtitleOverlay");
+  const crp = $("#cropBox");
+  const vpR = vp.getBoundingClientRect();
+  const rel = (el) => {
+    const r = el.getBoundingClientRect();
+    return {
+      x: Math.round(r.left - vpR.left),
+      y: Math.round(r.top  - vpR.top),
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+    };
+  };
+  const activeBlur = document.querySelector(".blur-preset-card.active");
+  return {
+    version: "2.0-pro",
+    generatedAt: new Date().toISOString(),
+    ratio: vp.dataset.ratio || "9:16",
+    viewport: { width: Math.round(vpR.width), height: Math.round(vpR.height) },
+    video: { url: $("#previewVideo").src },
+    crop: $("#cropOverlayBox").classList.contains("hidden") ? null : rel(crp),
+    subtitle: {
+      ...rel(sub),
+      text:         $("#subTextDisplay").textContent,
+      fontFamily:   $("#fontDropdown").value,
+      fontSize:     parseInt($("#rngFontSize").value),
+      color:        $("#nativeTextColorPicker").value,
+      outlineColor: $("#nativeOutlineColorPicker").value,
+      outlineWidth: parseInt($("#rngOutlineWidth").value),
+      boxBg:        $("#chkBoxBg").checked,
+    },
+    blurBoxes: Array.from(document.querySelectorAll("#blurContainer .blur-overlay-box")).map(rel),
+    background: {
+      mode:       $("#btnModeBlurBg").classList.contains("active") ? "blur" : "photo",
+      blurPreset: activeBlur?.dataset.preset || "medium",
+      opacity:    parseInt($("#rngBgOpacity").value) / 100,
+    },
+    tts: {
+      voice: $("#voiceSelectDropdown").value,
+      speed: parseFloat($("#rngVoiceSpeed").value),
+      pitch: parseFloat($("#rngVoicePitch").value),
+    },
+  };
 }
