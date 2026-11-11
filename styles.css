@@ -258,3 +258,71 @@ body { background: var(--bg-app); color: var(--text-main); min-height: 100vh; ov
 
 .execute-container { margin-top: 16px; flex-shrink: 0; }
 .btn-execute { width: 100%; background: var(--primary); color: #ffffff; border: none; padding: 12px; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+/* ============================================================
+   Blur Overlay Box Toolbar (Image 2 style)
+   ============================================================ */
+.blur-overlay-box {
+  /* ရှိပြီးသား style များ ထပ်မံဖြည့်စွက်ခြင်း */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* Blur အပြင်းအား ချိန်ညှိတဲ့ Toolbar */
+.blur-toolbar {
+  position: absolute;
+  top: -45px; /* Box ရဲ့ အပေါ်မှာ ပေါ်နေမည် */
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.85); /* Dark theme */
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  z-index: 30;
+  cursor: default;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.blur-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.blur-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.blur-btn:hover { background: rgba(255, 255, 255, 0.4); }
+
+/* Slider ကို သေးသေးလေး ဖြစ်စေရန် */
+.blur-strength {
+  width: 80px;
+  accent-color: #fff;
+  cursor: pointer;
+}
+
+.blur-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  width: 20px;
+  text-align: right;
+}
