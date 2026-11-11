@@ -1,5 +1,5 @@
 /* ============================================================
-   Red Bear Studio v2.0 Pro Engine — Fixed Build
+   Red Bear Studio v2.0 Pro Engine — Full Fixed Build
    ============================================================ */
 const $  = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
@@ -11,8 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initVideoModeCards();
   initAudioSliders();
   initCaptionsControls();
-  initSubtitleResizer();     // ✅ called ONCE
-  initOverlays();
+  initSubtitleResizer();     // Subtitle ကို ဘယ်ညာဆွဲခြင်း
+  initOverlays();            // Blur Box နှင့် Crop ထည့်ခြင်း
   initBackgroundControls();
   initRatioControls();
   initZoomControl();
@@ -77,9 +77,11 @@ function initMedia() {
     videoProgress.value = (previewVideo.currentTime / previewVideo.duration) * 100;
     timeReadout.textContent = `${fmt(previewVideo.currentTime)} / ${fmt(previewVideo.duration)}`;
   });
+  
   videoProgress.addEventListener("input", (e) => {
     if (previewVideo.duration) previewVideo.currentTime = (e.target.value / 100) * previewVideo.duration;
   });
+  
   const fmt = (s) => {
     if (!isFinite(s)) return "0:00";
     return `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,"0")}`;
@@ -151,7 +153,6 @@ function initCaptionsControls() {
   const subOverlay         = $("#subtitleOverlay");
   const vp                 = $("#phoneViewport");
 
-  // Width slider — always sync + clamp
   $("#rngSubWidth").addEventListener("input", (e) => {
     const val = parseInt(e.target.value);
     $("#captionWidthText").textContent = `${val}%`;
@@ -248,7 +249,6 @@ function initSubtitleResizer() {
     const cRect = vp.getBoundingClientRect();
     const eRect = subOverlay.getBoundingClientRect();
 
-    // Snap from centered → absolute left/top
     const curL = eRect.left - cRect.left;
     const curT = eRect.top  - cRect.top;
 
@@ -287,7 +287,7 @@ function initSubtitleResizer() {
 }
 
 /* ============================================================
-   CONSTRAINED DRAGGABLE — no jump, no auto-grow
+   CONSTRAINED DRAGGABLE — no jump, no auto-grow, X & Y axis
    ============================================================ */
 function makeConstrainedDraggable(el, container) {
   let isDrag = false;
@@ -295,19 +295,18 @@ function makeConstrainedDraggable(el, container) {
   let lockedW, lockedH, maxL, maxT;
 
   el.addEventListener("mousedown", (e) => {
-    if (e.target.closest(".blur-resize-handle, .blur-close-btn, .sub-handle-r, .crop-handle")) return;
+    // Toolbar ဒါမှမဟုတ် Handle တွေနှိပ်ရင် Drag မလုပ်ပါစေနဲ့
+    if (e.target.closest(".blur-toolbar, .blur-resize-handle, .blur-close-btn, .sub-handle-r, .crop-handle")) return;
     e.preventDefault();
 
     const cRect = container.getBoundingClientRect();
     const eRect = el.getBoundingClientRect();
 
-    // ✅ Use actual visual rect (handles translateX(-50%) etc.)
     startLeft = eRect.left - cRect.left;
     startTop  = eRect.top  - cRect.top;
     lockedW   = eRect.width;
     lockedH   = eRect.height;
 
-    // Convert any centering/bottom positioning → explicit left/top
     el.style.left      = startLeft + "px";
     el.style.top       = startTop  + "px";
     el.style.bottom    = "auto";
@@ -320,6 +319,7 @@ function makeConstrainedDraggable(el, container) {
 
     maxL = Math.max(0, cRect.width  - lockedW);
     maxT = Math.max(0, cRect.height - lockedH);
+    
     startMouseX = e.clientX;
     startMouseY = e.clientY;
     isDrag = true;
@@ -328,13 +328,16 @@ function makeConstrainedDraggable(el, container) {
 
   document.addEventListener("mousemove", (e) => {
     if (!isDrag) return;
+    
+    // X နဲ့ Y နှစ်ခုလုံးကို တွက်ချက်ခြင်း (အပေါ်အောက်၊ ဘယ်ညာ ရွှေ့နိုင်မည်)
     let nL = startLeft + (e.clientX - startMouseX);
     let nT = startTop  + (e.clientY - startMouseY);
+
     nL = Math.max(0, Math.min(maxL, nL));
     nT = Math.max(0, Math.min(maxT, nT));
+    
     el.style.left = nL + "px";
     el.style.top  = nT + "px";
-    // ⚠️ NEVER touch height/padding/line-height here
   });
 
   document.addEventListener("mouseup", () => { isDrag = false; });
@@ -355,21 +358,22 @@ function clampToViewport(el, container) {
   el.style.transform = "none";
 }
 
-/* OVERLAYS (Blur boxes + Crop) */
+/* ============================================================
+   OVERLAYS (Blur boxes with Toolbar + Crop)
+   ============================================================ */
 function initOverlays() {
   const vp            = $("#phoneViewport");
   const blurContainer = $("#blurContainer");
   const subOverlay    = $("#subtitleOverlay");
   let blurCount = 0;
 
-    $("#btnToggleBlur").addEventListener("click", () => {
+  $("#btnToggleBlur").addEventListener("click", () => {
     if (blurCount >= 3) return;
     blurCount++;
     
-    // Blur Box အသစ်ဆောက်ခြင်း
+    // Blur Box နှင့် Toolbar အသစ်ဆောက်ခြင်း
     const box = document.createElement("div");
     box.className = "blur-overlay-box";
-    // blur-overlay-box အတွင်း Control Bar ထည့်ထားသည်
     box.innerHTML = `
       <div class="blur-toolbar">
         <span class="blur-label">Blur</span>
@@ -383,7 +387,6 @@ function initOverlays() {
     `;
     blurContainer.appendChild(box);
 
-    // အပေါ်ကနေ ဖျက်မယ့် button
     box.querySelector(".blur-close-btn").addEventListener("click", () => {
       box.remove(); blurCount--;
     });
@@ -403,7 +406,6 @@ function initOverlays() {
     box.querySelector(".blur-dec").addEventListener("click", (e) => { e.stopPropagation(); applyStrength(parseInt(strengthSlider.value) - 1); });
     box.querySelector(".blur-inc").addEventListener("click", (e) => { e.stopPropagation(); applyStrength(parseInt(strengthSlider.value) + 1); });
     
-    // စစချင်း Blur ကို 10px သတ်မှတ်
     applyStrength(10);
 
     // Drag နဲ့ Resize ချိတ်ဆက်ခြင်း
@@ -411,6 +413,21 @@ function initOverlays() {
     makeResizable(box, vp);
   });
 
+  makeConstrainedDraggable(subOverlay, vp);
+
+  const cropOverlay = $("#cropOverlayBox");
+  $("#btnToggleCrop").addEventListener("click", () => cropOverlay.classList.remove("hidden"));
+  $("#btnResetCrop").addEventListener("click", () => {
+    cropOverlay.classList.add("hidden");
+    const c = $("#cropBox");
+    c.style.left = "15%"; c.style.top = "15%";
+    c.style.width = "70%"; c.style.height = "70%";
+  });
+
+  initCropInteractivity();
+}
+
+/* RESIZE BLUR HANDLE */
 function makeResizable(box, container) {
   const handle = box.querySelector(".blur-resize-handle");
   if (!handle) return;
@@ -434,6 +451,7 @@ function makeResizable(box, container) {
   document.addEventListener("mouseup", () => { isResize = false; });
 }
 
+/* CROP INTERACTIVITY */
 function initCropInteractivity() {
   const cropBox = $("#cropBox");
   const vp      = $("#phoneViewport");
@@ -482,11 +500,10 @@ function initCropInteractivity() {
 }
 
 /* ============================================================
-   BACKGROUND — Blur presets + Photo BG (fixed reactivity)
+   BACKGROUND — Blur presets + Photo BG
    ============================================================ */
 function initBackgroundControls() {
   const bgLayer       = $("#bgLayer");
-  const previewVideo  = $("#previewVideo");
   const panelBlurBg   = $("#panelBlurBg");
   const panelPhotoBg  = $("#panelPhotoBg");
   const BLUR_MAP      = { soft: 8, medium: 16, hard: 28 };
@@ -517,7 +534,6 @@ function initBackgroundControls() {
     panelBlurBg.classList.remove("hidden");
     panelPhotoBg.classList.add("hidden");
     bgLayer.style.backgroundImage = "none";
-    // re-apply current preset
     const active = document.querySelector(".blur-preset-card.active");
     if (active) applyBlur(active.dataset.preset);
   });
@@ -527,7 +543,6 @@ function initBackgroundControls() {
     $("#btnModeBlurBg").classList.remove("active");
     panelPhotoBg.classList.remove("hidden");
     panelBlurBg.classList.add("hidden");
-    // Use background image on bgLayer
     bgLayer.style.backdropFilter = "none";
     bgLayer.style.webkitBackdropFilter = "none";
     bgLayer.style.filter = "none";
@@ -535,7 +550,6 @@ function initBackgroundControls() {
 
   function applyBlur(preset) {
     const px = BLUR_MAP[preset] ?? 16;
-    // ✅ backdrop-filter blurs the video BELOW the layer → visible effect
     bgLayer.style.backdropFilter      = `blur(${px}px) brightness(0.55)`;
     bgLayer.style.webkitBackdropFilter = `blur(${px}px) brightness(0.55)`;
   }
@@ -565,7 +579,6 @@ function initRatioControls() {
       $$(".ratio-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       vp.dataset.ratio = btn.dataset.ratio;
-      // Re-clamp overlays after layout change
       requestAnimationFrame(() => {
         clampToViewport($("#subtitleOverlay"), vp);
         $$("#blurContainer .blur-overlay-box").forEach(b => clampToViewport(b, vp));
@@ -627,7 +640,12 @@ function buildRenderPayload() {
       outlineWidth: parseInt($("#rngOutlineWidth").value),
       boxBg:        $("#chkBoxBg").checked,
     },
-    blurBoxes: Array.from(document.querySelectorAll("#blurContainer .blur-overlay-box")).map(rel),
+    blurBoxes: Array.from(document.querySelectorAll("#blurContainer .blur-overlay-box")).map(box => {
+        return {
+           ...rel(box),
+           strength: box.querySelector(".blur-strength") ? parseInt(box.querySelector(".blur-strength").value) : 10
+        }
+    }),
     background: {
       mode:       $("#btnModeBlurBg").classList.contains("active") ? "blur" : "photo",
       blurPreset: activeBlur?.dataset.preset || "medium",
