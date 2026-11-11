@@ -36,8 +36,16 @@
         <div class="breadcrumb">
           <span class="root">Red Bear Studio</span><span class="sep">/</span><span class="current">Manual ညှိနှိုင်းခြင်း</span>
         </div>
+        
+        <!-- HEADER RIGHT ACTIONS (WITH LOGIN & CREATE ACCOUNT) -->
         <div class="top-actions">
-          <button class="theme-toggle-btn" id="themeToggleBtn">☀️ Light</button>
+          <button class="theme-toggle-btn" id="themeToggleBtn">
+            <span class="theme-icon">☀️</span> <span class="theme-text">Light</span>
+          </button>
+          <div class="auth-btn-group">
+            <button class="btn-login" id="btnLogin">Sign In</button>
+            <button class="btn-create-acc" id="btnCreateAcc">Create Account</button>
+          </div>
         </div>
       </header>
 
@@ -74,7 +82,7 @@
                   <video id="previewVideo" playsinline></video>
                   <div class="bg-layer" id="bgLayer"></div>
 
-                  <!-- SUBTITLE OVERLAY (With Right Edge Handle for Dynamic Width) -->
+                  <!-- SUBTITLE OVERLAY (Fixed Box Dimension Scale - No Auto Growing) -->
                   <div class="subtitle-overlay" id="subtitleOverlay">
                     <span class="sub-text" id="subTextDisplay">ဒီနေရာမှာ စာတန်းထိုး ပေါ်မယ်</span>
                     <div class="sub-handle-r" id="subHandleR"></div>
@@ -184,10 +192,10 @@
           </div>
         </div>
 
-        <!-- RIGHT SIDEBAR (340px CLASSIC HIGH-CONTRAST CARDS) -->
+        <!-- RIGHT SIDEBAR (340px HIGH CONTRAST CLASSIC) -->
         <aside class="right-config-sidebar">
           
-          <!-- TAB HEADER WITH WHITE PILL HIGHLIGHT -->
+          <!-- TAB HEADER WITH WHITE HIGHLIGHT PILL -->
           <div class="config-tabs-header">
             <button class="tab-btn active" data-tab="tab-video">Video</button>
             <button class="tab-btn" data-tab="tab-voice">Voice</button>
@@ -195,7 +203,7 @@
             <button class="tab-btn" data-tab="tab-extras">Extras</button>
           </div>
 
-          <!-- TAB 1: VIDEO (With Mode Card Descriptions) -->
+          <!-- TAB 1: VIDEO -->
           <div class="tab-content active" id="tab-video">
             <div class="config-card">
               <h3 class="config-title">Mode</h3>
@@ -239,7 +247,7 @@
             </div>
           </div>
 
-          <!-- TAB 2: VOICE (Voice Settings + Speed/Pitch Value Displays) -->
+          <!-- TAB 2: VOICE -->
           <div class="tab-content" id="tab-voice">
             <div class="config-card">
               <h3 class="config-title">Choose Voice</h3>
@@ -270,7 +278,7 @@
             </div>
           </div>
 
-          <!-- TAB 3: CAPTIONS (Image-Matched Layout + Native Color Picker + Bottom Caption Width Slider) -->
+          <!-- TAB 3: CAPTIONS -->
           <div class="tab-content" id="tab-captions">
             <div class="config-card">
               <div class="card-header-checkbox">
@@ -285,7 +293,7 @@
             <div class="config-card">
               <label class="field-label">Font</label>
               <select class="voice-select-dropdown" id="fontDropdown">
-                <option value="Noto Sans Myanmar">Noto Sans (regular)</option>
+                <option value="Noto Sans Myanmar">Noto Sans Myanmar</option>
                 <option value="Padauk">Padauk</option>
               </select>
 
@@ -299,7 +307,7 @@
                 <button class="btn-step" id="btnFontSizeInc">+</button>
               </div>
 
-              <!-- TEXT COLOR WITH NATIVE COLOR PICKER POPUP -->
+              <!-- TEXT COLOR WITH NATIVE PICKER POPUP -->
               <div class="color-picker-section mt-10">
                 <div class="range-row-label">
                   <span>Text color</span>
@@ -318,7 +326,7 @@
                 </div>
               </div>
 
-              <!-- OUTLINE COLOR WITH NATIVE COLOR PICKER POPUP -->
+              <!-- OUTLINE COLOR WITH NATIVE PICKER POPUP -->
               <div class="range-row-label mt-10">
                 <span>Outline color</span>
                 <div class="color-swatch-wrapper">
@@ -337,12 +345,12 @@
                 <button class="btn-step" id="btnOutlineInc">+</button>
               </div>
 
-              <div class="switch-row mt-10">
+              <div classswitch-row mt-10">
                 <span>Box (background)</span>
                 <input type="checkbox" id="chkBoxBg" checked>
               </div>
 
-              <!-- CAPTION WIDTH SLIDER AT THE VERY BOTTOM -->
+              <!-- CAPTION WIDTH SLIDER AT BOTTOM -->
               <div class="range-row-label mt-12 border-top-divider">
                 <span>Caption Width</span>
                 <span class="range-val-text" id="captionWidthText">70%</span>
