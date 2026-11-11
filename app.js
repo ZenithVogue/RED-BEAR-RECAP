@@ -295,28 +295,31 @@ function makeConstrainedDraggable(el, container) {
   let lockedW, lockedH, maxL, maxT;
 
   el.addEventListener("mousedown", (e) => {
-    // Toolbar ဒါမှမဟုတ် Handle တွေနှိပ်ရင် Drag မလုပ်ပါစေနဲ့
+    // Toolbar သို့မဟုတ် Handle များကို နှိပ်လျှင် Drag မလုပ်ပါစေနှင့်
     if (e.target.closest(".blur-toolbar, .blur-resize-handle, .blur-close-btn, .sub-handle-r, .crop-handle")) return;
     e.preventDefault();
 
     const cRect = container.getBoundingClientRect();
     const eRect = el.getBoundingClientRect();
 
+    // လက်ရှိ Box ရဲ့ တကယ့် အနေအထားကို တွက်ချက်ခြင်း
     startLeft = eRect.left - cRect.left;
     startTop  = eRect.top  - cRect.top;
     lockedW   = eRect.width;
     lockedH   = eRect.height;
 
-    el.style.left      = startLeft + "px";
-    el.style.top       = startTop  + "px";
-    el.style.bottom    = "auto";
-    el.style.right     = "auto";
-    el.style.transform = "none";
-    el.style.width     = lockedW + "px";
-    el.style.height    = lockedH + "px";
-    el.style.minHeight = lockedH + "px";
-    el.style.maxHeight = lockedH + "px";
+    // CSS က top/left ကို လွှမ်းမိုးမနေစေရန် တိုက်ရိုက် သတ်မှတ်ခြင်း
+    el.style.setProperty('left', startLeft + "px", "important");
+    el.style.setProperty('top', startTop + "px", "important");
+    el.style.setProperty('bottom', 'auto', "important");
+    el.style.setProperty('right', 'auto', "important");
+    el.style.setProperty('transform', 'none', "important");
+    el.style.setProperty('width', lockedW + "px", "important");
+    el.style.setProperty('height', lockedH + "px", "important");
+    el.style.setProperty('min-height', lockedH + "px", "important");
+    el.style.setProperty('max-height', lockedH + "px", "important");
 
+    // ရွှေ့လို့ရတဲ့ အများဆုံး အကွာအဝေး (ဘောင်အတွင်း)
     maxL = Math.max(0, cRect.width  - lockedW);
     maxT = Math.max(0, cRect.height - lockedH);
     
@@ -329,15 +332,16 @@ function makeConstrainedDraggable(el, container) {
   document.addEventListener("mousemove", (e) => {
     if (!isDrag) return;
     
-    // X နဲ့ Y နှစ်ခုလုံးကို တွက်ချက်ခြင်း (အပေါ်အောက်၊ ဘယ်ညာ ရွှေ့နိုင်မည်)
+    // X (ဘယ်ညာ) နှင့် Y (အပေါ်အောက်) နှစ်ခုလုံးကို တွက်ချက်ခြင်း
     let nL = startLeft + (e.clientX - startMouseX);
     let nT = startTop  + (e.clientY - startMouseY);
 
+    // ဘောင်ကျော်မထွက်အောင် ထိန်းချုပ်ခြင်း
     nL = Math.max(0, Math.min(maxL, nL));
     nT = Math.max(0, Math.min(maxT, nT));
     
-    el.style.left = nL + "px";
-    el.style.top  = nT + "px";
+    el.style.setProperty('left', nL + "px", "important");
+    el.style.setProperty('top', nT + "px", "important");
   });
 
   document.addEventListener("mouseup", () => { isDrag = false; });
