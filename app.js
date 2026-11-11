@@ -403,6 +403,45 @@ function initCropInteractivity() {
   });
 }
 
+/* ============================================================
+   Fixed Subtitle Dragging & Resizing Logic (No Auto-Growing)
+   ============================================================ */
+function initSubtitleResizer() {
+  const subOverlay = $("#subtitleOverlay");
+  const handleR = $("#subHandleR");
+  const vp = $("#phoneViewport");
+  const rngSubWidth = $("#rngSubWidth");
+  const captionWidthText = $("#captionWidthText");
+
+  let isResizing = false, startX, startW;
+
+  handleR.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startW = subOverlay.offsetWidth;
+    e.stopPropagation();
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+    let dx = e.clientX - startX;
+    // မူလ ၂ ဆ မြှောက်ထားမှုကို ဖြုတ်ပြီး mouse ရွေ့သလောက် ပုံမှန် Pixel အတိုင်းသာ Width ကို ချိန်မည်
+    let newWidthPx = startW + dx;
+
+    let pct = Math.round((newWidthPx / vp.clientWidth) * 100);
+    pct = Math.max(30, Math.min(95, pct));
+
+    subOverlay.style.width = `${pct}%`;
+    if (rngSubWidth) rngSubWidth.value = pct;
+    if (captionWidthText) captionWidthText.textContent = `${pct}%`;
+  });
+
+  document.addEventListener("mouseup", () => {
+    isResizing = false;
+  });
+}
+
 function makeConstrainedDraggable(el, container) {
   let isDrag = false, sX, sY, iL, iT;
 
@@ -423,38 +462,12 @@ function makeConstrainedDraggable(el, container) {
     let nL = iL + (e.clientX - sX);
     let nT = iT + (e.clientY - sY);
 
+    // Box ကို ရွှေ့တဲ့အခါ width/height လုံးဝ မပြောင်းလဲစေဘဲ နေရာ (left, top) ကိုသာ တိကျစွာ ရွှေ့မည်
     el.style.left = `${Math.max(0, Math.min(maxL, nL))}px`;
     el.style.top = `${Math.max(0, Math.min(maxT, nT))}px`;
-    el.style.transform = "none"; // Keeps scale fixed, preventing any auto-growing bug
+    el.style.transform = "none";
+    el.style.width = `${el.offsetWidth}px`; // Box အရွယ်အစား မပြောင်းလဲအောင် Fixed Width ပေးခြင်း
   });
 
   document.addEventListener("mouseup", () => { isDrag = false; });
-}
-
-function makeResizable(el, container) {
-  const handle = el.querySelector(".blur-resize-handle");
-  let isResize = false, rX, rY, iW, iH;
-
-  handle.addEventListener("mousedown", (e) => {
-    isResize = true;
-    rX = e.clientX;
-    rY = e.clientY;
-    iW = el.offsetWidth;
-    iH = el.offsetHeight;
-    e.stopPropagation();
-    e.preventDefault();
-  });
-
-  document.addEventListener("mousemove", (e) => {
-    if (!isResize) return;
-    const maxW = container.clientWidth - el.offsetLeft;
-    const maxH = container.clientHeight - el.offsetTop;
-    let nW = iW + (e.clientX - rX);
-    let nH = iH + (e.clientY - rY);
-
-    el.style.width = `${Math.max(60, Math.min(maxW, nW))}px`;
-    el.style.height = `${Math.max(30, Math.min(maxH, nH))}px`;
-  });
-
-  document.addEventListener("mouseup", () => { isResize = false; });
 }
