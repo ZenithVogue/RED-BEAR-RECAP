@@ -9,25 +9,37 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Myanmar:wght@400;500;600;700&family=Padauk:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="sidebar-open">
   <div class="app-shell">
     
     <!-- LEFT SIDEBAR -->
     <aside class="left-sidebar">
-      <div class="brand-header">
-        <div class="brand-logo">🐻</div>
-        <div class="brand-info">
-          <h1 class="brand-name">Red Bear Studio</h1>
-          <span class="brand-tag">v2.0 Pro</span>
-        </div>
-      </div>
+     <div class="brand-header">
+  <div class="brand-logo">🐻</div>
+  <div class="brand-info">
+    <h1 class="brand-name">Red Bear Studio</h1>
+    <span class="brand-tag">v2.0 Pro</span>
+  </div>
+  <!-- NEW: sidebar toggle button -->
+  <button class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Toggle sidebar" title="Toggle sidebar">
+    <span class="toggle-icon">☰</span>
+  </button>
+</div>
 
       <nav class="sidebar-nav">
-        <button class="nav-btn active"><span class="nav-icon">⚡</span><span>Manual ညှိနှိုင်းခြင်း</span></button>
-        <button class="nav-btn"><span class="nav-icon">🪄</span><span>Auto Recap</span></button>
-        <button class="nav-btn"><span class="nav-icon">📂</span><span>လုပ်ငန်းမှတ်တမ်း</span></button>
-        <button class="nav-btn"><span class="nav-icon">🔑</span><span>API Keys / ဆက်တင်</span></button>
-      </nav>
+  <button class="nav-btn active" data-label="Manual ညှိနှိုင်းခြင်း">
+    <span class="nav-icon">⚡</span><span>Manual ညှိနှိုင်းခြင်း</span>
+  </button>
+  <button class="nav-btn" data-label="Auto Recap">
+    <span class="nav-icon">🪄</span><span>Auto Recap</span>
+  </button>
+  <button class="nav-btn" data-label="လုပ်ငန်းမှတ်တမ်း">
+    <span class="nav-icon">📂</span><span>လုပ်ငန်းမှတ်တမ်း</span>
+  </button>
+  <button class="nav-btn" data-label="API Keys / ဆက်တင်">
+    <span class="nav-icon">🔑</span><span>API Keys / ဆက်တင်</span>
+  </button>
+</nav>
     </aside>
 
     <!-- MAIN WRAPPER -->
