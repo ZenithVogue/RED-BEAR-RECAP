@@ -16,7 +16,8 @@
   --tab-active-bg: #2563eb;
   --tab-active-text: #ffffff;
 }
-
+font-family: 'Inter', 'Noto Sans Myanmar', 'Padauk',
+             'Myanmar Text', 'Myanmar Sangam MN', sans-serif;
 :root[data-theme="light"] {
   --bg-app: #f1f5f9;
   --bg-sidebar: #ffffff;
