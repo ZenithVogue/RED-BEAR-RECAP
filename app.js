@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initSidebarTabs();
   initVideoModeCards();
   initAudioSliders();
+  initSidebarToggle();  
   initCaptionsControls();
   initSubtitleResizer();     // Subtitle ကို ဘယ်ညာဆွဲခြင်း
   initOverlays();            // Blur Box နှင့် Crop ထည့်ခြင်း
@@ -676,4 +677,46 @@ function buildRenderPayload() {
       pitch: parseFloat($("#rngVoicePitch").value),
     },
   };
+}
+/* ============================================================
+   COLLAPSIBLE SIDEBAR
+   ============================================================ */
+function initSidebarToggle() {
+  const body   = document.body;
+  const btn    = $("#sidebarToggleBtn");
+  if (!btn) return;
+
+  // Load saved preference (default = open)
+  const saved = localStorage.getItem("rbs_sidebar_state");
+  if (saved === "collapsed") {
+    body.classList.remove("sidebar-open");
+    body.classList.add("sidebar-collapsed");
+    btn.querySelector(".toggle-icon").textContent = "☰";
+  }
+
+  const toggle = () => {
+    const isCollapsed = body.classList.toggle("sidebar-collapsed");
+    body.classList.toggle("sidebar-open", !isCollapsed);
+    btn.querySelector(".toggle-icon").textContent = "☰";
+
+    localStorage.setItem(
+      "rbs_sidebar_state",
+      isCollapsed ? "collapsed" : "open"
+    );
+  };
+
+  btn.addEventListener("click", toggle);
+
+  // Mobile reopen helper: if sidebar is fully hidden, tapping the
+  // floating hamburger (rendered via ::before) should reopen.
+  // Since ::before can't listen, attach a document-level click handler
+  // that detects taps on that top-left 40×40 region when collapsed+mobile.
+  document.addEventListener("click", (e) => {
+    if (window.innerWidth > 768) return;
+    if (!body.classList.contains("sidebar-collapsed")) return;
+    if (e.clientX > 52 || e.clientY > 52) return; // outside floating btn
+    // ignore if tapping an actual interactive element
+    if (e.target.closest("button, a, input, select")) return;
+    toggle();
+  });
 }
