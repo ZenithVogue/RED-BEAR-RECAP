@@ -326,3 +326,358 @@ body { background: var(--bg-app); color: var(--text-main); min-height: 100vh; ov
   width: 20px;
   text-align: right;
 }
+/* ============================================================
+   RED BEAR STUDIO — RESPONSIVE + BURMESE FONT IMPROVEMENTS
+   ============================================================ */
+
+/* ---------- BURMESE TYPOGRAPHY (Myanmar script needs taller line-height
+     and slightly heavier weight to render cleanly at small sizes) ---------- */
+body {
+  font-family: 'Inter', 'Noto Sans Myanmar', 'Padauk', 'Myanmar Text', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Myanmar text blocks get extra breathing room — avoids clipped stacked
+   consonants (e.g. ကြွ, သင်း) and vowel signs */
+.brand-name,
+.nav-btn,
+.section-title,
+.mode-title,
+.mode-desc,
+.config-title,
+.config-desc,
+.ctrl-title,
+.breadcrumb,
+.sub-text,
+#captionPreviewText,
+.caption-live-preview-box span,
+.voice-select-dropdown,
+.field-label,
+.range-row-label,
+.switch-row,
+.btn-login,
+.btn-create-acc,
+.btn-execute {
+  font-family: 'Inter', 'Noto Sans Myanmar', 'Padauk', sans-serif;
+  line-height: 1.65;
+  letter-spacing: 0;
+}
+
+/* Subtitle / caption overlay — thicker stroke looks muddy on Myanmar;
+   reduce stroke, boost weight, add shadow for legibility */
+.sub-text,
+.caption-live-preview-box span {
+  font-family: 'Noto Sans Myanmar', 'Padauk', 'Inter', sans-serif !important;
+  line-height: 1.7 !important;
+  font-weight: 700 !important;
+  -webkit-text-stroke: 0.6px #000 !important;
+  paint-order: stroke fill;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.85);
+  /* allow Burmese to wrap instead of clipping */
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* ---------- PREVENT HORIZONTAL SCROLL / iOS 100vw BUG ---------- */
+html, body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+.app-shell {
+  width: 100%;
+  max-width: 100%;
+  height: 100vh;
+  height: 100dvh;            /* dynamic viewport — fixes mobile chrome */
+}
+
+.studio-content {
+  height: auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---------- TOUCH-FRIENDLY (iPad / Mobile) ---------- */
+button, input[type="range"], .nav-btn, .tab-btn,
+.ratio-btn, .lang-btn, .blur-preset-card, .mode-card-item {
+  touch-action: manipulation;   /* removes 300ms tap delay */
+  -webkit-tap-highlight-color: transparent;
+}
+
+.subtitle-overlay, .blur-overlay-box, .crop-box, .crop-handle,
+.sub-handle-r, .blur-resize-handle {
+  touch-action: none;           /* lets drag work smoothly */
+}
+
+/* ============================================================
+   BREAKPOINT 1 — TABLET / iPad (≤ 1180px)
+   Collapse right sidebar to below, keep 2-col bottom controls
+   ============================================================ */
+@media (max-width: 1180px) {
+  .studio-content {
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    overflow-y: auto;
+    height: auto;
+  }
+
+  .central-column {
+    overflow: visible;
+    height: auto;
+    padding-right: 0;
+  }
+
+  /* Right config panel goes full-width under the preview */
+  .right-config-sidebar {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .bottom-controls-row {
+    grid-template-columns: repeat(2, 1fr);
+    min-height: 0;
+  }
+
+  /* Phone preview centered */
+  .phone-preview-view { align-items: center; }
+}
+
+/* ============================================================
+   BREAKPOINT 2 — MOBILE (≤ 768px)
+   Hide left sidebar, single column, compact everything
+   ============================================================ */
+@media (max-width: 768px) {
+  .app-shell {
+    flex-direction: column;
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  /* Convert left sidebar into a horizontal scroll nav bar */
+  .left-sidebar {
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 12px;
+    border-right: none;
+    border-bottom: 1.5px solid var(--border-color);
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg-sidebar);
+  }
+
+  .brand-header {
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+
+  .brand-name { font-size: 13px; }
+  .brand-tag  { font-size: 9px; }
+  .brand-logo { width: 34px; height: 34px; font-size: 18px; }
+
+  .sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    gap: 6px;
+    scrollbar-width: none;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none; }
+
+  .nav-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .nav-btn .nav-icon { font-size: 14px; }
+
+  /* Top nav — compact */
+  .main-wrapper { height: auto; min-height: 0; }
+  .top-nav {
+    height: 52px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .breadcrumb { font-size: 11px; }
+  .breadcrumb .current { display: none; }  /* keep breadcrumb short */
+
+  .theme-toggle-btn { padding: 5px 9px; font-size: 11px; }
+  .btn-login, .btn-create-acc {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  /* Auth buttons: show only icons if very tight */
+  .auth-btn-group { gap: 6px; }
+
+  /* Content */
+  .studio-content {
+    flex-direction: column;
+    padding: 12px;
+    gap: 14px;
+    height: auto;
+  }
+
+  .central-column {
+    gap: 12px;
+    overflow: visible;
+    height: auto;
+  }
+
+  .blue-container-box {
+    padding: 14px;
+    min-height: 320px;
+    border-radius: 12px;
+  }
+
+  .section-title { font-size: 13px; }
+
+  .upload-dropzone {
+    padding: 16px 12px;
+  }
+  .upload-dropzone h3 { font-size: 13px; }
+  .upload-dropzone p  { font-size: 11px; }
+
+  .link-controls {
+    flex-direction: column;
+  }
+  .link-controls input,
+  .btn-fetch {
+    width: 100%;
+  }
+
+  /* Phone preview — scale to fit mobile screen */
+  .phone-frame {
+    width: 100%;
+    max-width: 280px;
+    height: auto;
+    aspect-ratio: 9 / 16;
+  }
+
+  .preview-footer-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .file-info-text { text-align: center; font-size: 11px; }
+  .action-btn-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .btn-tool, .btn-remove-media {
+    padding: 8px 4px;
+    font-size: 10px;
+  }
+
+  /* Bottom controls — single column stack */
+  .bottom-controls-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .ctrl-card { padding: 12px; }
+
+  /* Ratio buttons stay 2 cols */
+  .ratio-btn-group {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Right sidebar */
+  .right-config-sidebar {
+    padding: 12px;
+    border-radius: 12px;
+    width: 100%;
+  }
+
+  /* Tab header — reduce padding */
+  .config-tabs-header { margin-bottom: 12px; }
+  .tab-btn { padding: 7px 2px; font-size: 11px; }
+
+  .config-card { padding: 12px; }
+
+  /* Mode cards — smaller */
+  .mode-card-item { padding: 9px 10px; }
+
+  /* Execute button bigger for thumbs */
+  .btn-execute {
+    padding: 14px;
+    font-size: 14px;
+  }
+
+  /* Blur toolbar — repostion so it doesn't fly off-screen on tiny phones */
+  .blur-toolbar {
+    top: -42px;
+    padding: 3px 8px;
+    gap: 6px;
+  }
+  .blur-label { font-size: 10px; }
+  .blur-strength { width: 60px; }
+  .blur-val { font-size: 10px; }
+  .blur-btn { width: 18px; height: 18px; font-size: 12px; }
+}
+
+/* ============================================================
+   BREAKPOINT 3 — SMALL MOBILE (≤ 420px)
+   ============================================================ */
+@media (max-width: 420px) {
+  .top-nav {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+  .top-actions {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .theme-text { display: none; }   /* icon only on tiny phones */
+
+  .phone-frame { max-width: 240px; }
+
+  .action-btn-group {
+    grid-template-columns: 1fr 1fr;   /* 3rd button wraps */
+  }
+
+  .sub-text,
+  .caption-live-preview-box span {
+    font-size: 12px !important;
+  }
+}
+
+/* ============================================================
+   LANDSCAPE MOBILE / TABLET — don't squash vertically
+   ============================================================ */
+@media (max-height: 600px) and (orientation: landscape) {
+  .blue-container-box { min-height: 260px; }
+  .left-sidebar {
+    flex-direction: row;
+    height: auto;
+    overflow-x: auto;
+  }
+}
+
+/* ============================================================
+   REDUCED MOTION — accessibility
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
