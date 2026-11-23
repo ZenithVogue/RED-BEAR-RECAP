@@ -933,3 +933,10 @@ body.sidebar-collapsed .nav-btn:hover::after {
   aspect-ratio: 1 / 1;
   width: 280px;
 }
+.bg-layer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
