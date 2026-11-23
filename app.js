@@ -594,11 +594,27 @@ function initBackgroundControls() {
 /* RATIO */
 function initRatioControls() {
   const vp = $("#phoneViewport");
+  const frame = document.querySelector(".phone-frame");
+
+  const RATIO_SIZES = {
+    "9:16": { w: 240, h: 426 },
+    "3:4":  { w: 260, h: 347 },
+    "16:9": { w: 360, h: 203 },
+    "1:1":  { w: 280, h: 280 },
+  };
+
   $$(".ratio-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".ratio-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
-      vp.dataset.ratio = btn.dataset.ratio;
+      const ratio = btn.dataset.ratio;
+      vp.dataset.ratio = ratio;
+
+      const size = RATIO_SIZES[ratio] || RATIO_SIZES["9:16"];
+      frame.style.width  = size.w + "px";
+      frame.style.height = size.h + "px";
+      frame.style.aspectRatio = "auto";
+
       requestAnimationFrame(() => {
         clampToViewport($("#subtitleOverlay"), vp);
         $$("#blurContainer .blur-overlay-box").forEach(b => clampToViewport(b, vp));
@@ -606,7 +622,6 @@ function initRatioControls() {
     });
   });
 }
-
 /* ZOOM */
 function initZoomControl() {
   const rngZoom      = $("#rngZoom");
@@ -719,4 +734,50 @@ function initSidebarToggle() {
     if (e.target.closest("button, a, input, select")) return;
     toggle();
   });
+}
+// In initMedia(), when loading a video:
+function loadVideo(src) {
+  const mainVid = $("#previewVideo");
+  const bgVid   = $("#previewVideoBg");
+
+  mainVid.src = src;
+  bgVid.src   = src;
+
+  // Keep them in sync
+  mainVid.addEventListener("play",  () => bgVid.play());
+  mainVid.addEventListener("pause", () => bgVid.pause());
+  mainVid.addEventListener("seeked", () => { bgVid.currentTime = mainVid.currentTime; });
+
+  $("#mediaInputView").classList.add("hidden");
+  $("#phonePreviewView").classList.remove("hidden");
+}
+
+// In initBackgroundControls():
+function setModeBlur() {
+  $("#btnModeBlurBg").classList.add("active");
+  $("#btnModePhotoBg").classList.remove("active");
+  $("#panelBlurBg").classList.remove("hidden");
+  $("#panelPhotoBg").classList.add("hidden");
+
+  // Show blurred video bg, hide photo bg
+  $("#previewVideoBg").style.display = "block";
+  $("#bgLayer").style.backgroundImage = "none";
+  applyBlur(activePreset);
+}
+
+function setModePhoto() {
+  $("#btnModePhotoBg").classList.add("active");
+  $("#btnModeBlurBg").classList.remove("active");
+  $("#panelPhotoBg").classList.remove("hidden");
+  $("#panelBlurBg").classList.add("hidden");
+
+  // Hide blurred video bg, show photo bg
+  $("#previewVideoBg").style.display = "none";
+  // bgLayer already has the uploaded photo
+}
+
+function applyBlur(preset) {
+  const BLUR_MAP = { soft: 8, medium: 16, hard: 28 };
+  const px = BLUR_MAP[preset] ?? 16;
+  $("#phoneViewport").style.setProperty("--bg-blur", px + "px");
 }
