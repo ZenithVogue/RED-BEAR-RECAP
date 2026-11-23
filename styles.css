@@ -940,3 +940,18 @@ body.sidebar-collapsed .nav-btn:hover::after {
   background-position: center;
   z-index: 0;
 }
+/* bgLayer starts hidden until photo is uploaded */
+.bg-layer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 1;
+  display: none;      /* ← hidden by default */
+  transition: opacity 0.3s ease;
+}
+
+.bg-layer.visible {
+  display: block;
+}
